@@ -1,4 +1,4 @@
-export const BASE_URL = "http://172.168.1.24:5000";
+export const BASE_URL = "http://10.170.7.221:5001";
 
 export const ASTROLOGY_API_KEY = "ByNqfA4kvD1EBGyi6ZlUC8aekqCi7FgF8VuJ8SF1";
 export const ASTROLOGY_BASE_URL = "https://json.freeastrologyapi.com/western";

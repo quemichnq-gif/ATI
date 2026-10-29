@@ -45,22 +45,32 @@ export default function RegisterScreen2({ route, navigation }) {
     // Validate date format (YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(birthDate)) {
+      console.log('❌ Invalid date format:', birthDate);
       return Alert.alert('⚠️', 'Ngày sinh phải có định dạng YYYY-MM-DD (VD: 1999-06-27)');
     }
 
-    // Validate time format (HH:MM)
-    const timeRegex = /^\d{2}:\d{2}$/;
+    // Validate time format (H:MM or HH:MM)
+    const timeRegex = /^\d{1,2}:\d{2}$/;
     if (!timeRegex.test(birthTime)) {
+      console.log('❌ Invalid time format:', birthTime);
       return Alert.alert('⚠️', 'Giờ sinh phải có định dạng HH:MM (VD: 03:20)');
     }
 
     setLoading(true);
     try {
-      // Step 1: Fetch astrology data
+      // Step 1: Fetch astrology data (optional - if API fails, use defaults)
       console.log('📡 Fetching astrology data...');
       setLoadingMessage('Đang tính toán biểu đồ chiêm tinh...');
-      const astrologyData = await fetchAstrologyData(birthDate, birthTime, birthPlace);
-      console.log('✅ Astrology data received:', astrologyData);
+      let astrologyData = {};
+      try {
+        astrologyData = await fetchAstrologyData(birthDate, birthTime, birthPlace);
+        console.log('✅ Astrology data received:', astrologyData);
+      } catch (astroErr) {
+        console.warn('⚠️ Astrology API failed, using defaults:', astroErr.message);
+        // Calculate age manually as fallback
+        const [year] = birthDate.split('-').map(Number);
+        astrologyData = { age: new Date().getFullYear() - year };
+      }
       
       // Step 2: Prepare user data
       const userData = {
@@ -141,9 +151,8 @@ export default function RegisterScreen2({ route, navigation }) {
       await setDoc(doc(db, 'users', uid), userData, { merge: true }); // ⭐ KEY FIX: Added merge option
       
       console.log('✅ Data saved successfully to Firestore');
-      Alert.alert('✅ Thành công!', 'Đăng ký hoàn tất!', [
-        { text: 'OK', onPress: () => navigation.replace('Main') }
-      ]);
+      // Navigate directly - Alert callback doesn't work on Expo Web
+      navigation.replace('Main');
     } catch (err) {
       console.error('❌ Error in handleSubmit:', err);
       console.error('Error details:', err.message);

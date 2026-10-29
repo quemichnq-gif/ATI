@@ -1,6 +1,20 @@
+# Virtual environment
 AI_App_BE/venv/
 AI_App_BE/.venv/
+venv/
+.venv/
 
-package.json
-package-lock.json
+# Node modules
 node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Subfolder clone
+ATI/

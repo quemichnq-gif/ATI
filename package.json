@@ -1,0 +1,12 @@
+{
+  "name": "resonancia-monorepo",
+  "version": "1.0.0",
+  "description": "Resonancia - AI-Powered Astrology Matchmaking Platform",
+  "scripts": {
+    "start": "npm run web",
+    "web": "cd AI_App_FE/ResonanciaWeb && npm run dev",
+    "web:build": "cd AI_App_FE/ResonanciaWeb && npm run build",
+    "be": "cd AI_App_BE && ./venv/bin/python main.py",
+    "mobile": "cd AI_App_FE/SoulMateApp && npx expo start"
+  }
+}

@@ -4,14 +4,13 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDnzNnNMDI__0gsGSg_RTR69m-RKUh9n04",
-  authDomain: "astrolove-e53f8.firebaseapp.com",
-  databaseURL: "https://astrolove-e53f8-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "astrolove-e53f8",
-  storageBucket: "astrolove-e53f8.firebasestorage.app",
-  messagingSenderId: "558608123139",
-  appId: "1:558608123139:web:1769fc52f3d9960a3b5536",
-  measurementId: "G-PYD6JX4RJN"
+  apiKey: "AIzaSyDJPtNpFNYyI1wt1lu03pnzyqXkyOWumgU",
+  authDomain: "soulmateapp-new.firebaseapp.com",
+  projectId: "soulmateapp-new",
+  storageBucket: "soulmateapp-new.firebasestorage.app",
+  messagingSenderId: "601603073289",
+  appId: "1:601603073289:web:31a53d6d91e10802e4dfd8",
+  measurementId: "G-2VMC8DRCNB"
 };
 
 // Chỉ khởi tạo 1 lần
