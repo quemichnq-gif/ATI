@@ -6,12 +6,52 @@ import { db } from '../services/firebase';
 import { fetchAstrologyData } from '../services/astrologyService';
 import StarField from '../components/StarField';
 import UiIcon from '../components/UiIcon';
+import type { IconName } from '../components/UiIcon';
+import { RELATIONSHIP_OPTIONS } from '../constants/relationshipOptions';
 
 const steps = [
   { id: 1, label: 'Thông Tin Cá Nhân', icon: 'user' },
-  { id: 2, label: 'Ngày & Giờ Sinh', icon: 'calendar' },
-  { id: 3, label: 'Nơi Sinh', icon: 'pin' },
+  { id: 2, label: 'Tình Trạng', icon: 'heart' },
+  { id: 3, label: 'Ngày & Giờ Sinh', icon: 'calendar' },
+  { id: 4, label: 'Nơi Sinh', icon: 'pin' },
 ];
+
+function RelationshipIcon({ type, label, active }: { type: string; label: string; active: boolean }) {
+  const iconProps = {
+    viewBox: '0 0 48 48',
+    className: `w-10 h-10 ${active ? 'text-pink-400' : 'text-purple-400'}`,
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2.5,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    role: 'img' as const,
+    'aria-label': label,
+  };
+
+  switch (type) {
+    case 'single':
+      return <svg {...iconProps}><path d="M24 39S10 28 10 17a8 8 0 0 1 14-5 8 8 0 0 1 14 5c0 11-14 22-14 22z"/><circle cx="19" cy="18" r="1.5" fill="currentColor"/><circle cx="29" cy="18" r="1.5" fill="currentColor"/><path d="M20 23c1.5 2 6.5 2 8 0"/></svg>;
+    case 'in_relationship':
+      return <svg {...iconProps}><path d="M20 37S8 28 8 18a7 7 0 0 1 12-4.5 7 7 0 0 1 12 4.5c0 10-12 19-12 19z"/><path d="M31 11a5.5 5.5 0 0 1 9.5 3.5c0 7-9 14-9 14" strokeDasharray="1 1"/><circle cx="16" cy="19" r="1.2" fill="currentColor"/><circle cx="24" cy="19" r="1.2" fill="currentColor"/><path d="M17 23c1 1.5 5 1.5 6 0"/></svg>;
+    case 'cohabiting':
+      return <svg {...iconProps}><path d="M8 22l16-13 16 13v17a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3V22z"/><path d="M20 42V26h8v16"/></svg>;
+    case 'engaged':
+      return <svg {...iconProps}><circle cx="18" cy="27" r="10"/><circle cx="30" cy="27" r="10"/><path d="M24 13l4-6h-8l4 6z"/></svg>;
+    case 'married':
+      return <svg {...iconProps}><circle cx="19" cy="27" r="8"/><path d="M25 21l8-8m0 0h-6m6 0v6"/><circle cx="29" cy="23" r="8"/><path d="M29 31v8m-4-4h8"/></svg>;
+    case 'separated':
+      return <svg {...iconProps}><path d="M11 12h8v5a2 2 0 1 0 4 0v-5h8v8h-5a2 2 0 1 0 0 4h5v8h-8v-5a2 2 0 1 0-4 0v5h-8z"/><path d="M29 27l8 8m-4-8h8v8"/></svg>;
+    case 'divorced':
+      return <svg {...iconProps}><path d="M24 39S10 28 10 17a8 8 0 0 1 14-5 8 8 0 0 1 14 5c0 11-14 22-14 22z"/><path d="M24 12l-4 8 7 4-5 9 3 6"/></svg>;
+    case 'widowed':
+      return <svg {...iconProps}><ellipse cx="24" cy="9" rx="12" ry="3.5"/><path d="M24 40S10 29 10 18a8 8 0 0 1 14-5 8 8 0 0 1 14 5c0 11-14 22-14 22z"/><circle cx="19" cy="20" r="1.3" fill="currentColor"/><circle cx="29" cy="20" r="1.3" fill="currentColor"/><path d="M21 25h6"/></svg>;
+    case 'complicated':
+      return <svg {...iconProps}><path d="M24 39S10 28 10 17a8 8 0 0 1 14-5 8 8 0 0 1 14 5c0 11-14 22-14 22z"/><path d="M21 17a3 3 0 0 1 5-1c1.5 1 1 3-1 4v2"/><circle cx="25" cy="27" r="1.2" fill="currentColor"/></svg>;
+    default:
+      return <UiIcon name="heart" label={label} className="w-10 h-10" />;
+  }
+}
 
 export default function RegisterStep2Page() {
   const navigate = useNavigate();
@@ -21,6 +61,7 @@ export default function RegisterStep2Page() {
   const [step, setStep] = useState(1);
   const [fullName, setFullName] = useState('');
   const [gender, setGender] = useState('');
+  const [relationshipStatus, setRelationshipStatus] = useState('Độc thân');
   const [birthDate, setBirthDate] = useState('');
   const [birthTime, setBirthTime] = useState('');
   const [birthPlace, setBirthPlace] = useState('');
@@ -52,6 +93,7 @@ export default function RegisterStep2Page() {
       await setDoc(doc(db, 'users', uid), {
         name: fullName, age: astro.age || 0, gender,
         birthDate, birthTime, birthPlace, email: email || '',
+        relationshipStatus,
         sun: astro.sun || '', moon: astro.moon || '',
         mercury: astro.mercury || '', venus: astro.venus || '', mars: astro.mars || '',
         jupiter: astro.jupiter || '', saturn: astro.saturn || '',
@@ -71,7 +113,7 @@ export default function RegisterStep2Page() {
         fireRatio: astro.fireRatio || 0, earthRatio: astro.earthRatio || 0,
         airRatio: astro.airRatio || 0, waterRatio: astro.waterRatio || 0,
         avatar: '', coverImage: '', height: null, weight: null,
-        job: '', relationshipStatus: 'Độc thân',
+        job: '',
         profileComplete: true, updatedAt: serverTimestamp(),
       }, { merge: true });
 
@@ -104,7 +146,7 @@ export default function RegisterStep2Page() {
                 background: 'linear-gradient(135deg, rgba(157,78,221,0.4), rgba(255,110,180,0.3))',
                 border: '1px solid rgba(157,78,221,0.4)',
               } : {}}>
-                <UiIcon name={s.icon as 'user'} label={s.label} />
+                <UiIcon name={s.icon as IconName} label={s.label} />
                 <span className="hidden sm:inline">{s.label}</span>
               </div>
               {i < steps.length - 1 && (
@@ -116,7 +158,7 @@ export default function RegisterStep2Page() {
 
         <div className="glass-card p-8" style={{ border: '1px solid rgba(157,78,221,0.3)' }}>
           <div className="text-center mb-6">
-            <div className="text-4xl mb-2"><UiIcon name={steps[step - 1].icon as 'user'} label={steps[step - 1].label} /></div>
+            <div className="text-4xl mb-2"><UiIcon name={steps[step - 1].icon as IconName} label={steps[step - 1].label} /></div>
             <h2 className="text-2xl font-bold gradient-text">{steps[step - 1].label}</h2>
             <p className="text-purple-300 text-sm opacity-70 mt-1">Bước {step} / {steps.length}</p>
           </div>
@@ -152,6 +194,26 @@ export default function RegisterStep2Page() {
               )}
 
               {step === 2 && (
+                <div role="group" aria-label="Tình trạng mối quan hệ" className="grid grid-cols-3 gap-3">
+                  {RELATIONSHIP_OPTIONS.map(option => {
+                    const selected = relationshipStatus === option.id;
+                    return (
+                      <button key={option.id} type="button" aria-pressed={selected}
+                        onClick={() => setRelationshipStatus(option.id)}
+                        className={`glass-card p-3 flex flex-col items-center justify-center gap-2 text-center transition-all ${selected ? 'text-white border-purple-400' : 'text-purple-300'}`}
+                        style={selected ? {
+                          background: 'linear-gradient(135deg, rgba(157,78,221,0.3), rgba(255,110,180,0.2))',
+                          border: '1px solid rgba(157,78,221,0.3)',
+                        } : {}}>
+                        <RelationshipIcon type={option.iconType} label={option.id} active={selected} />
+                        <span className="text-xs text-center whitespace-pre-line leading-tight">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {step === 3 && (
                 <>
                   <div>
                     <label htmlFor="register-birth-date" className="block text-purple-300 text-sm mb-2">Ngày sinh (YYYY-MM-DD)</label>
@@ -168,7 +230,7 @@ export default function RegisterStep2Page() {
                 </>
               )}
 
-              {step === 3 && (
+              {step === 4 && (
                 <>
                   <div>
                     <label htmlFor="register-birth-place" className="block text-purple-300 text-sm mb-2">Nơi sinh</label>
@@ -182,6 +244,7 @@ export default function RegisterStep2Page() {
                     <div className="glass p-4 rounded-xl mt-4" style={{ border: '1px solid rgba(157,78,221,0.2)' }}>
                       <p className="text-purple-300 text-xs mb-2 font-medium">✦ Tóm tắt thông tin</p>
                       <p className="text-white text-sm"><span className="text-purple-300">Tên:</span> {fullName}</p>
+                      <p className="text-white text-sm"><span className="text-purple-300">Tình trạng:</span> {relationshipStatus}</p>
                       <p className="text-white text-sm"><span className="text-purple-300">Ngày sinh:</span> {birthDate} {birthTime}</p>
                       {gender && <p className="text-white text-sm"><span className="text-purple-300">Giới tính:</span> {gender}</p>}
                     </div>
@@ -216,9 +279,10 @@ export default function RegisterStep2Page() {
             <button
               onClick={() => {
                 setError('');
-                if (step < 3) {
+                if (step === 2 && !relationshipStatus) return setError('Vui lòng chọn tình trạng mối quan hệ');
+                if (step < 4) {
                   if (step === 1 && !fullName) return setError('Nhập họ tên');
-                  if (step === 2 && (!birthDate || !birthTime)) return setError('Nhập ngày và giờ sinh');
+                  if (step === 3 && (!birthDate || !birthTime)) return setError('Nhập ngày và giờ sinh');
                   setStep(s => s + 1);
                 } else handleSubmit();
               }}
@@ -230,7 +294,7 @@ export default function RegisterStep2Page() {
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Đang xử lý...
                 </span>
-              ) : step < 3 ? 'Tiếp Theo →' : <><UiIcon name="check" label="Hoàn tất" className="mr-1 inline" />Hoàn Tất</>}
+              ) : step < 4 ? 'Tiếp Theo →' : <><UiIcon name="check" label="Hoàn tất" className="mr-1 inline" />Hoàn Tất</>}
             </button>
           </div>
         </div>

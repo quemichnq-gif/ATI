@@ -8,6 +8,7 @@ import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
 import UiIcon from '../components/UiIcon';
 import type { IconName } from '../components/UiIcon';
 import ZodiacIcon from '../components/ZodiacIcon';
+import { RELATIONSHIP_OPTIONS } from '../constants/relationshipOptions';
 
 export default function ProfilePage() {
   const profile = useSelector((s: RootState) => s.profile);
@@ -134,9 +135,9 @@ export default function ProfilePage() {
             </div>
           ))}
           <div>
-            <label className="block text-purple-300 text-sm mb-2">Tình trạng</label>
+            <p className="block text-purple-300 text-sm mb-2">Tình trạng</p>
             <div role="group" aria-label="Tình trạng mối quan hệ" className="flex flex-wrap gap-2">
-              {['Độc thân', 'Đang hẹn hò', 'Đã có đôi'].map(s => (
+              {[...new Set([...RELATIONSHIP_OPTIONS.map(option => option.id), formData.relationshipStatus])].map(s => (
                 <button key={s} type="button"
                   aria-pressed={formData.relationshipStatus === s}
                   onClick={() => setFormData(p => ({ ...p, relationshipStatus: s }))}
