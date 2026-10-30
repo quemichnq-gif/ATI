@@ -292,7 +292,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <h3 className="text-white text-sm font-semibold mb-0.5">Bản Đồ Chi Tiết (Natal Chart)</h3>
-                  <p className="text-purple-300/60 text-xs">Khám phá vị trí 10 hành tinh và 12 cung địa bàn</p>
+                  <p className="text-purple-300/60 text-xs">Khám phá biểu đồ SVG tròn 10 hành tinh và 12 cung</p>
                 </div>
               </motion.div>
 
@@ -318,6 +318,99 @@ export default function HomePage() {
                   <p className="text-purple-300/60 text-xs">Kết nối dựa trên độ hòa hợp cung hoàng đạo</p>
                 </div>
               </motion.div>
+            </div>
+
+            {/* Advanced Cosmic Tools Section */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs uppercase font-mono tracking-widest text-purple-300/60">Công Cụ Khám Phá Nâng Cao</h3>
+                <span className="text-[11px] text-pink-400 font-mono">5 tính năng mới</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <motion.div
+                  whileHover={{ y: -2 }}
+                  onClick={() => navigate('/synastry')}
+                  className="glass-card p-4 cursor-pointer hover:border-purple-400/40 transition-all"
+                  style={{ borderColor: 'rgba(168, 85, 247, 0.12)' }}
+                >
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center border mb-3"
+                    style={{ background: 'rgba(147, 51, 234, 0.12)', borderColor: 'rgba(168,85,247,0.3)' }}>
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-purple-300" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/>
+                    </svg>
+                  </div>
+                  <h4 className="text-white text-xs font-semibold mb-1">Bản Đồ Đôi (Synastry)</h4>
+                  <p className="text-purple-300/60 text-[11px] leading-relaxed">So khớp góc chiếu & độ tương hợp sâu giữa 2 người</p>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ y: -2 }}
+                  onClick={() => navigate('/transit')}
+                  className="glass-card p-4 cursor-pointer hover:border-purple-400/40 transition-all"
+                  style={{ borderColor: 'rgba(168, 85, 247, 0.12)' }}
+                >
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center border mb-3"
+                    style={{ background: 'rgba(56, 189, 248, 0.12)', borderColor: 'rgba(56, 189, 248, 0.3)' }}>
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-sky-300" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="9" ry="3.5" transform="rotate(-30 12 12)"/>
+                    </svg>
+                  </div>
+                  <h4 className="text-white text-xs font-semibold mb-1">Vận Hạn (Transit)</h4>
+                  <p className="text-purple-300/60 text-[11px] leading-relaxed">Dự báo năng lượng vũ trụ hiện tại tác động lên bạn</p>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ y: -2 }}
+                  onClick={() => navigate('/tarot')}
+                  className="glass-card p-4 cursor-pointer hover:border-purple-400/40 transition-all"
+                  style={{ borderColor: 'rgba(168, 85, 247, 0.12)' }}
+                >
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center border mb-3"
+                    style={{ background: 'rgba(236, 72, 153, 0.12)', borderColor: 'rgba(236, 72, 153, 0.3)' }}>
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-pink-300" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <rect x="5" y="3" width="14" height="18" rx="2"/><path d="m12 8 1 2 2 1-2 1-1 2-1-2-2-1 2-1Z"/>
+                    </svg>
+                  </div>
+                  <h4 className="text-white text-xs font-semibold mb-1">Trải Bài Tarot</h4>
+                  <p className="text-purple-300/60 text-[11px] leading-relaxed">Rút 1 lá bài trực quan & nhận thông điệp ngày mới</p>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ y: -2 }}
+                  onClick={() => navigate('/journal')}
+                  className="glass-card p-4 cursor-pointer hover:border-purple-400/40 transition-all"
+                  style={{ borderColor: 'rgba(168, 85, 247, 0.12)' }}
+                >
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center border mb-3"
+                    style={{ background: 'rgba(34, 197, 94, 0.12)', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M8 7h8M8 11h8M8 15h5"/>
+                    </svg>
+                  </div>
+                  <h4 className="text-white text-xs font-semibold mb-1">Nhật Ký Vũ Trụ</h4>
+                  <p className="text-purple-300/60 text-[11px] leading-relaxed">Lưu giữ cảm xúc đồng hành cùng các chu kỳ trăng</p>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ y: -2 }}
+                  onClick={() => navigate('/glossary')}
+                  className="glass-card p-4 cursor-pointer hover:border-purple-400/40 transition-all sm:col-span-2"
+                  style={{ borderColor: 'rgba(168, 85, 247, 0.12)' }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center border flex-shrink-0"
+                      style={{ background: 'rgba(250, 204, 21, 0.12)', borderColor: 'rgba(250, 204, 21, 0.3)' }}>
+                      <svg viewBox="0 0 24 24" className="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-white text-xs font-semibold mb-0.5">Từ Điển Chiêm Tinh Học</h4>
+                      <p className="text-purple-300/60 text-[11px]">Tra cứu ý nghĩa 12 cung hoàng đạo, 12 nhà (houses) và các góc chiếu chi tiết</p>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
             </div>
           </motion.div>
         ) : (
