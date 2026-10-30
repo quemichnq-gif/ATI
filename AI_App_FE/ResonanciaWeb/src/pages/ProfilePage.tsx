@@ -130,11 +130,21 @@ export default function ProfilePage() {
           <div>
             <label className="block text-purple-300 text-sm mb-2">Tình trạng</label>
             <div className="flex flex-wrap gap-2">
-              {['Độc thân', 'Đang hẹn hò', 'Đã có đôi'].map(s => (
+              {[
+                'Độc thân',
+                'Đang trong mối quan hệ',
+                'Sống chung',
+                'Đã đính hôn',
+                'Đã kết hôn',
+                'Ly thân',
+                'Đã ly hôn',
+                'Góa',
+                'Mối quan hệ phức tạp',
+              ].map(s => (
                 <button key={s} type="button"
                   onClick={() => setFormData(p => ({ ...p, relationshipStatus: s }))}
-                  className={`px-4 py-2 rounded-xl text-sm transition-all ${
-                    formData.relationshipStatus === s ? 'text-white' : 'text-purple-300 glass'
+                  className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm transition-all ${
+                    formData.relationshipStatus === s ? 'text-white font-medium border border-pink-400' : 'text-purple-300 glass hover:text-white'
                   }`}
                   style={formData.relationshipStatus === s ? { background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` } : {}}>
                   {s}
