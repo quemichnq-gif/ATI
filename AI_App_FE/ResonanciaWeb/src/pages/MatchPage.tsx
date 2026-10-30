@@ -98,8 +98,10 @@ export default function MatchPage() {
               style={selectedTag === tag ? {
                 background: `linear-gradient(135deg, ${info.color}33, ${info.color}22)`,
                 border: `1px solid ${info.color}66`,
-                boxShadow: `0 0 20px ${info.color}22`,
-              } : {}}
+                /* Layered glow: tight + mid + outer ambient */
+                boxShadow: `0 0 4px ${info.color}44, 0 0 14px ${info.color}33, 0 0 28px ${info.color}11`,
+                transition: 'box-shadow 200ms ease',
+              } : { transition: 'box-shadow 200ms ease' }}
             >
               <div className="text-2xl mb-1"><UiIcon name={TAG_ICONS[tag as MatchTagType]} label={info.label} /></div>
               <p className="text-sm font-semibold">{info.label}</p>
