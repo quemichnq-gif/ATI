@@ -7,6 +7,7 @@ import { db } from '../services/firebase';
 import { RootState } from '../store';
 import { apiCompatibility, apiSendMatchRequest, apiCheckMatchStatus } from '../services/api';
 import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
+import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, PolarRadiusAxis } from 'recharts';
 import UiIcon from '../components/UiIcon';
 import ZodiacIcon from '../components/ZodiacIcon';
@@ -33,6 +34,17 @@ export default function UserProfilePage() {
       return;
     }
     setLoading(true);
+
+    // Kiểm tra xem đây có phải là ứng viên mẫu không
+    const defaultCandidate = DEFAULT_CANDIDATE_PROFILES[targetUid];
+    if (defaultCandidate) {
+      setTargetProfile(defaultCandidate);
+      setLoading(false);
+      // Đồng bộ profile vào Firestore để các tính năng khác (chat, request) hoạt động
+      setDoc(doc(db, 'users', targetUid), defaultCandidate, { merge: true }).catch(() => {});
+      return;
+    }
+
     getDoc(doc(db, 'users', targetUid))
       .then(snap => {
         if (snap.exists()) {
@@ -106,7 +118,13 @@ export default function UserProfilePage() {
     finally { setSending(false); }
   };
 
-  const compatScores = compatibility?.scores;
+  const compatScores = compatibility?.scores || (compatibility?.compatibility_score != null ? {
+    overall: compatibility.compatibility_score,
+    love: compatibility.love_score ?? compatibility.compatibility_score,
+    trust: compatibility.trust_score ?? compatibility.compatibility_score,
+    communication: compatibility.communication_score ?? compatibility.compatibility_score,
+    marriage: compatibility.marriage_score ?? compatibility.compatibility_score,
+  } : null);
   const radarData = compatScores ? [
     { subject: 'Tổng thể', value: compatScores.overall },
     { subject: 'Tình Yêu', value: compatScores.love },

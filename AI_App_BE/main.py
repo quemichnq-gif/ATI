@@ -1385,45 +1385,41 @@ def compatibility_analysis():
         if not my_uid or not partner_uid:
             return jsonify({"error": "Thiếu thông tin UID"}), 400
 
-        # Kiểm tra cache Firestore (cặp đôi có thể được phân tích theo 2 chiều)
         cache_key = f"{my_uid}_{partner_uid}"
-        reverse_key = f"{partner_uid}_{my_uid}"
-        
-        cache_query = (
-            db.collection("compatibility_analysis")
-            .where("cache_key", "in", [cache_key, reverse_key])
-            .limit(1)
-            .stream()
-        )
 
-        for doc in cache_query:
-            cached_data = doc.to_dict()
-            print(f"✅ Cache phân tích có sẵn cho cặp {my_uid} - {partner_uid}")
-            return jsonify({
-                "analysis": cached_data.get("analysis", ""),
-                "compatibility_score": cached_data.get("compatibility_score", 0),
-                "love_score": cached_data.get("love_score", 0),
-                "trust_score": cached_data.get("trust_score", 0),
-                "communication_score": cached_data.get("communication_score", 0),
-                "marriage_score": cached_data.get("marriage_score", 0),
-                "cached": True
-            })
+        # Ưu tiên lấy trực tiếp từ request payload
+        user1_req = data.get("user1Data") or {}
+        user2_req = data.get("user2Data") or {}
 
-        print(f"⚙️ Không có cache → Lấy dữ liệu và gọi Gemini")
+        me_raw = user1_req
+        if not me_raw:
+            cand = next((c for c in DEFAULT_MATCH_CANDIDATES if c["uid"] == my_uid), None)
+            if cand:
+                me_raw = cand
 
-        # --- LẤY THÔNG TIN USER 1 ---
-        me_doc = db.collection("users").document(my_uid).get()
-        if not me_doc.exists:
-            return jsonify({"error": "Không tìm thấy thông tin người dùng"}), 404
+        partner_raw = user2_req
+        if not partner_raw:
+            cand = next((c for c in DEFAULT_MATCH_CANDIDATES if c["uid"] == partner_uid), None)
+            if cand:
+                partner_raw = cand
 
-        me_raw = me_doc.to_dict()
+        if not me_raw or not partner_raw:
+            try:
+                if not me_raw:
+                    d1 = db.collection("users").document(my_uid).get(timeout=1.5)
+                    if d1.exists:
+                        me_raw = d1.to_dict()
+                if not partner_raw:
+                    d2 = db.collection("users").document(partner_uid).get(timeout=1.5)
+                    if d2.exists:
+                        partner_raw = d2.to_dict()
+            except Exception as e:
+                safe_print("Firestore query fallback:", e)
 
-        # --- LẤY THÔNG TIN USER 2 ---
-        partner_doc = db.collection("users").document(partner_uid).get()
-        if not partner_doc.exists:
-            return jsonify({"error": "Không tìm thấy thông tin đối phương"}), 404
-
-        partner_raw = partner_doc.to_dict()
+        if not me_raw:
+            me_raw = {"name": "Bạn", "sun": "Ma Kết", "moon": "Kim Ngưu"}
+        if not partner_raw:
+            partner_raw = {"name": "Đối phương", "sun": "Bảo Bình", "moon": "Nhân Mã"}
 
         # --- HELPER FUNCTIONS ---
         def extract_user_info(user_data):
@@ -1474,6 +1470,11 @@ def compatibility_analysis():
         partner_houses = extract_houses(partner_raw)
         partner_aspects = extract_aspects(partner_raw)
         partner_elements = extract_elements(partner_raw)
+
+        my_name = me_info.get("name") or "Bạn"
+        partner_name = partner_info.get("name") or "Đối phương"
+        s1 = me_info.get("sun") or "Ma Kết"
+        s2 = partner_info.get("sun") or "Bảo Bình"
 
         #  prompt phân tích tương hợp
         prompt = f"""
@@ -1561,10 +1562,8 @@ def compatibility_analysis():
             response = model.generate_content(prompt, request_options={"timeout": 2.5})
             analysis_text = response.text if hasattr(response, "text") else str(response)
             analysis_text = re.sub(r"(```|'''|\"\"\")", "", analysis_text).strip()
-        except Exception as gemini_err:
-            print("⚠️ Gemini Compatibility Error (sử dụng luận giải hòa hợp dự phòng):", gemini_err)
-            s1 = my_planets.get("sun") or "Ma Kết"
-            s2 = partner_planets.get("sun") or "Kim Ngưu"
+        except BaseException as gemini_err:
+            safe_print("⚠️ Gemini Compatibility Error (sử dụng luận giải hòa hợp dự phòng):", gemini_err)
             analysis_text = f"""1. Tổng quan về mối quan hệ:
 Sự kết hợp giữa {my_name} ({s1}) và {partner_name} ({s2}) tạo nên một liên kết chiêm tinh học vô cùng bền vững và hài hòa. Hai bạn có tiếng nói chung trong quan điểm sống và dễ dàng đồng cảm với nhau.
 
@@ -1620,8 +1619,7 @@ marriage_score: 93"""
             }
         }
 
-        db.collection("compatibility_analysis").add(compatibility_doc)
-        print(f"✅ Đã lưu phân tích tương hợp cho {me_info['name']} - {partner_info['name']}")
+
 
         return jsonify({
             "analysis": analysis_text,
@@ -1630,6 +1628,13 @@ marriage_score: 93"""
             "trust_score": scores["trust_score"],
             "communication_score": scores["communication_score"],
             "marriage_score": scores["marriage_score"],
+            "scores": {
+                "overall": scores["compatibility_score"],
+                "love": scores["love_score"],
+                "trust": scores["trust_score"],
+                "communication": scores["communication_score"],
+                "marriage": scores["marriage_score"],
+            },
             "cached": False
         }), 200
 
