@@ -87,10 +87,33 @@ body {
   background-clip: text;
 }
 
-/* Glow effects */
-.glow-purple { box-shadow: 0 0 20px rgba(157, 78, 221, 0.4), 0 0 40px rgba(157, 78, 221, 0.2); }
-.glow-pink { box-shadow: 0 0 20px rgba(255, 110, 180, 0.4), 0 0 40px rgba(255, 110, 180, 0.2); }
-.glow-blue { box-shadow: 0 0 20px rgba(76, 201, 240, 0.4); }
+/* Glow effects — layered: inner tight + mid + outer ambient */
+/* Technique: stripe.com gradient glow layering pattern */
+.glow-purple {
+  box-shadow:
+    0 0 6px  rgba(157, 78, 221, 0.55),
+    0 0 18px rgba(157, 78, 221, 0.35),
+    0 0 42px rgba(157, 78, 221, 0.15);
+}
+.glow-pink {
+  box-shadow:
+    0 0 6px  rgba(255, 110, 180, 0.55),
+    0 0 18px rgba(255, 110, 180, 0.35),
+    0 0 42px rgba(255, 110, 180, 0.15);
+}
+.glow-blue {
+  box-shadow:
+    0 0 6px  rgba(76, 201, 240, 0.55),
+    0 0 18px rgba(76, 201, 240, 0.35),
+    0 0 40px rgba(76, 201, 240, 0.15);
+}
+.glow-gold {
+  /* Uses --cosmic-gold (#ffd700) */
+  box-shadow:
+    0 0 6px  rgba(255, 215, 0, 0.55),
+    0 0 18px rgba(255, 215, 0, 0.30),
+    0 0 38px rgba(255, 215, 0, 0.12);
+}
 
 /* Input styles */
 .cosmic-input {
@@ -128,7 +151,11 @@ body {
 
 .btn-cosmic:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(157, 78, 221, 0.5);
+  /* vercel.com dark button: outer lift + inner rim light */
+  box-shadow:
+    0 10px 30px rgba(157, 78, 221, 0.45),
+    0 0 0 1px rgba(255,255,255,0.08) inset,
+    0 1px 0   rgba(255,255,255,0.12) inset;
 }
 
 .btn-cosmic:active { transform: translateY(0); }
@@ -138,8 +165,8 @@ body {
   position: absolute;
   top: 0; left: -100%;
   width: 100%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  transition: left 0.5s;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  transition: left 0.25s ease;
 }
 
 .btn-cosmic:hover::after { left: 100%; }
@@ -160,6 +187,10 @@ body {
   border-top-color: #9d4edd;
   border-radius: 50%;
   animation: cosmic-spin 1s linear infinite;
+  /* linear.app: soft glow ring on spinner */
+  box-shadow:
+    0 0 10px rgba(157, 78, 221, 0.35),
+    0 0 24px rgba(157, 78, 221, 0.15);
 }
 
 /* Zodiac orbital rings */
@@ -180,12 +211,47 @@ body {
 
 /* Card hover */
 .card-hover {
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .card-hover:hover {
-  transform: translateY(-6px) scale(1.01);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(157, 78, 221, 0.2);
+  transform: translateY(-4px) scale(1.01);
+  /* Layered shadow: depth + purple ambient */
+  box-shadow:
+    0 16px 36px rgba(0,0,0,0.45),
+    0 0 14px rgba(157, 78, 221, 0.25),
+    0 0 32px rgba(157, 78, 221, 0.10);
 }
+
+/* Pulse glow — for special-state cards (Destiny, Twin Flame) */
+/* Source: animations.dev — pulse-shadow pattern */
+@keyframes pulse-glow-purple {
+  0%, 100% {
+    box-shadow:
+      0 0 6px  rgba(157, 78, 221, 0.4),
+      0 0 16px rgba(157, 78, 221, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 12px rgba(157, 78, 221, 0.65),
+      0 0 28px rgba(157, 78, 221, 0.35),
+      0 0 50px rgba(157, 78, 221, 0.12);
+  }
+}
+@keyframes pulse-glow-gold {
+  0%, 100% {
+    box-shadow:
+      0 0 6px  rgba(255, 215, 0, 0.4),
+      0 0 16px rgba(255, 215, 0, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 12px rgba(255, 215, 0, 0.65),
+      0 0 28px rgba(255, 215, 0, 0.30),
+      0 0 48px rgba(255, 215, 0, 0.10);
+  }
+}
+.pulse-glow-purple { animation: pulse-glow-purple 2.4s ease-in-out infinite; }
+.pulse-glow-gold    { animation: pulse-glow-gold 2.4s ease-in-out infinite; }
 
 /* Notification badge */
 .notification-badge {

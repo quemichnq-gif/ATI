@@ -212,7 +212,8 @@ export default function HomePage() {
                     </motion.div>
                     <div className="absolute w-20 h-20 rounded-full flex flex-col items-center justify-center shadow-lg"
                       style={{ background: 'radial-gradient(circle, rgba(147,51,234,0.35) 0%, rgba(30,15,55,0.9) 80%)', border: '1px solid rgba(168,85,247,0.4)' }}>
-                      <ZodiacIcon sign={profile.sun} label={`Cung Mặt Trời ${profile.sun}`} className="text-3xl text-purple-200" />
+                      {/* Alpha-shaped glow follows the existing icon color. Source: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/filter-function/drop-shadow */}
+                      <ZodiacIcon sign={profile.sun} label={`Cung Mặt Trời ${profile.sun}`} className="text-3xl text-purple-200" style={{ filter: 'drop-shadow(0 0 6px currentColor)' }} />
                       <span className="text-[9px] text-purple-300/80 uppercase font-mono mt-0.5 tracking-wider">Soul</span>
                     </div>
                   </div>

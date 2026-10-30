@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 export type IconName =
   | 'home' | 'chart' | 'search' | 'message' | 'bell' | 'user' | 'logout'
@@ -43,6 +43,6 @@ const paths: Record<IconName, ReactNode> = {
   mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,
 };
 
-export default function UiIcon({ name, label, className = '' }: { name: IconName; label: string; className?: string }) {
-  return <svg aria-label={label} role="img" className={className} width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
+export default function UiIcon({ name, label, className = '', style }: { name: IconName; label: string; className?: string; style?: CSSProperties }) {
+  return <svg aria-label={label} role="img" className={className} style={style} width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 }
