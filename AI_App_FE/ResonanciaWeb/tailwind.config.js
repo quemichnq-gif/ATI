@@ -8,7 +8,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
-        display: ['Cinzel', 'serif'],
+        display: ['"Playfair Display"', 'Cinzel', 'serif'],
       },
       colors: {
         cosmic: {

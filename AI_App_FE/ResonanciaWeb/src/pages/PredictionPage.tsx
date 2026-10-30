@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { RootState } from '../store';
 import { apiGenerate } from '../services/api';
@@ -25,18 +25,45 @@ export default function PredictionPage() {
     { id: 'work', label: 'Công Việc', icon: 'briefcase', desc: 'Vận thế sự nghiệp' },
   ];
 
+  const getCacheKey = (cat: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    return `pred_${profile.uid || 'guest'}_${cat}_${today}`;
+  };
+
   const handleGenerate = async (cat: string) => {
-    setCategory(cat); setLoading(true);
+    setCategory(cat);
+    const cacheKey = getCacheKey(cat);
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      setPrediction(cached);
+      return;
+    }
+
+    setLoading(true);
     try {
       const res = await apiGenerate({
         userData: { uid: profile.uid, name: profile.name, sun: profile.sun, moon: profile.moon, birthDate: profile.birthDate },
         category: cat,
         day: new Date().toISOString().split('T')[0],
       });
-      setPrediction(res.data?.prediction || '');
-    } catch { setPrediction('Không thể tải dự đoán. Vui lòng thử lại.'); }
-    finally { setLoading(false); }
+      const text = res.data?.prediction || '';
+      setPrediction(text);
+      if (text) {
+        sessionStorage.setItem(cacheKey, text);
+      }
+    } catch {
+      setPrediction('Không thể tải dự đoán. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Tự động tải dự đoán nếu chưa có
+  useEffect(() => {
+    if (!prediction && profile.sun) {
+      handleGenerate(category);
+    }
+  }, [profile.sun]);
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
