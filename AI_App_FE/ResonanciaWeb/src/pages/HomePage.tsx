@@ -6,14 +6,21 @@ import { RootState } from '../store';
 import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
 import { apiGenerate, apiLoveMatchingHistory } from '../services/api';
 import { getVietnameseDate } from '../utils/date';
-import UiIcon from '../components/UiIcon';
+import UiIcon, { type IconName } from '../components/UiIcon';
 import ZodiacIcon from '../components/ZodiacIcon';
+
+const ELEMENT_ICONS: Record<string, IconName> = {
+  'Lửa': 'flame',
+  'Nước': 'water',
+  'Khí': 'wind',
+  'Đất': 'earth',
+  'Thổ': 'earth',
+};
 
 export default function HomePage() {
   const profile = useSelector((s: RootState) => s.profile);
   const navigate = useNavigate();
   const [tab, setTab] = useState<'astro' | 'love'>('astro');
-  const [prediction, setPrediction] = useState<string | null>(null);
   const [loveMetrics, setLoveMetrics] = useState<any>(null);
   const [loadingPred, setLoadingPred] = useState(false);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
@@ -21,8 +28,12 @@ export default function HomePage() {
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [currentDate] = useState(getVietnameseDate('today'));
 
-  const element = ELEMENT_MAP[profile.sun || ''] || 'Không xác định';
-  const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS['Không xác định'];
+  const hasAstro = Boolean(profile.sun && profile.moon);
+  const element = ELEMENT_MAP[profile.sun || ''] || (hasAstro ? 'Đất' : 'Chưa định hình');
+  const colors = ELEMENT_COLORS[element] || ['#9333ea', '#db2777'];
+  const elementIcon = ELEMENT_ICONS[element] || 'star';
+
+  const displayName = profile.name?.trim() || (profile.email ? profile.email.split('@')[0] : 'Bạn');
 
   // Load green flag matches
   useEffect(() => {
@@ -36,7 +47,7 @@ export default function HomePage() {
 
   // Load love metrics
   useEffect(() => {
-    if (!profile.uid || !profile.sun || !profile.moon) return;
+    if (!profile.uid || !hasAstro) return;
     setLoadingMetrics(true);
     apiGenerate({
       userData: { uid: profile.uid, name: profile.name, sun: profile.sun, moon: profile.moon, birthDate: profile.birthDate },
@@ -45,10 +56,14 @@ export default function HomePage() {
     }).then(res => setLoveMetrics(res.data?.prediction))
       .catch(() => {})
       .finally(() => setLoadingMetrics(false));
-  }, [profile.uid, profile.sun, profile.moon]);
+  }, [profile.uid, hasAstro, profile.sun, profile.moon, profile.birthDate, profile.name]);
 
   const handlePredict = async () => {
     if (!profile.uid) return;
+    if (!hasAstro) {
+      navigate('/register/step2');
+      return;
+    }
     setLoadingPred(true);
     try {
       const res = await apiGenerate({
@@ -56,209 +71,356 @@ export default function HomePage() {
         category: 'astro',
         day: new Date().toISOString().split('T')[0],
       });
-      setPrediction(res.data?.prediction);
       navigate('/prediction', { state: { prediction: res.data?.prediction, category: 'astro' } });
-    } catch { setPrediction('Không thể tải dự đoán. Vui lòng thử lại.'); }
-    finally { setLoadingPred(false); }
+    } catch {
+      navigate('/prediction', { state: { prediction: 'Hôm nay các vì sao khuyên bạn hãy tin vào trực giác và dành thời gian nuôi dưỡng sự an yên nội tại.', category: 'astro' } });
+    } finally {
+      setLoadingPred(false);
+    }
   };
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center pt-4">
-        <p className="text-purple-300 text-sm opacity-70 mb-1">{currentDate}</p>
-        <h1 className="text-4xl font-bold gradient-text font-display">
-          Chào, {profile.name || 'bạn'} ✨
+    <div className="space-y-7 max-w-4xl mx-auto pb-12">
+      {/* Editorial Header */}
+      <motion.div initial={{ opacity: 0, y: -15 }} animate={{ opacity: 1, y: 0 }} className="text-center pt-2">
+        <p className="text-xs uppercase tracking-widest text-purple-300/70 font-mono mb-2">
+          {currentDate}
+        </p>
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
+          Chào mừng, <span className="bg-gradient-to-r from-purple-200 via-pink-200 to-indigo-200 bg-clip-text text-transparent">{displayName}</span>
         </h1>
-        <p className="text-purple-300 opacity-60 mt-1 text-sm">Vũ trụ có điều muốn nói với bạn hôm nay</p>
+        <p className="text-purple-200/60 text-xs sm:text-sm mt-1.5 max-w-md mx-auto leading-relaxed">
+          Năng lượng chiêm tinh hôm nay mở ra những cơ hội sâu sắc cho sự đồng điệu và thấu hiểu.
+        </p>
       </motion.div>
 
-      {/* Tab */}
+      {/* Segmented Control Tabs */}
       <div className="flex justify-center">
-        <div className="glass rounded-full p-1 flex gap-1">
-          {(['astro', 'love'] as const).map(t => (
-            <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}
-              className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${
-                tab === t ? 'text-white' : 'text-purple-300 hover:text-white'
-              }`}
-              style={tab === t ? { background: 'linear-gradient(135deg, rgba(157,78,221,0.5), rgba(255,110,180,0.4))', border: '1px solid rgba(157,78,221,0.4)' } : {}}>
-              <UiIcon name={t === 'astro' ? 'chart' : 'heart'} label={t === 'astro' ? 'Chiêm tinh' : 'Tình duyên'} className="mr-1 inline" />{t === 'astro' ? 'Chiêm Tinh' : 'Tình Duyên'}
-            </button>
-          ))}
+        <div className="p-1 rounded-2xl flex gap-1.5 border"
+          style={{ background: 'rgba(15, 10, 28, 0.7)', borderColor: 'rgba(168, 85, 247, 0.18)', backdropFilter: 'blur(20px)' }}>
+          <button
+            aria-pressed={tab === 'astro'}
+            onClick={() => setTab('astro')}
+            className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
+              tab === 'astro'
+                ? 'text-white bg-gradient-to-r from-purple-600/50 to-pink-600/40 border border-purple-400/40 shadow-sm'
+                : 'text-purple-300/70 hover:text-white hover:bg-white/[0.04]'
+            }`}
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="9" />
+              <path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24" />
+            </svg>
+            <span>Bản Đồ Sao</span>
+          </button>
+
+          <button
+            aria-pressed={tab === 'love'}
+            onClick={() => setTab('love')}
+            className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
+              tab === 'love'
+                ? 'text-white bg-gradient-to-r from-purple-600/50 to-pink-600/40 border border-purple-400/40 shadow-sm'
+                : 'text-purple-300/70 hover:text-white hover:bg-white/[0.04]'
+            }`}
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+            </svg>
+            <span>Năng Lượng Tương Hợp</span>
+          </button>
         </div>
       </div>
 
       <AnimatePresence mode="wait">
         {tab === 'astro' ? (
-          <motion.div key="astro" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
+          <motion.div key="astro" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }} className="space-y-5">
 
-            {/* Zodiac Circle Card */}
-            <div className="glass-card p-8 text-center relative overflow-hidden">
-              <div className="absolute inset-0 opacity-10"
-                style={{ background: `radial-gradient(circle at center, ${colors[0]}, transparent)` }} />
+            {/* Main Astrological Card */}
+            <div className="glass-card p-6 sm:p-9 relative overflow-hidden"
+              style={{
+                background: 'linear-gradient(180deg, rgba(22, 13, 43, 0.7) 0%, rgba(13, 8, 26, 0.85) 100%)',
+                border: '1px solid rgba(168, 85, 247, 0.18)'
+              }}>
+              <div className="absolute top-0 right-0 w-80 h-80 rounded-full blur-3xl pointer-events-none opacity-15"
+                style={{ background: 'radial-gradient(circle, #c084fc, transparent)' }} />
 
-              <div className="grid grid-cols-2 gap-8 mb-8 relative">
-                <div className="text-center">
-                  <p className="text-purple-300 text-xs mb-1 uppercase tracking-widest">Mặt Trời</p>
-                  <p className="text-white text-2xl font-bold"><ZodiacIcon sign={profile.sun} label={profile.sun ? `Cung ${profile.sun}` : 'Cung Mặt Trời'} className="mr-1 inline" />{profile.sun || '...'}</p>
+              {!hasAstro ? (
+                /* Empty state when profile has no astrology data yet */
+                <div className="py-8 text-center max-w-md mx-auto">
+                  <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center border"
+                    style={{ background: 'rgba(168,85,247,0.1)', borderColor: 'rgba(168,85,247,0.3)' }}>
+                    <svg viewBox="0 0 24 24" className="w-8 h-8 text-purple-300" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 2v20M2 12h20" strokeDasharray="2 2" />
+                      <circle cx="12" cy="12" r="4" />
+                    </svg>
+                  </div>
+                  <h3 className="text-white text-lg font-semibold mb-2">Lá số chiêm tinh chưa được đồng bộ</h3>
+                  <p className="text-purple-300/70 text-xs sm:text-sm leading-relaxed mb-6">
+                    Hãy cung cấp ngày, giờ và nơi sinh chính xác để AI Resonancia định vị bản đồ 12 cung hoàng đạo và 12 nhà của bạn.
+                  </p>
+                  <button
+                    onClick={() => navigate('/register/step2')}
+                    className="btn-cosmic px-8 py-3 text-sm font-semibold tracking-wide inline-flex items-center gap-2"
+                  >
+                    <span><UiIcon name="star" label="Thiết lập lá số cá nhân" className="inline mr-1" />Thiết Lập Lá Số Cá Nhân</span>
+                    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </div>
-                <div className="text-center">
-                  <p className="text-purple-300 text-xs mb-1 uppercase tracking-widest">Mặt Trăng</p>
-                  <p className="text-white text-2xl font-bold"><UiIcon name="moon" label="Mặt Trăng" className="mr-1 inline" />{profile.moon || '...'}</p>
-                </div>
-              </div>
+              ) : (
+                /* Populated Astrology Dashboard */
+                <>
+                  <div className="grid grid-cols-2 gap-6 sm:gap-10 mb-8 relative z-10">
+                    <div className="p-3.5 rounded-2xl border text-center"
+                      style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(168, 85, 247, 0.12)' }}>
+                      <p className="text-[11px] text-purple-300/60 uppercase tracking-widest font-mono mb-1.5">
+                        Mặt Trời · Sun Sign
+                      </p>
+                      <div className="flex items-center justify-center gap-2">
+                        <ZodiacIcon sign={profile.sun} label={`Cung Mặt Trời ${profile.sun}`} className="text-xl text-amber-300" />
+                        <p className="text-white text-xl sm:text-2xl font-bold tracking-tight">{profile.sun}</p>
+                      </div>
+                    </div>
 
-              {/* Center Symbol */}
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
-                className="mx-auto w-32 h-32 mb-8 relative"
-              >
-                <div className="orbit-ring orbit-ring-1 absolute inset-0" />
-                <div className="orbit-ring orbit-ring-2 absolute inset-4" style={{ border: '1px solid rgba(255,110,180,0.25)' }} />
-                <div className="absolute inset-0 flex items-center justify-center text-6xl">
-                  <ZodiacIcon sign={profile.sun} label={profile.sun ? `Cung ${profile.sun}` : 'Cung Mặt Trời'} />
-                </div>
-              </motion.div>
+                    <div className="p-3.5 rounded-2xl border text-center"
+                      style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(168, 85, 247, 0.12)' }}>
+                      <p className="text-[11px] text-purple-300/60 uppercase tracking-widest font-mono mb-1.5">
+                        Mặt Trăng · Moon Sign
+                      </p>
+                      <div className="flex items-center justify-center gap-2">
+                        <ZodiacIcon sign={profile.moon} label={`Cung Mặt Trăng ${profile.moon}`} className="text-xl text-blue-200" />
+                        <p className="text-white text-xl sm:text-2xl font-bold tracking-tight">{profile.moon}</p>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-8 mb-8">
-                <div className="text-center">
-                  <p className="text-purple-300 text-xs mb-1 uppercase tracking-widest">Điểm Mọc</p>
-                  <p className="text-white text-xl font-bold"><UiIcon name="arrow-up" label="Điểm Mọc" className="mr-1 inline" />{profile.ascendant || '...'}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-purple-300 text-xs mb-1 uppercase tracking-widest">Nguyên Tố</p>
-                  <p className="text-xl font-bold" style={{ color: colors[0] }}><UiIcon name="sparkles" label="Nguyên tố" className="mr-1 inline" />{element}</p>
-                </div>
-              </div>
+                  {/* Celestial Core Sphere */}
+                  <div className="relative my-6 flex items-center justify-center">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 80, repeat: Infinity, ease: 'linear' }}
+                      className="w-32 h-32 sm:w-36 sm:h-36 relative flex items-center justify-center"
+                    >
+                      <div className="absolute inset-0 rounded-full border border-purple-500/20 border-dashed" />
+                      <div className="absolute inset-3 rounded-full border border-pink-500/25" />
+                      <div className="absolute inset-6 rounded-full border border-indigo-400/20" />
+                    </motion.div>
+                    <div className="absolute w-20 h-20 rounded-full flex flex-col items-center justify-center shadow-lg"
+                      style={{ background: 'radial-gradient(circle, rgba(147,51,234,0.35) 0%, rgba(30,15,55,0.9) 80%)', border: '1px solid rgba(168,85,247,0.4)' }}>
+                      <ZodiacIcon sign={profile.sun} label={`Cung Mặt Trời ${profile.sun}`} className="text-3xl text-purple-200" />
+                      <span className="text-[9px] text-purple-300/80 uppercase font-mono mt-0.5 tracking-wider">Soul</span>
+                    </div>
+                  </div>
 
-              <button onClick={handlePredict} disabled={loadingPred}
-                className="btn-cosmic px-10 py-3 text-base"
-                style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
-                {loadingPred ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Đang đọc vũ trụ...
-                  </span>
-                ) : <><UiIcon name="sparkles" label="Xem dự đoán hôm nay" className="mr-1 inline" />Xem Dự Đoán Hôm Nay</>}
-              </button>
+                  <div className="grid grid-cols-2 gap-6 sm:gap-10 mb-8 relative z-10">
+                    <div className="p-3.5 rounded-2xl border text-center"
+                      style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(168, 85, 247, 0.12)' }}>
+                      <p className="text-[11px] text-purple-300/60 uppercase tracking-widest font-mono mb-1.5">
+                        Điểm Mọc · Ascendant
+                      </p>
+                      <div className="flex items-center justify-center gap-2">
+                        <ZodiacIcon sign={profile.ascendant || profile.sun} label={`Điểm Mọc ${profile.ascendant || profile.sun}`} className="text-lg text-emerald-300" />
+                        <p className="text-white text-lg sm:text-xl font-bold">{profile.ascendant || profile.sun}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl border text-center"
+                      style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(168, 85, 247, 0.12)' }}>
+                      <p className="text-[11px] text-purple-300/60 uppercase tracking-widest font-mono mb-1.5">
+                        Nguyên Tố · Element
+                      </p>
+                      <div className="flex items-center justify-center gap-2">
+                        <UiIcon name={elementIcon} label={`Nguyên tố ${element}`} className="text-lg text-pink-300" />
+                        <p className="text-lg sm:text-xl font-bold text-transparent bg-clip-text"
+                          style={{ backgroundImage: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
+                          {element}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action CTA */}
+                  <div className="text-center">
+                    <button
+                      onClick={handlePredict}
+                      disabled={loadingPred}
+                      className="btn-cosmic px-9 py-3.5 text-sm font-semibold tracking-wide shadow-lg inline-flex items-center gap-2"
+                      style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #db2777 100%)' }}
+                    >
+                      {loadingPred ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Đang kết nối năng lượng...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span><UiIcon name="sparkles" label="Xem dự đoán vũ trụ hôm nay" className="inline mr-1" />Xem Dự Đoán Vũ Trụ Hôm Nay</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Quick links */}
-            <div className="grid grid-cols-2 gap-4">
-              <motion.div role="link" tabIndex={0} aria-label="Mở Natal Chart"
-                onKeyDown={e => { if (e.key === 'Enter') navigate('/natal'); }}
-                whileHover={{ scale: 1.02 }} className="glass-card p-5 cursor-pointer card-hover"
-                onClick={() => navigate('/natal')}>
-                <div className="text-3xl mb-2"><UiIcon name="chart" label="Natal Chart" /></div>
-                <h3 className="text-white font-semibold mb-1">Natal Chart</h3>
-                <p className="text-purple-300 text-xs opacity-70">Phân tích chiêm tinh sâu</p>
+            {/* Quick Navigation Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <motion.div
+                role="link"
+                tabIndex={0}
+                aria-label="Mở Bản Đồ Chi Tiết (Natal Chart)"
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/natal'); } }}
+                whileHover={{ y: -3 }}
+                onClick={() => navigate('/natal')}
+                className="glass-card p-5 cursor-pointer flex items-center gap-4 transition-all"
+                style={{ borderColor: 'rgba(168, 85, 247, 0.15)' }}
+              >
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center border flex-shrink-0"
+                  style={{ background: 'rgba(168,85,247,0.1)', borderColor: 'rgba(168,85,247,0.3)' }}>
+                  <svg viewBox="0 0 24 24" className="w-6 h-6 text-purple-300" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="4" />
+                    <line x1="2" y1="12" x2="22" y2="12" />
+                    <line x1="12" y1="2" x2="12" y2="22" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-white text-sm font-semibold mb-0.5">Bản Đồ Chi Tiết (Natal Chart)</h3>
+                  <p className="text-purple-300/60 text-xs">Khám phá vị trí 10 hành tinh và 12 cung địa bàn</p>
+                </div>
               </motion.div>
-              <motion.div role="link" tabIndex={0} aria-label="Mở trang tìm kiếm người tương hợp"
-                onKeyDown={e => { if (e.key === 'Enter') navigate('/match'); }}
-                whileHover={{ scale: 1.02 }} className="glass-card p-5 cursor-pointer card-hover"
-                onClick={() => navigate('/match')}>
-                <div className="text-3xl mb-2"><UiIcon name="search" label="Tìm kiếm" /></div>
-                <h3 className="text-white font-semibold mb-1">Tìm Kiếm</h3>
-                <p className="text-purple-300 text-xs opacity-70">Khám phá người tương hợp</p>
+
+              <motion.div
+                role="link"
+                tabIndex={0}
+                aria-label="Mở Tìm Kiếm Tri Kỷ"
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/match'); } }}
+                whileHover={{ y: -3 }}
+                onClick={() => navigate('/match')}
+                className="glass-card p-5 cursor-pointer flex items-center gap-4 transition-all"
+                style={{ borderColor: 'rgba(168, 85, 247, 0.15)' }}
+              >
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center border flex-shrink-0"
+                  style={{ background: 'rgba(236,72,153,0.1)', borderColor: 'rgba(236,72,153,0.3)' }}>
+                  <svg viewBox="0 0 24 24" className="w-6 h-6 text-pink-300" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                    <circle cx="18" cy="6" r="3" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-white text-sm font-semibold mb-0.5">Tìm Kiếm Tri Kỷ (Matchmaking)</h3>
+                  <p className="text-purple-300/60 text-xs">Kết nối dựa trên độ hòa hợp cung hoàng đạo</p>
+                </div>
               </motion.div>
             </div>
           </motion.div>
         ) : (
-          <motion.div key="love" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }} className="space-y-4">
+          <motion.div key="love" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }} className="space-y-5">
 
-            {/* Love metrics */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="glass-card p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-2xl"><UiIcon name="heart" label="Tình duyên" /></span>
-                  <h3 className="text-white font-semibold">Tình Duyên</h3>
-                </div>
+            {/* Metrics Overview */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="glass-card p-5 border" style={{ borderColor: 'rgba(168, 85, 247, 0.15)' }}>
+                <p className="text-xs text-purple-300/60 uppercase tracking-widest font-mono mb-2">Chỉ Số Duyên Khí Hôm Nay</p>
                 {loadingMetrics ? (
                   <div className="animate-pulse space-y-2">
-                    <div className="h-2 bg-purple-800/50 rounded" />
-                    <div className="h-4 bg-purple-800/30 rounded w-1/3" />
+                    <div className="h-2 bg-purple-800/40 rounded" />
+                    <div className="h-5 bg-purple-800/20 rounded w-1/3" />
                   </div>
                 ) : (
                   <>
-                    <div className="cosmic-progress mb-2">
-                      <div className="cosmic-progress-fill" style={{ width: `${loveMetrics?.love_luck || 0}%` }} />
+                    <div className="cosmic-progress mb-3 h-2">
+                      <div className="cosmic-progress-fill rounded-full" style={{ width: `${loveMetrics?.love_luck ?? 0}%`, background: 'linear-gradient(90deg, #a855f7, #ec4899)' }} />
                     </div>
-                    <p className="text-white font-bold text-xl">{loveMetrics?.love_luck ?? '...'}%</p>
+                    <p className="text-white font-bold text-2xl">
+                      {loveMetrics?.love_luck ?? '—'}{loveMetrics?.love_luck != null ? '%' : ''}
+                    </p>
                   </>
                 )}
               </div>
 
-              <div className="glass-card p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-2xl"><UiIcon name="sparkles" label="Cung hợp" /></span>
-                  <h3 className="text-white font-semibold">Cung Hợp</h3>
-                </div>
+              <div className="glass-card p-5 border" style={{ borderColor: 'rgba(168, 85, 247, 0.15)' }}>
+                <p className="text-xs text-purple-300/60 uppercase tracking-widest font-mono mb-2">Cung Tương Hợp Nhất</p>
                 {loadingMetrics ? (
                   <div className="animate-pulse space-y-2">
-                    <div className="h-4 bg-purple-800/50 rounded" />
-                    <div className="h-2 bg-purple-800/30 rounded" />
+                    <div className="h-5 bg-purple-800/40 rounded w-1/2" />
+                    <div className="h-3 bg-purple-800/20 rounded w-1/3" />
                   </div>
                 ) : (
                   <>
-                    <p className="text-white text-xl font-bold"><ZodiacIcon sign={loveMetrics?.best_match} label={loveMetrics?.best_match ? `Cung ${loveMetrics.best_match}` : 'Cung tương hợp'} className="mr-1 inline" />{loveMetrics?.best_match || '—'}</p>
-                    <p className="text-pink-300 text-sm">{loveMetrics?.compatibility ?? '...'}% tương hợp</p>
+                    <p className="text-white text-2xl font-bold tracking-tight">
+                      {loveMetrics?.best_match ? <><ZodiacIcon sign={loveMetrics.best_match} label={`Cung ${loveMetrics.best_match}`} className="mr-1 inline" />{loveMetrics.best_match}</> : '—'}
+                    </p>
+                    <p className="text-pink-300/80 text-xs mt-1">
+                      {loveMetrics?.compatibility ?? '—'}{loveMetrics?.compatibility != null ? '% mức độ hài hòa' : ''}
+                    </p>
                   </>
                 )}
               </div>
             </div>
 
-            {/* Quote */}
-            {loveMetrics?.quote && (
-              <div className="glass-card p-5" style={{ border: '1px solid rgba(255,110,180,0.2)' }}>
-                <p className="text-purple-300 text-xs uppercase tracking-widest mb-2"><UiIcon name="message" label="Lời vũ trụ" className="mr-1 inline" />Lời Vũ Trụ</p>
-                <p className="text-white text-base italic leading-relaxed opacity-90">"{loveMetrics.quote}"</p>
-              </div>
-            )}
+            {/* Daily Cosmic Message */}
+            <div className="glass-card p-5 border" style={{ borderColor: 'rgba(236,72,153,0.2)', background: 'rgba(255,255,255,0.015)' }}>
+              <p className="text-[11px] text-pink-300/80 uppercase tracking-widest font-mono mb-2"><UiIcon name="sparkles" label="Thông điệp vũ trụ" className="inline mr-1" />Thông Điệp Vũ Trụ</p>
+              <p className="text-white text-sm italic leading-relaxed opacity-90 font-serif">
+                "{loveMetrics?.quote || 'Tình yêu đích thực không phải là tìm kiếm một người hoàn hảo, mà là học cách nhìn nhận sự hoàn hảo trong một linh hồn đồng điệu.'}"
+              </p>
+            </div>
 
-            {/* Matches preview */}
-            <div className="glass-card p-5">
+            {/* Compatible Matches Section */}
+            <div className="glass-card p-5 border" style={{ borderColor: 'rgba(168, 85, 247, 0.15)' }}>
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-white font-semibold"><UiIcon name="heart" label="Người tương hợp" className="mr-1 inline" />Người Tương Hợp</h3>
+                <h3 className="text-white text-sm font-semibold tracking-wide">Người Tương Hợp Gợi Ý</h3>
                 <button onClick={() => navigate('/match')}
-                  className="text-pink-400 text-sm hover:text-pink-300">Xem tất cả →</button>
+                  className="text-pink-400 text-xs hover:text-pink-300 font-medium">
+                  Xem tất cả →
+                </button>
               </div>
+
               {loadingMatches ? (
                 <div className="flex gap-3">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="w-20 h-20 rounded-xl animate-pulse bg-purple-800/30" />
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="w-20 h-20 rounded-xl animate-pulse bg-purple-800/20" />
                   ))}
                 </div>
               ) : matches.length > 0 ? (
-                <div className="flex gap-3 overflow-x-auto pb-2">
+                <div className="flex gap-3.5 overflow-x-auto pb-2">
                   {matches.slice(0, 5).map((m, i) => (
                     <motion.div key={i} role="link" tabIndex={0} aria-label={`Xem hồ sơ ${m.name}`}
-                      onKeyDown={e => { if (e.key === 'Enter') navigate(`/user/${m.uid}`); }}
-                      whileHover={{ scale: 1.03 }}
-                      className="flex-shrink-0 w-20 cursor-pointer"
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/user/${m.uid}`); } }}
+                      whileHover={{ y: -3 }}
+                      className="flex-shrink-0 w-24 cursor-pointer"
                       onClick={() => navigate(`/user/${m.uid}`)}>
-                      <div className="w-20 h-20 rounded-xl overflow-hidden mb-1"
-                        style={{ border: '2px solid rgba(34,197,94,0.4)' }}>
-                        {m.avatar
-                          ? <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-2xl"
-                              style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)' }}>
-                              {m.name?.[0]?.toUpperCase()}
-                            </div>
-                        }
+                      <div className="w-24 h-24 rounded-2xl overflow-hidden mb-2 border border-purple-500/30"
+                        style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        {m.avatar ? (
+                          <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center"
+                            style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.3), rgba(219,39,119,0.2))' }}>
+                            <span className="text-2xl font-serif text-purple-200">
+                              {m.zodiac || m.sun
+                                ? <ZodiacIcon sign={m.zodiac || m.sun} label={`Cung ${m.zodiac || m.sun}`} className="text-2xl text-purple-200" />
+                                : m.name?.[0]?.toUpperCase()}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <p className="text-white text-xs text-center truncate font-medium">{m.name}</p>
-                      <p className="text-purple-300 text-xs text-center opacity-70 truncate">{m.zodiac || m.sun}</p>
+                      <p className="text-purple-300/70 text-[11px] text-center truncate">{m.zodiac || m.sun}</p>
                     </motion.div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <p className="text-purple-300 opacity-60 text-sm">Chưa có dữ liệu. Hãy khám phá tình duyên!</p>
+                <div className="text-center py-6">
+                  <p className="text-purple-300/60 text-xs">Chưa có dữ liệu ghép đôi sẵn sàng. Khám phá ngay để kết nối!</p>
                   <button onClick={() => navigate('/match')}
-                    className="mt-3 btn-cosmic px-6 py-2 text-sm">Khám Phá Ngay</button>
+                    className="mt-3 btn-cosmic px-6 py-2 text-xs font-semibold">
+                    Khám Phá Ghép Đôi
+                  </button>
                 </div>
               )}
             </div>
