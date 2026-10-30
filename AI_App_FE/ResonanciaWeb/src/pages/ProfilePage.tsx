@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
+import { doc, setDoc } from 'firebase/firestore';
 import { RootState } from '../store';
 import { updateProfile } from '../store/profileSlice';
 import { apiUpdateProfile, apiUploadImage } from '../services/api';
+import { auth, db } from '../services/firebase';
 import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
 import UiIcon from '../components/UiIcon';
 import type { IconName } from '../components/UiIcon';
@@ -17,16 +19,25 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({ name: profile.name, gender: profile.gender || '', job: profile.job || '', height: profile.height || '', weight: profile.weight || '', relationshipStatus: profile.relationshipStatus || 'Độc thân' });
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const element = ELEMENT_MAP[profile.sun || ''] || 'Không xác định';
   const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS['Không xác định'];
 
   const handleSave = async () => {
+    const uid = profile.uid || auth.currentUser?.uid;
+    if (!uid) return;
     setSaving(true);
     try {
-      await apiUpdateProfile({ uid: profile.uid, fields: formData });
+      await apiUpdateProfile({ uid, fields: formData });
       dispatch(updateProfile(formData as any));
+      try {
+        await setDoc(doc(db, 'users', uid), formData, { merge: true });
+      } catch (e) {
+        console.warn('Lưu form vào Firestore trực tiếp:', e);
+      }
       setEditing(false);
     } catch (e) { console.error(e); }
     finally { setSaving(false); }
@@ -35,6 +46,12 @@ export default function ProfilePage() {
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const uid = profile.uid || auth.currentUser?.uid;
+    if (!uid) {
+      alert('Chưa xác thực được người dùng, vui lòng đăng nhập lại.');
+      return;
+    }
+
     setUploadingAvatar(true);
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -44,10 +61,67 @@ export default function ProfilePage() {
         reader.readAsDataURL(file);
       });
       const base64 = dataUrl.split(',')[1];
-      const res = await apiUploadImage({ uid: profile.uid, imageType: 'avatar', imageBase64: base64 });
-      if (res.data?.imageUrl) dispatch(updateProfile({ avatar: res.data.imageUrl }));
-    } catch (e) { console.error(e); }
-    finally { setUploadingAvatar(false); }
+      const res = await apiUploadImage({
+        uid,
+        imageType: 'avatar',
+        imageData: base64,
+        imageBase64: base64
+      });
+      if (res.data?.imageUrl) {
+        const imageUrl = res.data.imageUrl;
+        dispatch(updateProfile({ avatar: imageUrl }));
+        try {
+          await setDoc(doc(db, 'users', uid), { avatar: imageUrl }, { merge: true });
+        } catch (fe) {
+          console.warn('Lưu avatar vào Firestore trực tiếp:', fe);
+        }
+      }
+    } catch (e: any) {
+      console.error('Lỗi tải ảnh đại diện:', e);
+      alert('Không thể tải ảnh đại diện lên: ' + (e.response?.data?.error || e.message || 'Lỗi mạng'));
+    } finally {
+      setUploadingAvatar(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const uid = profile.uid || auth.currentUser?.uid;
+    if (!uid) return;
+
+    setUploadingCover(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Không thể đọc ảnh'));
+        reader.onerror = () => reject(reader.error || new Error('Không thể đọc ảnh'));
+        reader.readAsDataURL(file);
+      });
+      const base64 = dataUrl.split(',')[1];
+      const res = await apiUploadImage({
+        uid,
+        imageType: 'coverImage',
+        imageData: base64,
+        imageBase64: base64
+      });
+      if (res.data?.imageUrl) {
+        const imageUrl = res.data.imageUrl;
+        dispatch(updateProfile({ coverImage: imageUrl }));
+        try {
+          await setDoc(doc(db, 'users', uid), { coverImage: imageUrl }, { merge: true });
+        } catch (fe) {
+          console.warn('Lưu cover vào Firestore trực tiếp:', fe);
+        }
+      }
+    } catch (e: any) {
+      console.error('Lỗi tải ảnh bìa:', e);
+      alert('Không thể tải ảnh bìa lên: ' + (e.response?.data?.error || e.message || 'Lỗi mạng'));
+    } finally {
+      setUploadingCover(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   return (
@@ -55,20 +129,40 @@ export default function ProfilePage() {
       {/* Cover + Avatar */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative">
         {/* Cover */}
-        <div className="h-40 rounded-2xl overflow-hidden relative"
-          style={{ background: `linear-gradient(135deg, ${colors[0]}44, ${colors[1]}44, #1a0030)` }}>
-          <div className="absolute inset-0 opacity-30"
-            style={{ background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%239C92AC" fill-opacity="0.3"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
-          <div className="absolute inset-0 flex items-center justify-center text-8xl opacity-20">
-            <ZodiacIcon sign={profile.sun} label={profile.sun ? `Cung ${profile.sun}` : 'Cung Mặt Trời'} />
-          </div>
+        <div className="h-44 rounded-2xl overflow-hidden relative group"
+          style={{
+            background: profile.coverImage
+              ? `url(${profile.coverImage}) center/cover no-repeat`
+              : `linear-gradient(135deg, ${colors[0]}44, ${colors[1]}44, #1a0030)`
+          }}>
+          {!profile.coverImage && (
+            <>
+              <div className="absolute inset-0 opacity-30"
+                style={{ background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%239C92AC" fill-opacity="0.3"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
+              <div className="absolute inset-0 flex items-center justify-center text-8xl opacity-20">
+                <ZodiacIcon sign={profile.sun} label={profile.sun ? `Cung ${profile.sun}` : 'Cung Mặt Trời'} />
+              </div>
+            </>
+          )}
+
+          {/* Change cover button */}
+          <button
+            type="button"
+            onClick={() => coverInputRef.current?.click()}
+            className="absolute top-3 right-3 px-3 py-1.5 rounded-xl text-xs font-medium text-white glass hover:bg-white/20 transition-all flex items-center gap-1.5 cursor-pointer border-0"
+            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}
+          >
+            <UiIcon name="camera" label="Đổi ảnh bìa" />
+            <span>{uploadingCover ? 'Đang tải...' : 'Đổi ảnh bìa'}</span>
+          </button>
+          <input type="file" ref={coverInputRef} className="hidden" accept="image/*" onChange={handleCoverChange} />
         </div>
 
         {/* Avatar */}
         <div className="absolute -bottom-8 left-6">
           <div className="relative">
             <button type="button" aria-label="Thay ảnh đại diện" aria-busy={uploadingAvatar}
-              className="w-24 h-24 rounded-2xl overflow-hidden cursor-pointer p-0 border-0 bg-transparent"
+              className="w-24 h-24 rounded-2xl overflow-hidden cursor-pointer p-0 border-0 bg-transparent block"
               style={{ border: `3px solid ${colors[0]}`, boxShadow: `0 0 20px ${colors[0]}44` }}
               onClick={() => fileInputRef.current?.click()}>
               {profile.avatar
@@ -79,14 +173,14 @@ export default function ProfilePage() {
                   </div>
               }
               {uploadingAvatar && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 </div>
               )}
             </button>
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" aria-label="Chọn ảnh đại diện" onChange={handleAvatarChange} />
             <button type="button" aria-label="Chọn ảnh đại diện"
-              className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs cursor-pointer border-0 p-0 text-white"
+              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center text-xs cursor-pointer border-2 border-[#090714] p-0 text-white shadow-md transition-transform hover:scale-110"
               style={{ background: colors[0] }} onClick={() => fileInputRef.current?.click()}>
               <UiIcon name="camera" label="Chọn ảnh đại diện" />
             </button>

@@ -383,15 +383,15 @@ def upload_image():
     Upload ảnh lên Cloudinary (MIỄN PHÍ)
     """
     try:
-        data = request.get_json()
-        uid = data.get("uid")
+        data = request.get_json() or {}
+        uid = data.get("uid") or data.get("userId")
         image_type = data.get("imageType", "avatar")
-        image_data = data.get("imageData")
+        image_data = data.get("imageData") or data.get("imageBase64") or data.get("image")
 
         if not uid or not image_data:
-            return jsonify({"error": "Thiếu uid hoặc imageData"}), 400
+            return jsonify({"error": "Thiếu uid hoặc dữ liệu ảnh (imageData/imageBase64)"}), 400
 
-        # Decode base64
+        # Decode / Chuẩn hóa base64
         try:
             if "," in image_data:
                 header, image_data = image_data.split(",", 1)
@@ -408,16 +408,19 @@ def upload_image():
             image_url = upload_result.get("secure_url")
 
         except Exception as e:
+            print(f"❌ Cloudinary upload error: {str(e)}")
             return jsonify({"error": f"Lỗi upload: {str(e)}"}), 400
 
-        # Cập nhật Firestore
-        user_ref = db.collection("users").document(uid)
-        user_ref.update({
-            image_type: image_url,
-            "updatedAt": firestore.SERVER_TIMESTAMP
-        })
-
-        print(f"✅ Đã upload {image_type} cho user {uid}: {image_url}")
+        # Cập nhật Firestore an toàn (timeout 1.5s để không làm nghẽn client)
+        try:
+            user_ref = db.collection("users").document(uid)
+            user_ref.set({
+                image_type: image_url,
+                "updatedAt": firestore.SERVER_TIMESTAMP
+            }, merge=True, timeout=1.5)
+            print(f"✅ Đã lưu {image_type} vào Firestore cho user {uid}: {image_url}")
+        except Exception as fe:
+            print(f"⚠️ Cảnh báo Firestore Admin update (frontend client sẽ tự sync): {str(fe)}")
 
         return jsonify({
             "success": True,
