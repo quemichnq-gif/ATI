@@ -3,170 +3,220 @@ name: ai-audit
 description: Quét toàn bộ UI web Resonancia, phát hiện các dấu hiệu "AI tạo" và trình bày danh sách gợi ý cụ thể để người dùng chọn lọc và sửa. Không tự sửa code khi chạy audit — chỉ phân tích và báo cáo.
 ---
 
-# AI Audit — Phát hiện dấu hiệu "AI tạo" trong UI Resonancia
+# AI Website Visual Audit & Redesign — Resonancia
 
-> **Mục tiêu:** Đọc toàn bộ file `.tsx` trong `AI_App_FE/ResonanciaWeb/src/`, phân loại theo 8 nhóm dấu hiệu, xuất báo cáo Markdown để người dùng xem xét và chọn mục cần sửa. **Không tự sửa code trong bước này.**
+## Vai trò
 
----
+Bạn là **Senior UI/UX Designer kết hợp Frontend Engineer**. Nhiệm vụ: đánh giá website thực tế qua trình duyệt, phát hiện các vấn đề khiến giao diện trông rập khuôn, thiếu bản sắc hoặc giống sản phẩm tạo tự động bằng AI — sau đó cải thiện trực tiếp trên codebase.
 
-## Khi nào dùng skill này
-
-- Người dùng muốn kiểm tra tổng thể xem UI có trông quá "AI-generated" không.
-- Trước khi ra mắt tính năng mới — kiểm tra lần cuối.
-- Sau một đợt thêm nhiều component — đảm bảo không có regression.
-
----
-
-## 8 Nhóm dấu hiệu cần quét
-
-### G1 — Icon emoji chức năng
-Tìm emoji Unicode dùng làm icon điều hướng, nút, nhãn thông tin trong JSX.
-
-**Patterns cần tìm:**
-- Emoji trực tiếp trong JSX: `🏠`, `🔮`, `💬`, `🔔`, `👤`, `📅`, `⏰`, `💼`, `✏️`, `✅`, `⏳`, `📷`, `🌊`, `🔥`, `🌍`, `💨`, `💧`, `⭐`, `🚀`, `💫`
-- Emoji trong string template: `` `${emoji}` `` nếu emoji là Unicode symbol
-- **Không** tính: ký hiệu hoàng đạo (♈♉♊♋♌♍♎♏♐♑♒♓) trong data display
-
-**Mức độ:** 🔴 Cao — trông rõ ràng nhất là AI-generated
+> **Ràng buộc dự án (đọc trước khi làm bất kỳ điều gì):**
+> - Giữ nguyên toàn bộ bảng màu `--cosmic-*` và giá trị CSS trong `index.css`. Không thêm màu mới.
+> - Giữ nguyên cấu trúc trang, route, thứ tự component, bố cục và khoảng cách.
+> - Không gỡ hiệu ứng vũ trụ (sao, gradient, kính mờ, orbit ring, glow).
+> - Không cài thêm thư viện. Stack: React 19, TypeScript, Tailwind 3.4, Framer Motion, Firebase.
+> - Nếu bất kỳ thay đổi nào yêu cầu vi phạm các điều trên → dừng, báo xung đột, xin phép.
 
 ---
 
-### G2 — Animation/Transition quá kịch tính
-Tìm giá trị vượt ngưỡng tự nhiên.
+## Giai đoạn 1 — Khảo sát & Quan sát thực tế
 
-**Patterns cần tìm:**
-- `scale` > 1.03 trong Framer Motion props hoặc CSS `transform`
-- `duration` > 0.4 (400ms) trong Framer Motion transition không phải mount animation
-- `transition: all Xs` với X > 0.35 trong CSS inline
-- `animation-duration` > 400ms trong CSS class thông thường (không phải orbit/twinkle)
-- `bounce`, `spring` với `stiffness` < 100 hoặc `damping` < 10 (quá lò xo)
+**Không kết luận về giao diện chỉ dựa trên code khi chưa quan sát thực tế.**
 
-**Mức độ:** 🟡 Trung bình
+### 1.1 Chuẩn bị môi trường
 
----
+```bash
+# Xác định lệnh chạy dev của dự án
+# Đọc package.json để biết script đúng
+cd AI_App_FE/ResonanciaWeb
+npm run dev   # hoặc script tương ứng
+```
 
-### G3 — Typography AI-ish
-Tìm kiểu chữ trông "template".
+Chờ server khởi động, xác nhận URL (thường `http://localhost:5173`).
 
-**Patterns cần tìm:**
-- `tracking-widest` kết hợp `uppercase` trên văn bản chạy dài (> 3 từ)
-- `font-weight: 900` hoặc `font-black` trên body text
-- `text-center` trên khối nội dung > 2 dòng (prose block)
-- `letter-spacing` > 0.15em trên text thường
+### 1.2 Chụp baseline — mỗi trang, mỗi viewport
 
-**Mức độ:** 🟡 Trung bình
+Dùng trình duyệt (Chrome DevTools hoặc MCP browser tool nếu có) để:
 
----
+1. Mở từng route: `/home`, `/natal`, `/match`, `/chat`, `/notifications`, `/profile`, `/login`
+2. Chụp screenshot toàn trang tại **3 viewport bắt buộc**: `390px · 768px · 1280px`
+3. Chụp thêm: hover state trên card, button active, form input focused, empty state, loading state
 
-### G4 — Nội dung lấp chỗ trống / placeholder
-Tìm text trông như AI sinh ra để điền chỗ.
+Ghi nhận quan sát **trực tiếp từ hình ảnh**, không từ code:
+- Màu thực tế có khớp ý định không?
+- Text có đọc được không?
+- Element nào bị cắt, tràn, chồng lấn?
+- Cảm giác tổng thể: có trông "template AI" không? Tại sao?
 
-**Patterns cần tìm:**
-- Chuỗi "Lorem", "placeholder", "test", "demo", "sample" trong JSX text
-- Số liệu giả trông có vẻ chính xác trong text cứng: "87%", "3.4k", "12,345"
-- Tên người giả trong text cứng: "Nguyễn Văn A", "User 1"
-- CTA với emoji đầu dòng trong text cứng: `"✨ Xem ngay"`, `"🚀 Bắt đầu"`
-- Văn bản nghe như chatbot: "Vũ trụ đang phân tích...", "AI đang xử lý..."
+### 1.3 Checklist quan sát
 
-**Mức độ:** 🟠 Quan trọng — ảnh hưởng độ tin cậy
+Đánh dấu từng mục sau khi quan sát thực tế:
 
----
-
-### G5 — Layout đối xứng hoàn hảo không có lý do
-Tìm layout trông quá "cân đối máy móc".
-
-**Patterns cần tìm:**
-- 3 column grid với 3 card identical (cùng height, cùng padding, cùng icon size)
-- Hero section: title + subtitle + CTA button căn giữa hoàn toàn, không có element lệch
-- Danh sách tính năng 3-4 mục mỗi mục đều có icon + title + description cùng độ dài
-- `grid-cols-3` hoặc `grid-cols-4` trong section marketing
-
-**Mức độ:** 🟡 Thấp — cần ngữ cảnh để đánh giá
+- [ ] Đã xem `/home` ở desktop + mobile
+- [ ] Đã xem `/natal`, `/match`, `/profile`, `/chat`
+- [ ] Đã kiểm tra hover state trên card và button
+- [ ] Đã kiểm tra loading skeleton
+- [ ] Đã kiểm tra empty state
+- [ ] Đã kiểm tra sidebar collapse trên mobile
 
 ---
 
-### G6 — Màu sắc / gradient quá rực
-Tìm giá trị màu neon cường độ cao không có trong bảng màu dự án.
+## Giai đoạn 2 — AI Visual Audit
 
-**Patterns cần tìm:**
-- Màu hex/rgb không nằm trong: `#0a0015`, `#1a0030`, `#9d4edd`, `#ff6eb4`, `#4cc9f0`, `#ffd700` và các biến thể rgba của chúng
-- `opacity` của màu neon > 0.7 trên diện rộng (background area)
-- Nhiều hơn 3 màu neon khác nhau trong cùng 1 component
+Đánh giá **10 tiêu chí** sau khi đã quan sát giao diện thực tế. Chỉ ghi vấn đề khi có **bằng chứng quan sát được** — không suy diễn từ code.
 
-**Mức độ:** 🔴 Cao nếu có màu ngoài bảng
+### Tiêu chí đánh giá
 
----
+| # | Tiêu chí | Câu hỏi kiểm tra |
+|---|----------|-----------------|
+| C1 | **Visual hierarchy** | Có điểm nhấn rõ ràng? Mắt biết nhìn vào đâu trước? |
+| C2 | **Typography** | Font, cỡ chữ, weight có tạo thứ bậc tự nhiên? Có chỗ nào uppercase-widest-tracking trên text dài? |
+| C3 | **Color system** | Màu có nhất quán? Có màu nào lạc tông? Contrast có đạt WCAG AA? |
+| C4 | **Layout & spacing** | Khoảng cách có nhịp điệu? Hay có chỗ quá chật/quá trống không lý do? |
+| C5 | **Components** | Card, button, input có nhất quán về shape, border, shadow không? |
+| C6 | **Icons** | Icon SVG có đồng bộ style (stroke width, weight)? Có icon nào trông không phù hợp? |
+| C7 | **Branding** | Resonancia có bản sắc riêng? Hay trông như template chiêm tinh generic? |
+| C8 | **Product fit** | Thiết kế có hỗ trợ user journey: ghép đôi → trò chuyện → xem lá số? |
+| C9 | **Responsive** | Layout mobile có vỡ, tràn, touch target quá nhỏ? |
+| C10 | **Accessibility** | Focus ring có thấy? Screen reader có đọc được các label? |
 
-### G7 — Hover/Focus state thiếu hoặc không tự nhiên
-Kiểm tra trạng thái tương tác.
+### Format ghi vấn đề
 
-**Patterns cần tìm:**
-- Element bấm được (`button`, `[role="link"]`, `NavLink`) không có hover state
-- Hover chỉ có `opacity` thay đổi mà không có gì khác (quá đơn giản)
-- Focus ring bị `outline: none` mà không có focus-visible thay thế
-- `cursor: pointer` thiếu trên element bấm được
+Mỗi vấn đề phát hiện ghi đủ 6 trường:
 
-**Mức độ:** 🟠 Quan trọng cho UX
+```
+[Px] Tên vấn đề ngắn
+- Trang/khu vực: [route + component]
+- Bằng chứng: [mô tả điều thấy được trong screenshot]
+- Nguyên nhân có thể: [...]
+- Mức độ: Critical / High / Medium / Low
+- Giải pháp: [cụ thể, không chung chung]
+- File cần sửa: [danh sách file]
+```
 
----
+### Nguyên tắc phán xét
 
-### G8 — SVG / Icon thiếu aria-label
-Tìm SVG không có accessibility.
-
-**Patterns cần tìm:**
-- `<svg>` không có `aria-label`, `aria-hidden`, hoặc `role="img"` + `<title>`
-- Icon SVG chức năng (không phải decorative) có `aria-hidden="true"`
-- `<img>` không có `alt`
-
-**Mức độ:** 🟠 Quan trọng cho a11y
-
----
-
-## Quy trình audit
-
-1. **Đọc từng file** trong `AI_App_FE/ResonanciaWeb/src/` — pages, components, (bỏ qua services, store, types).
-2. **Quét theo 8 nhóm** — ghi nhận: file, số dòng, đoạn code vi phạm, nhóm lỗi.
-3. **Phân loại mức độ:** 🔴 Cao / 🟠 Quan trọng / 🟡 Thấp
-4. **Xuất báo cáo Markdown** với cấu trúc:
-   - Bảng tổng hợp: số vấn đề theo nhóm và mức độ
-   - Chi tiết từng vấn đề: file + dòng + snippet + giải thích + gợi ý sửa
-   - Phần "Không cần sửa" — ghi rõ lý do ngoại lệ
-5. **Hỏi người dùng** chọn mục nào muốn sửa trước khi thực hiện bất kỳ thay đổi nào.
+- Gradient, bo tròn, glow **không phải** vấn đề tự động — chỉ vấn đề nếu thiếu mục đích hoặc lặp lại vô nghĩa.
+- Typography uppercase + tracking **không phải** vấn đề nếu dùng trên label ngắn (< 3 từ).
+- Màu neon **không phải** vấn đề nếu trong bảng màu dự án và dùng có chủ đích.
+- Vấn đề phải có **bằng chứng thực tế**, không phải cảm giác.
 
 ---
 
-## Format báo cáo
+## Giai đoạn 3 — Lập kế hoạch
+
+Trước khi sửa bất kỳ dòng code nào:
+
+### 3.1 Xác định phạm vi
+
+- Liệt kê các vấn đề theo mức độ: Critical → High → Medium → Low
+- Xác định vấn đề nào **trong giới hạn cho phép** (không cần xin phép)
+- Xác định vấn đề nào **cần xin phép** (ảnh hưởng màu, bố cục, cấu trúc)
+
+### 3.2 Nhóm thay đổi
+
+```
+Nhóm A — Sửa ngay, không cần phê duyệt (text, aria, focus, duration nhỏ):
+  - [danh sách vấn đề]
+
+Nhóm B — Cần phê duyệt trước (ảnh hưởng visual rõ ràng):
+  - [danh sách vấn đề + mô tả thay đổi cụ thể]
+
+Nhóm C — Không sửa (ngoài giới hạn hoặc rủi ro cao):
+  - [danh sách + lý do]
+```
+
+### 3.3 Trình kế hoạch
+
+Xuất kế hoạch ra artifact Markdown, hỏi người dùng phê duyệt **Nhóm B** trước khi thực hiện. Nhóm A có thể bắt đầu ngay sau khi người dùng xác nhận audit.
+
+---
+
+## Giai đoạn 4 — Thực hiện
+
+Sau khi được phê duyệt:
+
+### Nguyên tắc triển khai
+
+1. Sửa **thay đổi nhỏ nhất** đáp ứng yêu cầu — không refactor ngoài phạm vi.
+2. Loại bỏ hiệu ứng trang trí **không có mục đích chức năng**.
+3. Cải thiện typography, text content, focus state, aria label.
+4. Không xóa hoặc giả lập chức năng thật để giao diện đẹp hơn.
+5. Không thay đổi logic nghiệp vụ.
+6. Dùng lại component, class, token hiện có — tránh tạo trùng lặp.
+7. Ghi comment inline với lý do thay đổi khi không rõ ràng.
+
+### Checklist trước khi commit mỗi file
+
+- [ ] Không có màu mới ngoài CSS variable hiện có
+- [ ] Không có thư viện mới
+- [ ] Bố cục và cấu trúc DOM không thay đổi
+- [ ] Không có emoji chức năng mới
+- [ ] Hover scale ≤ 1.03, transition ≤ 250ms (trừ mount animation)
+- [ ] SVG mới có aria-label hoặc aria-hidden
+
+---
+
+## Giai đoạn 5 — Xác minh thực tế
+
+**Không tuyên bố đã sửa thành công nếu chưa kiểm tra bằng chứng thực tế.**
+
+### 5.1 Chạy lại website
+
+```bash
+npm run dev  # hoặc script tương ứng, reload trang
+```
+
+### 5.2 So sánh screenshot trước / sau
+
+- Chụp lại cùng route, cùng viewport, cùng trạng thái như baseline
+- Đặt cạnh nhau (hoặc mô tả delta rõ ràng)
+- Xác nhận từng vấn đề trong báo cáo audit đã được giải quyết
+
+### 5.3 Regression check
+
+- Màu không đổi so với baseline
+- Bố cục không lệch
+- Hiệu ứng vũ trụ vẫn hiển thị
+- Các trang khác không bị ảnh hưởng
+
+### 5.4 Nếu còn vấn đề
+
+Tiếp tục sửa và xác minh lại — không đóng audit cho đến khi kiểm tra xong.
+
+---
+
+## Báo cáo cuối
+
+Khi hoàn thành, cung cấp:
 
 ```markdown
-## AI Audit Report — Resonancia Web
-_Quét lúc: [timestamp] — [N] file — [N] vấn đề_
+## Kết quả AI Audit — [timestamp]
 
-### Tổng hợp
-| Nhóm | 🔴 Cao | 🟠 Quan trọng | 🟡 Thấp | Tổng |
-|------|--------|--------------|---------|------|
-| G1 Icon emoji    | N | - | - | N |
-| G2 Animation     | - | N | N | N |
-...
+### Vấn đề đã phát hiện: N
+### Vấn đề đã sửa: N
+### Vấn đề không sửa (và lý do): N
 
-### Chi tiết
+### File đã chỉnh sửa
+- `file.tsx` — mô tả thay đổi
 
-#### [G1] Icon emoji chức năng — 🔴 Cao
-| # | File | Dòng | Code | Gợi ý |
-|---|------|------|------|-------|
-| 1 | `ProfilePage.tsx` | 62 | `{zodiacEmoji}` | Thay bằng `<ZodiacIcon>` SVG |
+### Kết quả trước / sau
+[Screenshot comparison hoặc mô tả delta rõ ràng]
 
-...
-
-### Không cần sửa (ngoại lệ hợp lệ)
-- `astrologyMap.ts` line 17–29: ký hiệu hoàng đạo trong data map — đúng thiết kế.
+### Còn tồn tại / chưa xác minh được
+- [danh sách]
 ```
 
 ---
 
-## Sau audit
+## Nguồn tham khảo cho nghiên cứu UX
 
-- **Không tự sửa.** Chờ người dùng xác nhận mục muốn sửa.
-- Khi người dùng chọn mục, dùng skill tương ứng:
-  - Icon → `human-ui-design/SKILL.md` + `ui-polish/SKILL.md`
-  - Animation → `visual-effects/SKILL.md`
-  - Typography, layout → `human-ui-design/SKILL.md`
+Được dùng để học kỹ thuật, **không** copy màu/bố cục/asset:
+
+| Nguồn | Học gì |
+|-------|--------|
+| `co-star.app` | Hierarchy tối giản trong dark astro UI |
+| `sanctuary.app` | Card zodiac, empty state |
+| `linear.app` | Typography nhất quán, skeleton loader |
+| `vercel.com` | Focus ring, dark button treatment |
+| `refactoringui.com` | Spacing rhythm, visual hierarchy |
+| `mobbin.com` | Pattern dating/astro app thực tế |
