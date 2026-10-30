@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { RootState } from '../store';
 import { MATCH_TAGS, ZODIAC_SIGNS } from '../constants/astrologyMap';
-import { apiLoveMatching, apiLoveMatchingHistory } from '../services/api';
+import { apiLoveMatching } from '../services/api';
 import { MatchTagType } from '../types';
 import UiIcon from '../components/UiIcon';
 import ZodiacIcon from '../components/ZodiacIcon';
@@ -21,6 +21,8 @@ export default function MatchPage() {
   const [selectedTag, setSelectedTag] = useState<MatchTagType>('greenflag');
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadedTag, setLoadedTag] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   const handleStartChat = async (c: any, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -45,30 +47,81 @@ export default function MatchPage() {
     }
     navigate(`/chat/${chatId}`, { state: { chatName: c.name } });
   };
-  const [loadedTag, setLoadedTag] = useState<string | null>(null);
-  const [error, setError] = useState('');
 
   const loadCandidates = async (tag: MatchTagType) => {
     if (!profile.uid) return;
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     try {
-      // Try cache first
-      const cached = await apiLoveMatchingHistory(profile.uid, tag);
-      if (cached.data?.users?.length > 0) {
-        setCandidates(cached.data.users);
-        setLoadedTag(tag);
-        return;
+      // 1. Kiểm tra cache từ Client Firestore cực nhanh
+      try {
+        const cacheSnap = await getDoc(doc(db, 'love_matching_results', profile.uid, 'types', tag));
+        if (cacheSnap.exists()) {
+          const data = cacheSnap.data();
+          if (data?.users && Array.isArray(data.users) && data.users.length > 0) {
+            setCandidates(data.users);
+            setLoadedTag(tag);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (cacheErr) {
+        console.warn('Client cache read error:', cacheErr);
       }
-      // Call AI
+
+      // 2. Gọi backend AI phân tích
       const res = await apiLoveMatching(tag, {
         uid: profile.uid,
-        userData: { uid: profile.uid, name: profile.name, sun: profile.sun, moon: profile.moon, ascendant: profile.ascendant },
+        userData: {
+          uid: profile.uid,
+          name: profile.name,
+          sun: profile.sun || '',
+          moon: profile.moon || '',
+          ascendant: profile.ascendant || '',
+          zodiac: profile.sun || '',
+          fireRatio: profile.fireRatio || 0,
+          earthRatio: profile.earthRatio || 0,
+          airRatio: profile.airRatio || 0,
+          waterRatio: profile.waterRatio || 0,
+        },
       });
-      setCandidates(res.data?.users || []);
+
+      const users = res.data?.users || [];
+      setCandidates(users);
       setLoadedTag(tag);
+
+      // 3. Lưu cache vào Client Firestore để lần sau hiển thị tức thì
+      if (users.length > 0) {
+        try {
+          await setDoc(doc(db, 'love_matching_results', profile.uid, 'types', tag), {
+            type: tag,
+            uid: profile.uid,
+            users,
+            updatedAt: Date.now(),
+          }, { merge: true });
+        } catch (saveErr) {
+          console.warn('Client cache save error:', saveErr);
+        }
+      }
     } catch {
       setError('Không thể tải danh sách. Vui lòng thử lại.');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Tự động load ứng viên khi vào trang lần đầu
+  useEffect(() => {
+    if (profile.uid && !loadedTag) {
+      loadCandidates(selectedTag);
+    }
+  }, [profile.uid]);
+
+  const handleSelectTag = (tag: MatchTagType) => {
+    setSelectedTag(tag);
+    if (loadedTag !== tag) {
+      loadCandidates(tag);
+    }
   };
 
   const tagInfo = MATCH_TAGS[selectedTag];
@@ -91,7 +144,7 @@ export default function MatchPage() {
               aria-pressed={selectedTag === tag}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setSelectedTag(tag as MatchTagType)}
+              onClick={() => handleSelectTag(tag as MatchTagType)}
               className={`p-4 rounded-xl text-center transition-all ${
                 selectedTag === tag ? 'text-white' : 'glass text-purple-300 hover:text-white'
               }`}
@@ -152,44 +205,53 @@ export default function MatchPage() {
               </h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {candidates.map((c, i) => (
-                <motion.div key={i}
-                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.08 }}
-                  whileHover={{ y: -4 }}
-                  role="link" tabIndex={0} aria-label={`Xem hồ sơ ${c.name}`}
-                  onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) navigate(`/user/${c.uid}`); }}
-                  className="glass-card p-5 cursor-pointer card-hover"
-                  onClick={() => navigate(`/user/${c.uid}`)}
-                  style={{ border: `1px solid ${tagInfo.color}33` }}
-                >
-                  {/* Avatar */}
-                  <div className="flex items-start gap-4 mb-3">
-                    <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0"
-                      style={{ border: `2px solid ${tagInfo.color}66` }}>
-                      {c.avatar
-                        ? <img src={c.avatar} alt={c.name} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex items-center justify-center text-2xl"
-                            style={{ background: `linear-gradient(135deg, ${tagInfo.color}66, ${tagInfo.color}33)` }}>
-                            {ZODIAC_SIGNS[c.sun || c.zodiac || '']
-                              ? <ZodiacIcon sign={c.sun || c.zodiac} label={`Cung ${c.sun || c.zodiac}`} />
-                              : c.name?.[0]}
-                          </div>
-                      }
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-white font-bold text-base truncate">{c.name}</h3>
-                      <p className="text-purple-300 text-sm">{ZODIAC_SIGNS[c.sun || c.zodiac || ''] && <ZodiacIcon sign={c.sun || c.zodiac} label={`Cung ${c.sun || c.zodiac}`} className="mr-1 inline" />}{c.zodiac || c.sun}</p>
-                      {c.score && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="cosmic-progress flex-1 h-1.5">
-                            <div className="h-full rounded" style={{ width: `${c.score}%`, background: tagInfo.color }} />
-                          </div>
-                          <span className="text-xs font-bold" style={{ color: tagInfo.color }}>{c.score}%</span>
+              {candidates.map((c, i) => {
+                const matchScore = c.compatibility_score ?? c.score;
+                return (
+                  <motion.div key={c.uid || i}
+                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.08 }}
+                    whileHover={{ y: -4 }}
+                    role="link" tabIndex={0} aria-label={`Xem hồ sơ ${c.name}`}
+                    onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) navigate(`/user/${c.uid}`); }}
+                    className="glass-card p-5 cursor-pointer card-hover"
+                    onClick={() => navigate(`/user/${c.uid}`)}
+                    style={{ border: `1px solid ${tagInfo.color}33` }}
+                  >
+                    {/* Avatar */}
+                    <div className="flex items-start gap-4 mb-3">
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 relative"
+                        style={{ border: `2px solid ${tagInfo.color}66` }}>
+                        {c.avatar ? (
+                          <img
+                            src={c.avatar}
+                            alt={c.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : null}
+                        <div className="w-full h-full flex items-center justify-center text-2xl -z-10 absolute inset-0"
+                          style={{ background: `linear-gradient(135deg, ${tagInfo.color}66, ${tagInfo.color}33)` }}>
+                          {ZODIAC_SIGNS[c.sun || c.zodiac || '']
+                            ? <ZodiacIcon sign={c.sun || c.zodiac} label={`Cung ${c.sun || c.zodiac}`} />
+                            : c.name?.[0]}
                         </div>
-                      )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-white font-bold text-base truncate">{c.name}</h3>
+                        <p className="text-purple-300 text-sm">{ZODIAC_SIGNS[c.sun || c.zodiac || ''] && <ZodiacIcon sign={c.sun || c.zodiac} label={`Cung ${c.sun || c.zodiac}`} className="mr-1 inline" />}{c.zodiac || c.sun}</p>
+                        {matchScore != null && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="cosmic-progress flex-1 h-1.5">
+                              <div className="h-full rounded" style={{ width: `${matchScore}%`, background: tagInfo.color }} />
+                            </div>
+                            <span className="text-xs font-bold" style={{ color: tagInfo.color }}>{matchScore}%</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
                   {c.reason && (
                     <p className="text-purple-200 text-xs leading-relaxed opacity-80 italic">"{c.reason}"</p>
                   )}
@@ -210,7 +272,8 @@ export default function MatchPage() {
                     </button>
                   </div>
                 </motion.div>
-              ))}
+              );
+            })}
             </div>
           </motion.div>
         )}
