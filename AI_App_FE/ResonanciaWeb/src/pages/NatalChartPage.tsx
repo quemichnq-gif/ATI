@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RootState } from '../store';
-import { apiNatalAnalysis } from '../services/api';
+import { apiNatalAnalysis, apiGenerate } from '../services/api';
 import { ELEMENT_COLORS, ELEMENT_MAP } from '../constants/astrologyMap';
 import UiIcon from '../components/UiIcon';
 import type { IconName } from '../components/UiIcon';
+import NatalChartSVG from '../components/NatalChartSVG';
 
 const SECTIONS = [
   { key: 'personality', label: 'Tính Cách', icon: 'user' },
@@ -16,6 +17,12 @@ const SECTIONS = [
   { key: 'elements', label: 'Nguyên Tố', icon: 'water' },
   { key: 'advice', label: 'Lời Khuyên', icon: 'chart' },
   { key: 'idealPartner', label: 'Người Lý Tưởng', icon: 'user' },
+];
+
+const PAGE_TABS = [
+  { id: 'chart', label: 'Biểu Đồ Sao' },
+  { id: 'analysis', label: 'Phân Tích AI' },
+  { id: 'career', label: 'Hướng Nghiệp' },
 ];
 
 function parseAnalysisSections(text: string) {
@@ -31,11 +38,14 @@ function parseAnalysisSections(text: string) {
 
 export default function NatalChartPage() {
   const profile = useSelector((s: RootState) => s.profile);
+  const [pageTab, setPageTab] = useState('chart');
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [sections, setSections] = useState<Record<string, string>>({});
   const [activeSection, setActiveSection] = useState('personality');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [careerAnalysis, setCareerAnalysis] = useState('');
+  const [careerLoading, setCareerLoading] = useState(false);
 
   const element = ELEMENT_MAP[profile.sun || ''] || 'Không xác định';
   const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS['Không xác định'];
@@ -83,6 +93,21 @@ export default function NatalChartPage() {
     } finally { setLoading(false); }
   };
 
+  const handleCareerAnalysis = async () => {
+    if (!profile.uid) return;
+    setCareerLoading(true);
+    try {
+      const res = await apiGenerate({
+        userData: { uid: profile.uid, name: profile.name, sun: profile.sun, moon: profile.moon, birthDate: profile.birthDate },
+        category: 'career_chart',
+        day: new Date().toISOString().split('T')[0],
+      });
+      setCareerAnalysis(res.data?.prediction || 'Không thể tải. Vui lòng thử lại.');
+    } catch {
+      setCareerAnalysis(`${profile.sun} của bạn được hành tinh Saturn và Jupiter chi phối sự nghiệp. Nhà thứ 10 trong lá số tiết lộ con đường phù hợp nhất với bản chất bạn.`);
+    } finally { setCareerLoading(false); }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -91,29 +116,122 @@ export default function NatalChartPage() {
         <p className="text-purple-300 opacity-70 mt-1">Phân tích chiêm tinh sâu từ biểu đồ sinh của bạn</p>
       </motion.div>
 
-      {/* Planet Overview */}
-      <div className="glass-card p-6">
-        <h2 className="text-white font-semibold mb-4"><UiIcon name="sparkles" label="Hành tinh của bạn" className="mr-2 inline" />Hành Tinh Của Bạn</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {[
-            { label: 'Mặt Trời', icon: 'sun', value: profile.sun },
-            { label: 'Mặt Trăng', icon: 'moon', value: profile.moon },
-            { label: 'Sao Thuỷ ☿', value: profile.mercury },
-            { label: 'Sao Kim ♀', value: profile.venus },
-            { label: 'Sao Hoả ♂', value: profile.mars },
-            { label: 'Sao Mộc ♃', value: profile.jupiter },
-            { label: 'Sao Thổ ♄', value: profile.saturn },
-            { label: 'Điểm Mọc ↑', value: profile.ascendant },
-            { label: 'Trung Thiên', icon: 'star', value: profile.mc },
-            { label: 'Nguyên Tố', icon: 'sparkles', value: element },
-          ].map(p => (
-            <div key={p.label} className="glass p-3 rounded-xl text-center">
-              <p className="text-purple-300 text-xs mb-1 opacity-70">{'icon' in p && <UiIcon name={p.icon as IconName} label={p.label} className="mr-1 inline" />}{p.label}</p>
-              <p className="text-white text-sm font-semibold">{p.value || '—'}</p>
-            </div>
-          ))}
-        </div>
+      {/* Page tabs */}
+      <div className="flex gap-2">
+        {PAGE_TABS.map(tab => (
+          <button key={tab.id} onClick={() => setPageTab(tab.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              pageTab === tab.id ? 'text-white' : 'glass text-purple-300 hover:text-white'
+            }`}
+            style={pageTab === tab.id ? {
+              background: `linear-gradient(135deg, ${colors[0]}50, ${colors[1]}40)`,
+              border: `1px solid ${colors[0]}60`,
+            } : {}}>
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {/* TAB: CHART */}
+      {pageTab === 'chart' && (
+        <>
+        {/* SVG Natal Chart */}
+        <div className="glass-card p-6">
+          <h2 className="text-white font-semibold mb-4"><UiIcon name="chart" label="Biểu đồ chiêm tinh" className="mr-2 inline" />Biểu Đồ Natal Chart</h2>
+          <div className="flex justify-center">
+            <NatalChartSVG
+              planets={{
+                sun: profile.sun, moon: profile.moon, mercury: profile.mercury,
+                venus: profile.venus, mars: profile.mars, jupiter: profile.jupiter,
+                saturn: profile.saturn, uranus: profile.uranus, neptune: profile.neptune,
+                pluto: profile.pluto, ascendant: profile.ascendant, mc: profile.mc,
+              }}
+              aspects={{
+                conjunction: profile.conjunctionAspect,
+                trine: profile.trineAspect,
+                opposition: profile.oppositionAspect,
+                square: profile.squareAspect,
+                sextile: profile.sextileAspect,
+              }}
+              size={320}
+            />
+          </div>
+          {/* Legend */}
+          <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs">
+            {[['#fbbf24','Conjunction'],['#4ade80','Trine'],['#f87171','Opposition'],['#fb923c','Square'],['#38bdf8','Sextile']].map(([c,l])=>(
+              <span key={l} className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block rounded" style={{background:c}}/><span className="text-purple-300 opacity-70">{l}</span></span>
+            ))}
+          </div>
+        </div>
+
+        {/* Planet Overview */}
+        <div className="glass-card p-6">
+          <h2 className="text-white font-semibold mb-4"><UiIcon name="sparkles" label="Hành tinh của bạn" className="mr-2 inline" />Hành Tinh Của Bạn</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[
+              { label: 'Mặt Trời', icon: 'sun', value: profile.sun },
+              { label: 'Mặt Trăng', icon: 'moon', value: profile.moon },
+              { label: 'Sao Thuỷ ☿', value: profile.mercury },
+              { label: 'Sao Kim ♀', value: profile.venus },
+              { label: 'Sao Hoả ♂', value: profile.mars },
+              { label: 'Sao Mộc ♃', value: profile.jupiter },
+              { label: 'Sao Thổ ♄', value: profile.saturn },
+              { label: 'Điểm Mọc ↑', value: profile.ascendant },
+              { label: 'Trung Thiên', icon: 'star', value: profile.mc },
+              { label: 'Nguyên Tố', icon: 'sparkles', value: element },
+            ].map(p => (
+              <div key={p.label} className="glass p-3 rounded-xl text-center">
+                <p className="text-purple-300 text-xs mb-1 opacity-70">{'icon' in p && <UiIcon name={p.icon as IconName} label={p.label} className="mr-1 inline" />}{p.label}</p>
+                <p className="text-white text-sm font-semibold">{p.value || '—'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        </>)}
+
+      {/* TAB: CAREER CHART */}
+      {pageTab === 'career' && (
+        <div className="space-y-4">
+          <div className="glass-card p-6">
+            <h2 className="text-white font-semibold mb-2">💼 Bản Đồ Hướng Nghiệp</h2>
+            <p className="text-purple-300 text-sm opacity-70 mb-4">Phân tích sự nghiệp từ Nhà 10, Midheaven và Saturn trong lá số của {profile.sun}</p>
+            {!careerAnalysis ? (
+              <button onClick={handleCareerAnalysis} disabled={careerLoading}
+                className="btn-cosmic px-8 py-3 w-full"
+                style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
+                {careerLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Đang phân tích hướng nghiệp...
+                  </span>
+                ) : '🔭 Phân Tích Hướng Nghiệp'}
+              </button>
+            ) : (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <p className="text-purple-100 text-sm leading-relaxed whitespace-pre-wrap opacity-90 border-l-2 pl-4 italic"
+                  style={{ borderColor: colors[0] }}>{careerAnalysis}</p>
+                <button onClick={() => setCareerAnalysis('')} className="text-purple-400 text-xs mt-3 hover:text-purple-300 underline">↻ Phân tích lại</button>
+              </motion.div>
+            )}
+          </div>
+          <div className="glass-card p-5">
+            <h3 className="text-white font-semibold mb-3">📊 Vị Trí Liên Quan Sự Nghiệp</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {[{l:'Trung Thiên (MC)',v:profile.mc},{l:'Nhà 10',v:profile.house10},{l:'Sao Thổ',v:profile.saturn},{l:'Sao Mộc',v:profile.jupiter}].map(({l,v})=>(
+                <div key={l} className="glass p-3 rounded-xl text-center">
+                  <p className="text-purple-400 text-xs mb-1">{l}</p>
+                  <p className="text-white font-semibold text-sm">{v||'—'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: ANALYSIS (existing natal analysis) */}
+      {pageTab === 'analysis' && (
+        <>
+      {/* Element Ratios */}
 
       {/* Element Ratios */}
       <div className="glass-card p-6">
@@ -143,16 +261,7 @@ export default function NatalChartPage() {
         </div>
       </div>
 
-      {/* Natal Chart Image */}
-      {profile.natalChartImage && (
-        <div className="glass-card p-6">
-          <h2 className="text-white font-semibold mb-4"><UiIcon name="chart" label="Biểu đồ chiêm tinh" className="mr-2 inline" />Biểu Đồ Chiêm Tinh</h2>
-          <div className="flex justify-center">
-            <img src={`data:image/svg+xml;base64,${profile.natalChartImage}`}
-              alt="Natal Chart" className="max-w-md w-full rounded-xl" />
-          </div>
-        </div>
-      )}
+
 
       {/* Analyze button */}
       {!analysis && (
@@ -210,6 +319,8 @@ export default function NatalChartPage() {
             ↻ Phân tích lại
           </button>
         </motion.div>
+      )}
+      </>
       )}
     </div>
   );

@@ -20,6 +20,16 @@ function NavIcon({ name }: { name: string }) {
       return <svg {...props} viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>;
     case 'profile':
       return <svg {...props} viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+    case 'synastry':
+      return <svg {...props} viewBox="0 0 24 24"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></svg>;
+    case 'transit':
+      return <svg {...props} viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="9" ry="3.5" transform="rotate(-30 12 12)"/></svg>;
+    case 'tarot':
+      return <svg {...props} viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="m12 8 1 2 2 1-2 1-1 2-1-2-2-1 2-1Z"/></svg>;
+    case 'journal':
+      return <svg {...props} viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>;
+    case 'glossary':
+      return <svg {...props} viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
     case 'logout':
       return <svg {...props} viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
     default:
@@ -30,10 +40,18 @@ function NavIcon({ name }: { name: string }) {
 const navItems = [
   { path: '/home', iconKey: 'home', label: 'Trang Chủ' },
   { path: '/natal', iconKey: 'natal', label: 'Bản Đồ Sao' },
-  { path: '/match', iconKey: 'match', label: 'Ghép Đôi Chiêm Tinh' },
+  { path: '/match', iconKey: 'match', label: 'Ghép Đôi' },
   { path: '/chat', iconKey: 'chat', label: 'Trò Chuyện' },
   { path: '/notifications', iconKey: 'notifications', label: 'Thông Báo' },
-  { path: '/profile', iconKey: 'profile', label: 'Hồ Sơ Cá Nhân' },
+  { path: '/profile', iconKey: 'profile', label: 'Hồ Sơ' },
+];
+
+const astroItems = [
+  { path: '/synastry', iconKey: 'synastry', label: 'Bản Đồ Đôi (Synastry)' },
+  { path: '/transit', iconKey: 'transit', label: 'Vận Hạn (Transit)' },
+  { path: '/tarot', iconKey: 'tarot', label: 'Trải Bài Tarot' },
+  { path: '/journal', iconKey: 'journal', label: 'Nhật Ký Vũ Trụ' },
+  { path: '/glossary', iconKey: 'glossary', label: 'Từ Điển Chiêm Tinh' },
 ];
 
 export default function Sidebar() {
@@ -107,6 +125,30 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
         {navItems.map(item => (
+          <NavLink key={item.path} to={item.path}
+            className={({ isActive }) => `
+              flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-200
+              ${isActive
+                ? 'text-white'
+                : 'text-purple-300/70 hover:text-white hover:bg-white/[0.04]'
+              }
+            `}
+            style={({ isActive }) => isActive ? {
+              background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.25), rgba(219, 39, 119, 0.15))',
+              border: '1px solid rgba(168, 85, 247, 0.35)',
+              boxShadow: '0 4px 12px rgba(147, 51, 234, 0.15)'
+            } : {}}
+          >
+            <NavIcon name={item.iconKey} />
+            <span className="tracking-wide">{item.label}</span>
+          </NavLink>
+        ))}
+
+        <div className="pt-3 pb-1 px-3">
+          <p className="text-[10px] uppercase font-mono tracking-wider text-purple-300/40 font-semibold">Khám Phá Chiêm Tinh</p>
+        </div>
+
+        {astroItems.map(item => (
           <NavLink key={item.path} to={item.path}
             className={({ isActive }) => `
               flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-200

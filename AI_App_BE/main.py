@@ -257,6 +257,10 @@ def generate_prediction():
 
     safe_print(f"⚙️ Tạo dự đoán mới ({category}, {day}) cho {name} ({sun})")
 
+
+    # Extra data (synastry, transit, etc.)
+    extra = data.get("extra", {})
+
     category_map = {
         "daily": "Dự đoán hằng ngày",
         "love": "Dự đoán tình duyên",
@@ -272,7 +276,53 @@ def generate_prediction():
     day_label = day_map.get(day, "hôm nay")
     cat_label = category_map.get(category, "Dự đoán chiêm tinh")
 
-    prompt = f"""
+    # Build prompt based on category
+    if category == "synastry":
+        p2_name = extra.get("person2_name", "Người kia")
+        p2_sun = extra.get("person2_sun", "Không rõ")
+        p2_moon = extra.get("person2_moon", "Không rõ")
+        p2_asc = extra.get("person2_ascendant", "")
+        p2_venus = extra.get("person2_venus", "")
+        p2_mars = extra.get("person2_mars", "")
+        prompt = f"""
+        Phân tích tuyệt đối tương hợp cặp đôi theo chiêm tinh. Trả lời JSON với cấu trúc:
+        {{"overall": <số 0-100>, "love": <số 0-100>, "communication": <số 0-100>, "passion": <số 0-100>, "spiritual": <số 0-100>, "summary": "tóm tắt 2-3 câu", "strengths": "2-3 câu về điểm mạnh", "challenges": "2-3 câu về thách thức", "advice": "lời khuyên 2-3 câu"}}
+        Người 1: {name}, Mặt Trời {sun}, Mặt Trăng {moon}
+        Người 2: {p2_name}, Mặt Trời {p2_sun}, Mặt Trăng {p2_moon}, Cung Mọc {p2_asc}, Sao Kim {p2_venus}, Sao Hỏa {p2_mars}
+        Chỉ trả lời JSON thuần, không thêm giải thích ngoài.
+        """
+    elif category == "career_chart":
+        prompt = f"""
+        Phân tích hướng nghiệp qua lá số chiêm tinh cho {name} (Mặt Trời {sun}, Mặt Trăng {moon}).
+        Tập trung vào: Nhà 10 (Midheaven), Saturn, Jupiter.
+        Phân tích: (1) Tài năng bẩm sinh (2) Ngành nghề phù hợp (3) Môi trường làm việc lý tưởng (4) Lời khuyên phát triển sự nghiệp.
+        Viết bằng tiếng Việt, khoảng 200 từ, giỏi văn, không dùng emoji.
+        """
+    elif category.startswith("tarot_"):
+        card_name = category.replace("tarot_", "").replace("_", " ").title()
+        prompt = f"""
+        Giải nghĩa lá Tarot '{card_name}' cho {name} với cung Mặt Trời {sun} và Mặt Trăng {moon}.
+        Tập trung vào: (1) Ý nghĩa lá bài hôm nay (2) Cách ứng dụng cho {sun} (3) Lời cảnh báo hoặc cơ hội.
+        Viết 3-4 câu nơi mở, thi vị, không dùng emoji.
+        """
+    elif category.startswith("transit_"):
+        transit_event = extra.get("transit_event", "Sự kiện thiên văn")
+        prompt = f"""
+        Phân tích ảnh hưởng của sự kiện thiên văn lên {name} (cung {sun}, Mặt Trăng {moon}).
+        Sự kiện: {transit_event}
+        Viết lời khuyên cụ thể, thiết thực cho {sun}, khoảng 2-3 câu. Không dùng emoji.
+        """
+    elif category.endswith("_week") or category.endswith("_month"):
+        period_str = "tuần này" if category.endswith("_week") else "tháng này"
+        base_cat = category.replace("_week", "").replace("_month", "")
+        cat_map2 = {"astro": "tổng quan chiêm tinh", "love": "tình duyên", "work": "công việc"}
+        base_label = cat_map2.get(base_cat, "chiêm tinh")
+        prompt = f"""
+        Dự đoán {base_label} {period_str} cho {name} (Mặt Trời {sun}, Mặt Trăng {moon}).
+        Viết 150-200 từ, chia theo các giai đoạn (đầu/giữa/cuối {period_str}), lời khuyên cụ thể. Không dùng emoji.
+        """
+    else:
+        prompt = f"""
     {cat_label} cho {day_label}:
     - Tên: {name}
     - Mặt Trời: {sun}, Mặt Trăng: {moon}
@@ -280,6 +330,8 @@ def generate_prediction():
     Mô tả cụ thể năng lượng, cảm xúc, xu hướng và lời khuyên thiết thực.
     Không dùng emoji, không ký tự đặc biệt, không mở đầu hay kết thúc dư thừa.
     """
+
+
 
     try:
         text = ""
