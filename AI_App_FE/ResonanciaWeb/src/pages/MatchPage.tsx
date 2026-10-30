@@ -48,25 +48,27 @@ export default function MatchPage() {
     navigate(`/chat/${chatId}`, { state: { chatName: c.name } });
   };
 
-  const loadCandidates = async (tag: MatchTagType) => {
+  const loadCandidates = async (tag: MatchTagType, forceRefresh = false) => {
     if (!profile.uid) return;
     setLoading(true);
     setError('');
     try {
-      // 1. Kiểm tra cache từ Client Firestore cực nhanh
-      try {
-        const cacheSnap = await getDoc(doc(db, 'love_matching_results', profile.uid, 'types', tag));
-        if (cacheSnap.exists()) {
-          const data = cacheSnap.data();
-          if (data?.users && Array.isArray(data.users) && data.users.length > 0) {
-            setCandidates(data.users);
-            setLoadedTag(tag);
-            setLoading(false);
-            return;
+      // 1. Kiểm tra cache từ Client Firestore nếu không yêu cầu forceRefresh
+      if (!forceRefresh) {
+        try {
+          const cacheSnap = await getDoc(doc(db, 'love_matching_results', profile.uid, 'types', tag));
+          if (cacheSnap.exists()) {
+            const data = cacheSnap.data();
+            if (data?.users && Array.isArray(data.users) && data.users.length > 0) {
+              setCandidates(data.users);
+              setLoadedTag(tag);
+              setLoading(false);
+              return;
+            }
           }
+        } catch (cacheErr) {
+          console.warn('Client cache read error:', cacheErr);
         }
-      } catch (cacheErr) {
-        console.warn('Client cache read error:', cacheErr);
       }
 
       // 2. Gọi backend AI phân tích
@@ -75,6 +77,7 @@ export default function MatchPage() {
         userData: {
           uid: profile.uid,
           name: profile.name,
+          gender: profile.gender || '',
           sun: profile.sun || '',
           moon: profile.moon || '',
           ascendant: profile.ascendant || '',
@@ -110,9 +113,9 @@ export default function MatchPage() {
     }
   };
 
-  // Tự động load ứng viên khi vào trang lần đầu
+  // Tự động load ứng viên khi vào trang lần đầu hoặc khi đổi profile
   useEffect(() => {
-    if (profile.uid && !loadedTag) {
+    if (profile.uid) {
       loadCandidates(selectedTag);
     }
   }, [profile.uid]);
@@ -163,8 +166,8 @@ export default function MatchPage() {
           ))}
         </div>
 
-        <div className="mt-4 flex gap-3 items-center">
-          <button onClick={() => loadCandidates(selectedTag)} disabled={loading}
+        <div className="mt-4 flex flex-wrap gap-3 items-center">
+          <button onClick={() => loadCandidates(selectedTag, true)} disabled={loading}
             className="btn-cosmic px-8 py-3 flex items-center gap-2"
             style={{ background: `linear-gradient(135deg, ${tagInfo.color}, ${tagInfo.color}99)` }}>
             {loading ? (
@@ -175,6 +178,14 @@ export default function MatchPage() {
             ) : (
               <><UiIcon name={TAG_ICONS[selectedTag]} label={tagInfo.label} className="inline" /> Tìm {tagInfo.label}</>
             )}
+          </button>
+          <button onClick={() => loadCandidates(selectedTag, true)} disabled={loading}
+            className="glass px-4 py-3 rounded-xl text-xs text-purple-300 hover:text-white transition-all flex items-center gap-1.5"
+            title="Đổi nhóm ứng viên khác">
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            <span>Đổi người khác</span>
           </button>
           {loadedTag && loadedTag !== selectedTag && (
             <p className="text-purple-400 text-sm">Nhấn để tải kết quả cho {tagInfo.label}</p>
