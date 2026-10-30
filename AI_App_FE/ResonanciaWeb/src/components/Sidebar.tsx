@@ -3,9 +3,10 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
+import UiIcon from './UiIcon';
 
 function NavIcon({ name }: { name: string }) {
-  const props = { className: "w-5 h-5", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const props = { className: "w-5 h-5", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" as const, strokeLinejoin: "round" as const, role: "img" as const, "aria-label": name };
   switch (name) {
     case 'home':
       return <svg {...props} viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
@@ -60,7 +61,7 @@ export default function Sidebar() {
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.3), rgba(236,72,153,0.2))', border: '1px solid rgba(168,85,247,0.4)' }}>
-            <svg viewBox="0 0 24 24" className="w-4 h-4 text-purple-300" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="w-4 h-4 text-purple-300" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07 19.07 4.93" strokeLinecap="round"/>
             </svg>
           </div>
@@ -91,12 +92,12 @@ export default function Sidebar() {
             <p className="text-white text-xs font-semibold truncate tracking-wide">{displayName}</p>
             {hasAstro ? (
               <p className="text-[11px] text-purple-300/70 truncate mt-0.5">
-                ☉ {profile.sun} · ☽ {profile.moon}
+                <UiIcon name="sun" label="Mặt Trời" className="inline mr-1" />{profile.sun} · <UiIcon name="moon" label="Mặt Trăng" className="inline mr-1" />{profile.moon}
               </p>
             ) : (
               <button onClick={() => navigate('/register/step2')}
                 className="text-[11px] text-pink-400 hover:text-pink-300 hover:underline truncate mt-0.5 flex items-center gap-1">
-                <span>✦ Thiết lập lá số</span>
+                <span><UiIcon name="star" label="Thiết lập lá số" className="inline mr-1" />Thiết lập lá số</span>
               </button>
             )}
           </div>

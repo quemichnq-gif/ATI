@@ -13,43 +13,27 @@ export const ELEMENT_COLORS: Record<string, [string, string]> = {
   'Không xác định': ['#5a5a5a', '#888888'],
 };
 
-export const ZODIAC_EMOJIS: Record<string, string> = {
-  'Bạch Dương': '♈',
-  'Kim Ngưu': '♉',
-  'Song Tử': '♊',
-  'Cự Giải': '♋',
-  'Sư Tử': '♌',
-  'Xử Nữ': '♍',
-  'Thiên Bình': '♎',
-  'Bọ Cạp': '♏',
-  'Nhân Mã': '♐',
-  'Ma Kết': '♑',
-  'Bảo Bình': '♒',
-  'Song Ngư': '♓',
-  'Không xác định': '✨',
+export const ZODIAC_SIGNS: Record<string, string> = {
+  'Bạch Dương': 'aries',
+  'Kim Ngưu': 'taurus',
+  'Song Tử': 'gemini',
+  'Cự Giải': 'cancer',
+  'Sư Tử': 'leo',
+  'Xử Nữ': 'virgo',
+  'Thiên Bình': 'libra',
+  'Bọ Cạp': 'scorpio',
+  'Nhân Mã': 'sagittarius',
+  'Ma Kết': 'capricorn',
+  'Bảo Bình': 'aquarius',
+  'Song Ngư': 'pisces',
 };
 
-export const ZODIAC_SYMBOLS: Record<string, { emoji: string; symbol: string; en: string }> = {
-  'Bạch Dương': { emoji: '♈', symbol: '🐏', en: 'Aries' },
-  'Kim Ngưu': { emoji: '♉', symbol: '🐂', en: 'Taurus' },
-  'Song Tử': { emoji: '♊', symbol: '👫', en: 'Gemini' },
-  'Cự Giải': { emoji: '♋', symbol: '🦀', en: 'Cancer' },
-  'Sư Tử': { emoji: '♌', symbol: '🦁', en: 'Leo' },
-  'Xử Nữ': { emoji: '♍', symbol: '🌾', en: 'Virgo' },
-  'Thiên Bình': { emoji: '♎', symbol: '⚖️', en: 'Libra' },
-  'Bọ Cạp': { emoji: '♏', symbol: '🦂', en: 'Scorpio' },
-  'Nhân Mã': { emoji: '♐', symbol: '🏹', en: 'Sagittarius' },
-  'Ma Kết': { emoji: '♑', symbol: '🐐', en: 'Capricorn' },
-  'Bảo Bình': { emoji: '♒', symbol: '🏺', en: 'Aquarius' },
-  'Song Ngư': { emoji: '♓', symbol: '🐟', en: 'Pisces' },
-};
-
-export const MATCH_TAGS: Record<string, { label: string; emoji: string; color: string; desc: string }> = {
-  greenflag: { label: 'Green Flag', emoji: '💚', color: '#22c55e', desc: 'Người tương hợp hoàn toàn' },
-  redflag: { label: 'Red Flag', emoji: '🚩', color: '#ef4444', desc: 'Người thử thách bạn' },
-  karmic: { label: 'Karmic', emoji: '🔮', color: '#a855f7', desc: 'Kết nối nghiệp duyên' },
-  destiny: { label: 'Destiny', emoji: '⭐', color: '#f59e0b', desc: 'Người vận mệnh' },
-  twinflame: { label: 'Twin Flame', emoji: '🔥', color: '#f97316', desc: 'Ngọn lửa đôi' },
+export const MATCH_TAGS: Record<string, { label: string; color: string; desc: string }> = {
+  greenflag: { label: 'Green Flag', color: '#22c55e', desc: 'Người tương hợp hoàn toàn' },
+  redflag: { label: 'Red Flag', color: '#ef4444', desc: 'Người thử thách bạn' },
+  karmic: { label: 'Karmic', color: '#a855f7', desc: 'Kết nối nghiệp duyên' },
+  destiny: { label: 'Destiny', color: '#f59e0b', desc: 'Người vận mệnh' },
+  twinflame: { label: 'Twin Flame', color: '#f97316', desc: 'Ngọn lửa đôi' },
 };
 
 export const TRANSLATIONS: Record<string, string> = {

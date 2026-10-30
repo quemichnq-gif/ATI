@@ -5,9 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { RootState } from '../store';
-import { MATCH_TAGS, ZODIAC_EMOJIS } from '../constants/astrologyMap';
+import { MATCH_TAGS, ZODIAC_SIGNS } from '../constants/astrologyMap';
 import { apiLoveMatching, apiLoveMatchingHistory } from '../services/api';
 import { MatchTagType } from '../types';
+import UiIcon from '../components/UiIcon';
+import ZodiacIcon from '../components/ZodiacIcon';
+
+const TAG_ICONS: Record<MatchTagType, 'heart' | 'flame' | 'sparkles' | 'star'> = {
+  greenflag: 'heart', redflag: 'flame', karmic: 'sparkles', destiny: 'star', twinflame: 'flame',
+};
 
 export default function MatchPage() {
   const profile = useSelector((s: RootState) => s.profile);
@@ -71,7 +77,7 @@ export default function MatchPage() {
     <div className="space-y-6">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold gradient-text font-display">💫 Khám Phá Tình Duyên</h1>
+        <h1 className="text-3xl font-bold gradient-text font-display"><UiIcon name="sparkles" label="Khám phá tình duyên" className="mr-2 inline" />Khám Phá Tình Duyên</h1>
         <p className="text-purple-300 opacity-70 mt-1">AI phân tích vũ trụ tìm người tương hợp với bạn</p>
       </motion.div>
 
@@ -82,7 +88,8 @@ export default function MatchPage() {
           {Object.entries(MATCH_TAGS).map(([tag, info]) => (
             <motion.button
               key={tag}
-              whileHover={{ scale: 1.05 }}
+              aria-pressed={selectedTag === tag}
+              whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setSelectedTag(tag as MatchTagType)}
               className={`p-4 rounded-xl text-center transition-all ${
@@ -94,7 +101,7 @@ export default function MatchPage() {
                 boxShadow: `0 0 20px ${info.color}22`,
               } : {}}
             >
-              <div className="text-2xl mb-1">{info.emoji}</div>
+              <div className="text-2xl mb-1"><UiIcon name={TAG_ICONS[tag as MatchTagType]} label={info.label} /></div>
               <p className="text-sm font-semibold">{info.label}</p>
               <p className="text-xs opacity-60 mt-0.5 leading-tight">{info.desc}</p>
             </motion.button>
@@ -111,7 +118,7 @@ export default function MatchPage() {
                 Đang phân tích...
               </>
             ) : (
-              <>{tagInfo.emoji} Tìm {tagInfo.label}</>
+              <><UiIcon name={TAG_ICONS[selectedTag]} label={tagInfo.label} className="inline" /> Tìm {tagInfo.label}</>
             )}
           </button>
           {loadedTag && loadedTag !== selectedTag && (
@@ -128,7 +135,7 @@ export default function MatchPage() {
             className="glass-card p-8 text-center">
             <div className="relative mx-auto w-16 h-16 mb-4">
               <div className="cosmic-spinner" />
-              <div className="absolute inset-0 flex items-center justify-center text-2xl">{tagInfo.emoji}</div>
+              <div className="absolute inset-0 flex items-center justify-center text-2xl"><UiIcon name={TAG_ICONS[selectedTag]} label={tagInfo.label} /></div>
             </div>
             <p className="text-white font-semibold mb-1">AI đang phân tích vũ trụ...</p>
             <p className="text-purple-300 text-sm opacity-70">Đang tìm {tagInfo.label} cho bạn</p>
@@ -139,7 +146,7 @@ export default function MatchPage() {
           <motion.div key="results" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
             <div className="flex justify-between items-center">
               <h2 className="text-white font-semibold">
-                {tagInfo.emoji} {tagInfo.label} – {candidates.length} người
+                <UiIcon name={TAG_ICONS[selectedTag]} label={tagInfo.label} className="mr-1 inline" />{tagInfo.label} – {candidates.length} người
               </h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -148,6 +155,8 @@ export default function MatchPage() {
                   initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.08 }}
                   whileHover={{ y: -4 }}
+                  role="link" tabIndex={0} aria-label={`Xem hồ sơ ${c.name}`}
+                  onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) navigate(`/user/${c.uid}`); }}
                   className="glass-card p-5 cursor-pointer card-hover"
                   onClick={() => navigate(`/user/${c.uid}`)}
                   style={{ border: `1px solid ${tagInfo.color}33` }}
@@ -160,13 +169,15 @@ export default function MatchPage() {
                         ? <img src={c.avatar} alt={c.name} className="w-full h-full object-cover" />
                         : <div className="w-full h-full flex items-center justify-center text-2xl"
                             style={{ background: `linear-gradient(135deg, ${tagInfo.color}66, ${tagInfo.color}33)` }}>
-                            {ZODIAC_EMOJIS[c.sun || c.zodiac || ''] || c.name?.[0]}
+                            {ZODIAC_SIGNS[c.sun || c.zodiac || '']
+                              ? <ZodiacIcon sign={c.sun || c.zodiac} label={`Cung ${c.sun || c.zodiac}`} />
+                              : c.name?.[0]}
                           </div>
                       }
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-white font-bold text-base truncate">{c.name}</h3>
-                      <p className="text-purple-300 text-sm">{ZODIAC_EMOJIS[c.sun || c.zodiac || '']} {c.zodiac || c.sun}</p>
+                      <p className="text-purple-300 text-sm">{ZODIAC_SIGNS[c.sun || c.zodiac || ''] && <ZodiacIcon sign={c.sun || c.zodiac} label={`Cung ${c.sun || c.zodiac}`} className="mr-1 inline" />}{c.zodiac || c.sun}</p>
                       {c.score && (
                         <div className="flex items-center gap-2 mt-1">
                           <div className="cosmic-progress flex-1 h-1.5">
@@ -185,7 +196,7 @@ export default function MatchPage() {
                       onClick={(e) => handleStartChat(c, e)}
                       className="flex-1 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
                       style={{ background: `linear-gradient(135deg, ${tagInfo.color}66, ${tagInfo.color}44)` }}>
-                      💬 Nhắn Tin
+                      <UiIcon name="message" label="Nhắn tin" className="mr-1 inline" />Nhắn Tin
                     </button>
                     <button
                       onClick={(e) => {
@@ -193,7 +204,7 @@ export default function MatchPage() {
                         navigate(`/user/${c.uid}`);
                       }}
                       className="flex-1 py-2 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/10">
-                      👤 Xem Hồ Sơ
+                      <UiIcon name="user" label="Xem hồ sơ" className="mr-1 inline" />Xem Hồ Sơ
                     </button>
                   </div>
                 </motion.div>
@@ -205,7 +216,7 @@ export default function MatchPage() {
         {!loading && candidates.length === 0 && loadedTag && (
           <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="glass-card p-10 text-center">
-            <div className="text-5xl mb-4">🔭</div>
+            <div className="text-5xl mb-4"><UiIcon name="compass" label="Chưa có kết quả phù hợp" /></div>
             <p className="text-white font-semibold mb-2">Chưa tìm thấy ai</p>
             <p className="text-purple-300 text-sm opacity-70">Vũ trụ đang chuẩn bị... Hãy thử lại sau!</p>
           </motion.div>

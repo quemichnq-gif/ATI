@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import StarField from '../components/StarField';
+import UiIcon from '../components/UiIcon';
 
 const FEATURES = [
-  { icon: '🔮', title: 'Natal Chart AI', desc: 'Phân tích biểu đồ chiêm tinh cá nhân sâu với Gemini AI' },
-  { icon: '💫', title: 'AI Matchmaking', desc: '5 loại kết nối: Green Flag, Red Flag, Karmic, Destiny, Twin Flame' },
-  { icon: '💬', title: 'Real-time Chat', desc: 'Kết nối và trò chuyện với người tương hợp trong thời gian thực' },
-  { icon: '⭐', title: 'Dự Đoán Hàng Ngày', desc: 'Horoscope cá nhân hoá dựa trên biểu đồ sinh của bạn' },
+  { icon: 'chart', title: 'Natal Chart AI', desc: 'Phân tích biểu đồ chiêm tinh cá nhân sâu với Gemini AI' },
+  { icon: 'heart', title: 'AI Matchmaking', desc: '5 loại kết nối: Green Flag, Red Flag, Karmic, Destiny, Twin Flame' },
+  { icon: 'message', title: 'Real-time Chat', desc: 'Kết nối và trò chuyện với người tương hợp trong thời gian thực' },
+  { icon: 'star', title: 'Dự Đoán Hàng Ngày', desc: 'Horoscope cá nhân hoá dựa trên biểu đồ sinh của bạn' },
 ];
 
 export default function OnboardingPage() {
@@ -37,7 +38,7 @@ export default function OnboardingPage() {
             animate={{ rotate: [0, 5, -5, 0], y: [0, -10, 0] }}
             transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
             className="text-8xl mb-6 inline-block"
-          >🔮</motion.div>
+          ><UiIcon name="chart" label="Biểu đồ chiêm tinh" className="text-8xl" /></motion.div>
           <h1 className="text-6xl font-bold font-display gradient-text mb-4">Resonancia</h1>
           <p className="text-xl text-purple-300 opacity-80 max-w-xl mx-auto leading-relaxed">
             Nền tảng kết đôi chiêm tinh học thông minh đầu tiên được hỗ trợ bởi <span className="text-pink-400 font-semibold">Gemini AI</span>
@@ -57,7 +58,7 @@ export default function OnboardingPage() {
               className="glass-card p-5 text-center card-hover"
               style={{ animationDelay: `${i * 0.1}s` }}
             >
-              <div className="text-4xl mb-3">{f.icon}</div>
+              <div className="text-4xl mb-3"><UiIcon name={f.icon as 'chart'} label={f.title} /></div>
               <h3 className="text-white font-semibold text-sm mb-1">{f.title}</h3>
               <p className="text-purple-300 text-xs opacity-70 leading-relaxed">{f.desc}</p>
             </motion.div>
@@ -72,15 +73,15 @@ export default function OnboardingPage() {
           className="flex flex-col sm:flex-row gap-4 justify-center"
         >
           <motion.button
-            whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => navigate('/register')}
             className="btn-cosmic px-10 py-4 text-lg font-bold"
           >
-            🚀 Bắt Đầu Hành Trình
+            <UiIcon name="rocket" label="Bắt đầu hành trình" className="mr-2 inline" />Bắt Đầu Hành Trình
           </motion.button>
           <motion.button
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => navigate('/login')}
             className="px-10 py-4 text-lg font-semibold rounded-full text-purple-300 hover:text-white transition-all"

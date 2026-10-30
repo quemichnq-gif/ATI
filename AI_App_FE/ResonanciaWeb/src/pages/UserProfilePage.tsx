@@ -6,8 +6,10 @@ import { motion } from 'framer-motion';
 import { db } from '../services/firebase';
 import { RootState } from '../store';
 import { apiCompatibility, apiSendMatchRequest, apiCheckMatchStatus } from '../services/api';
-import { ELEMENT_MAP, ELEMENT_COLORS, ZODIAC_EMOJIS } from '../constants/astrologyMap';
+import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, PolarRadiusAxis } from 'recharts';
+import UiIcon from '../components/UiIcon';
+import ZodiacIcon from '../components/ZodiacIcon';
 
 export default function UserProfilePage() {
   const params = useParams<{ userId?: string; uid?: string }>();
@@ -24,7 +26,6 @@ export default function UserProfilePage() {
 
   const element = ELEMENT_MAP[targetProfile?.sun || ''] || 'Không xác định';
   const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS['Không xác định'];
-  const zodiacEmoji = ZODIAC_EMOJIS[targetProfile?.sun || ''] || '✨';
 
   useEffect(() => {
     if (!targetUid) {
@@ -134,7 +135,7 @@ export default function UserProfilePage() {
       {/* Cover & Avatar */}
       <div className="relative">
         <div className="h-36 rounded-2xl" style={{ background: `linear-gradient(135deg, ${colors[0]}44, ${colors[1]}33, #1a0030)` }}>
-          <div className="absolute inset-0 flex items-center justify-center text-7xl opacity-15">{zodiacEmoji}</div>
+          <div className="absolute inset-0 flex items-center justify-center text-7xl opacity-15"><ZodiacIcon sign={targetProfile.sun} label={`Cung ${targetProfile.sun}`} /></div>
         </div>
         <div className="absolute -bottom-8 left-6">
           <div className="w-20 h-20 rounded-2xl overflow-hidden" style={{ border: `3px solid ${colors[0]}` }}>
@@ -153,12 +154,12 @@ export default function UserProfilePage() {
       <div className="pt-10">
         <h1 className="text-2xl font-bold text-white">{targetProfile.name}</h1>
         <div className="flex flex-wrap gap-2 mt-2">
-          <span className="glass px-3 py-1 rounded-full text-sm text-white">{zodiacEmoji} {targetProfile.sun}</span>
-          <span className="glass px-3 py-1 rounded-full text-sm text-white">🌙 {targetProfile.moon}</span>
-          {targetProfile.ascendant && <span className="glass px-3 py-1 rounded-full text-sm text-white">⬆️ {targetProfile.ascendant}</span>}
-          {targetProfile.age && <span className="glass px-3 py-1 rounded-full text-sm text-white">🎂 {targetProfile.age} tuổi</span>}
+          <span className="glass px-3 py-1 rounded-full text-sm text-white"><ZodiacIcon sign={targetProfile.sun} label={`Cung ${targetProfile.sun}`} className="mr-1 inline" />{targetProfile.sun}</span>
+          <span className="glass px-3 py-1 rounded-full text-sm text-white"><UiIcon name="moon" label="Mặt Trăng" className="mr-1 inline" />{targetProfile.moon}</span>
+          {targetProfile.ascendant && <span className="glass px-3 py-1 rounded-full text-sm text-white"><UiIcon name="arrow-up" label="Cung Mọc" className="mr-1 inline" />{targetProfile.ascendant}</span>}
+          {targetProfile.age && <span className="glass px-3 py-1 rounded-full text-sm text-white"><UiIcon name="star" label="Tuổi" className="mr-1 inline" />{targetProfile.age} tuổi</span>}
         </div>
-        {targetProfile.job && <p className="text-purple-300 text-sm mt-2 opacity-70">💼 {targetProfile.job}</p>}
+        {targetProfile.job && <p className="text-purple-300 text-sm mt-2 opacity-70"><UiIcon name="briefcase" label="Nghề nghiệp" className="mr-1 inline" />{targetProfile.job}</p>}
       </div>
 
       {/* Action Buttons */}
@@ -168,20 +169,20 @@ export default function UserProfilePage() {
           <div className="flex gap-3 flex-wrap">
             {matchStatus === 'none' && (
               <>
-                <input className="cosmic-input text-sm" placeholder="Lời nhắn kết nối (tuỳ chọn)..."
+                <input aria-label="Lời nhắn kết nối (tuỳ chọn)" className="cosmic-input text-sm" placeholder="Lời nhắn kết nối (tuỳ chọn)..."
                   value={matchMsg} onChange={e => setMatchMsg(e.target.value)} />
                 <button onClick={handleMatchRequest} disabled={sending}
                   className="btn-cosmic px-5 py-2 text-sm">
-                  {sending ? '⏳ Đang gửi...' : '💌 Gửi Yêu Cầu Kết Đôi'}
+                  {sending ? <><UiIcon name="hourglass" label="Đang gửi" className="mr-1 inline" />Đang gửi...</> : <><UiIcon name="mail" label="Gửi yêu cầu kết đôi" className="mr-1 inline" />Gửi Yêu Cầu Kết Đôi</>}
                 </button>
               </>
             )}
-            {matchStatus === 'pending' && <p className="text-yellow-400 text-sm">⏳ Đã gửi yêu cầu, đang chờ phản hồi</p>}
-            {matchStatus === 'matched' && <p className="text-green-400 text-sm">🎉 Đã kết đôi!</p>}
+            {matchStatus === 'pending' && <p className="text-yellow-400 text-sm"><UiIcon name="hourglass" label="Đang chờ phản hồi" className="mr-1 inline" />Đã gửi yêu cầu, đang chờ phản hồi</p>}
+            {matchStatus === 'matched' && <p className="text-green-400 text-sm"><UiIcon name="check" label="Đã kết đôi" className="mr-1 inline" />Đã kết đôi!</p>}
             <button className="btn-cosmic px-5 py-2 text-sm"
               style={{ background: 'rgba(76,201,240,0.3)', border: '1px solid rgba(76,201,240,0.4)' }}
               onClick={handleStartChat}>
-              💬 Nhắn Tin
+              <UiIcon name="message" label="Nhắn tin" className="mr-1 inline" />Nhắn Tin
             </button>
           </div>
         </div>
@@ -191,10 +192,10 @@ export default function UserProfilePage() {
       {targetUid !== profile.uid && (
         <div className="glass-card p-5">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-white font-semibold">💫 Phân Tích Tương Hợp</h3>
+            <h3 className="text-white font-semibold"><UiIcon name="sparkles" label="Phân tích tương hợp" className="mr-1 inline" />Phân Tích Tương Hợp</h3>
             <button onClick={handleCompatibility} disabled={loadingCompat}
               className="btn-cosmic px-4 py-2 text-sm">
-              {loadingCompat ? '⏳' : '🔮 Phân Tích'}
+              {loadingCompat ? <UiIcon name="hourglass" label="Đang phân tích" /> : <><UiIcon name="chart" label="Phân tích" className="mr-1 inline" />Phân Tích</>}
             </button>
           </div>
 

@@ -6,22 +6,15 @@ import { RootState } from '../store';
 import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
 import { apiGenerate, apiLoveMatchingHistory } from '../services/api';
 import { getVietnameseDate } from '../utils/date';
+import UiIcon, { type IconName } from '../components/UiIcon';
+import ZodiacIcon from '../components/ZodiacIcon';
 
-const ZODIAC_GLYPHS: Record<string, string> = {
-  'Bạch Dương': '♈', 'Kim Ngưu': '♉', 'Song Tử': '♊', 'Cự Giải': '♋',
-  'Sư Tử': '♌', 'Xử Nữ': '♍', 'Thiên Bình': '♎', 'Bọ Cạp': '♏',
-  'Nhân Mã': '♐', 'Ma Kết': '♑', 'Bảo Bình': '♒', 'Song Ngư': '♓',
-  'Aries': '♈', 'Taurus': '♉', 'Gemini': '♊', 'Cancer': '♋',
-  'Leo': '♌', 'Virgo': '♍', 'Libra': '♎', 'Scorpio': '♏',
-  'Sagittarius': '♐', 'Capricorn': '♑', 'Aquarius': '♒', 'Pisces': '♓'
-};
-
-const ELEMENT_SYMBOLS: Record<string, string> = {
-  'Lửa': '🜂',
-  'Nước': '🜄',
-  'Khí': '🜁',
-  'Đất': '🜃',
-  'Thổ': '🜃',
+const ELEMENT_ICONS: Record<string, IconName> = {
+  'Lửa': 'flame',
+  'Nước': 'water',
+  'Khí': 'wind',
+  'Đất': 'earth',
+  'Thổ': 'earth',
 };
 
 export default function HomePage() {
@@ -38,10 +31,7 @@ export default function HomePage() {
   const hasAstro = Boolean(profile.sun && profile.moon);
   const element = ELEMENT_MAP[profile.sun || ''] || (hasAstro ? 'Đất' : 'Chưa định hình');
   const colors = ELEMENT_COLORS[element] || ['#9333ea', '#db2777'];
-  const sunGlyph = ZODIAC_GLYPHS[profile.sun || ''] || '✦';
-  const moonGlyph = ZODIAC_GLYPHS[profile.moon || ''] || '☽';
-  const ascGlyph = ZODIAC_GLYPHS[profile.ascendant || ''] || '↑';
-  const elementSymbol = ELEMENT_SYMBOLS[element] || '✧';
+  const elementIcon = ELEMENT_ICONS[element] || 'star';
 
   const displayName = profile.name?.trim() || (profile.email ? profile.email.split('@')[0] : 'Bạn');
 
@@ -109,6 +99,7 @@ export default function HomePage() {
         <div className="p-1 rounded-2xl flex gap-1.5 border"
           style={{ background: 'rgba(15, 10, 28, 0.7)', borderColor: 'rgba(168, 85, 247, 0.18)', backdropFilter: 'blur(20px)' }}>
           <button
+            aria-pressed={tab === 'astro'}
             onClick={() => setTab('astro')}
             className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
               tab === 'astro'
@@ -124,6 +115,7 @@ export default function HomePage() {
           </button>
 
           <button
+            aria-pressed={tab === 'love'}
             onClick={() => setTab('love')}
             className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ${
               tab === 'love'
@@ -172,7 +164,7 @@ export default function HomePage() {
                     onClick={() => navigate('/register/step2')}
                     className="btn-cosmic px-8 py-3 text-sm font-semibold tracking-wide inline-flex items-center gap-2"
                   >
-                    <span>✦ Thiết Lập Lá Số Cá Nhân</span>
+                    <span><UiIcon name="star" label="Thiết lập lá số cá nhân" className="inline mr-1" />Thiết Lập Lá Số Cá Nhân</span>
                     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
@@ -188,7 +180,7 @@ export default function HomePage() {
                         Mặt Trời · Sun Sign
                       </p>
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-xl text-amber-300 font-serif">{sunGlyph}</span>
+                        <ZodiacIcon sign={profile.sun} label={`Cung Mặt Trời ${profile.sun}`} className="text-xl text-amber-300" />
                         <p className="text-white text-xl sm:text-2xl font-bold tracking-tight">{profile.sun}</p>
                       </div>
                     </div>
@@ -199,7 +191,7 @@ export default function HomePage() {
                         Mặt Trăng · Moon Sign
                       </p>
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-xl text-blue-200 font-serif">{moonGlyph}</span>
+                        <ZodiacIcon sign={profile.moon} label={`Cung Mặt Trăng ${profile.moon}`} className="text-xl text-blue-200" />
                         <p className="text-white text-xl sm:text-2xl font-bold tracking-tight">{profile.moon}</p>
                       </div>
                     </div>
@@ -218,7 +210,7 @@ export default function HomePage() {
                     </motion.div>
                     <div className="absolute w-20 h-20 rounded-full flex flex-col items-center justify-center shadow-lg"
                       style={{ background: 'radial-gradient(circle, rgba(147,51,234,0.35) 0%, rgba(30,15,55,0.9) 80%)', border: '1px solid rgba(168,85,247,0.4)' }}>
-                      <span className="text-3xl text-purple-200 font-serif leading-none">{sunGlyph}</span>
+                      <ZodiacIcon sign={profile.sun} label={`Cung Mặt Trời ${profile.sun}`} className="text-3xl text-purple-200" />
                       <span className="text-[9px] text-purple-300/80 uppercase font-mono mt-0.5 tracking-wider">Soul</span>
                     </div>
                   </div>
@@ -230,7 +222,7 @@ export default function HomePage() {
                         Điểm Mọc · Ascendant
                       </p>
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-lg text-emerald-300 font-mono">{ascGlyph}</span>
+                        <ZodiacIcon sign={profile.ascendant || profile.sun} label={`Điểm Mọc ${profile.ascendant || profile.sun}`} className="text-lg text-emerald-300" />
                         <p className="text-white text-lg sm:text-xl font-bold">{profile.ascendant || profile.sun}</p>
                       </div>
                     </div>
@@ -241,7 +233,7 @@ export default function HomePage() {
                         Nguyên Tố · Element
                       </p>
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-lg text-pink-300">{elementSymbol}</span>
+                        <UiIcon name={elementIcon} label={`Nguyên tố ${element}`} className="text-lg text-pink-300" />
                         <p className="text-lg sm:text-xl font-bold text-transparent bg-clip-text"
                           style={{ backgroundImage: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
                           {element}
@@ -265,7 +257,7 @@ export default function HomePage() {
                         </>
                       ) : (
                         <>
-                          <span>✦ Xem Dự Đoán Vũ Trụ Hôm Nay</span>
+                          <span><UiIcon name="sparkles" label="Xem dự đoán vũ trụ hôm nay" className="inline mr-1" />Xem Dự Đoán Vũ Trụ Hôm Nay</span>
                         </>
                       )}
                     </button>
@@ -277,6 +269,10 @@ export default function HomePage() {
             {/* Quick Navigation Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <motion.div
+                role="link"
+                tabIndex={0}
+                aria-label="Mở Bản Đồ Chi Tiết (Natal Chart)"
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/natal'); } }}
                 whileHover={{ y: -3 }}
                 onClick={() => navigate('/natal')}
                 className="glass-card p-5 cursor-pointer flex items-center gap-4 transition-all"
@@ -298,6 +294,10 @@ export default function HomePage() {
               </motion.div>
 
               <motion.div
+                role="link"
+                tabIndex={0}
+                aria-label="Mở Tìm Kiếm Tri Kỷ"
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/match'); } }}
                 whileHover={{ y: -3 }}
                 onClick={() => navigate('/match')}
                 className="glass-card p-5 cursor-pointer flex items-center gap-4 transition-all"
@@ -333,9 +333,11 @@ export default function HomePage() {
                 ) : (
                   <>
                     <div className="cosmic-progress mb-3 h-2">
-                      <div className="cosmic-progress-fill rounded-full" style={{ width: `${loveMetrics?.love_luck || 82}%`, background: 'linear-gradient(90deg, #a855f7, #ec4899)' }} />
+                      <div className="cosmic-progress-fill rounded-full" style={{ width: `${loveMetrics?.love_luck ?? 0}%`, background: 'linear-gradient(90deg, #a855f7, #ec4899)' }} />
                     </div>
-                    <p className="text-white font-bold text-2xl">{loveMetrics?.love_luck ?? 82}%</p>
+                    <p className="text-white font-bold text-2xl">
+                      {loveMetrics?.love_luck ?? '—'}{loveMetrics?.love_luck != null ? '%' : ''}
+                    </p>
                   </>
                 )}
               </div>
@@ -350,9 +352,11 @@ export default function HomePage() {
                 ) : (
                   <>
                     <p className="text-white text-2xl font-bold tracking-tight">
-                      {loveMetrics?.best_match ? `${ZODIAC_GLYPHS[loveMetrics.best_match] || '✦'} ${loveMetrics.best_match}` : 'Bảo Bình ♒'}
+                      {loveMetrics?.best_match ? <><ZodiacIcon sign={loveMetrics.best_match} label={`Cung ${loveMetrics.best_match}`} className="mr-1 inline" />{loveMetrics.best_match}</> : '—'}
                     </p>
-                    <p className="text-pink-300/80 text-xs mt-1">{loveMetrics?.compatibility ?? 94}% mức độ hài hòa</p>
+                    <p className="text-pink-300/80 text-xs mt-1">
+                      {loveMetrics?.compatibility ?? '—'}{loveMetrics?.compatibility != null ? '% mức độ hài hòa' : ''}
+                    </p>
                   </>
                 )}
               </div>
@@ -360,7 +364,7 @@ export default function HomePage() {
 
             {/* Daily Cosmic Message */}
             <div className="glass-card p-5 border" style={{ borderColor: 'rgba(236,72,153,0.2)', background: 'rgba(255,255,255,0.015)' }}>
-              <p className="text-[11px] text-pink-300/80 uppercase tracking-widest font-mono mb-2">✦ Thông Điệp Vũ Trụ</p>
+              <p className="text-[11px] text-pink-300/80 uppercase tracking-widest font-mono mb-2"><UiIcon name="sparkles" label="Thông điệp vũ trụ" className="inline mr-1" />Thông Điệp Vũ Trụ</p>
               <p className="text-white text-sm italic leading-relaxed opacity-90 font-serif">
                 "{loveMetrics?.quote || 'Tình yêu đích thực không phải là tìm kiếm một người hoàn hảo, mà là học cách nhìn nhận sự hoàn hảo trong một linh hồn đồng điệu.'}"
               </p>
@@ -385,7 +389,9 @@ export default function HomePage() {
               ) : matches.length > 0 ? (
                 <div className="flex gap-3.5 overflow-x-auto pb-2">
                   {matches.slice(0, 5).map((m, i) => (
-                    <motion.div key={i} whileHover={{ y: -3 }}
+                    <motion.div key={i} role="link" tabIndex={0} aria-label={`Xem hồ sơ ${m.name}`}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/user/${m.uid}`); } }}
+                      whileHover={{ y: -3 }}
                       className="flex-shrink-0 w-24 cursor-pointer"
                       onClick={() => navigate(`/user/${m.uid}`)}>
                       <div className="w-24 h-24 rounded-2xl overflow-hidden mb-2 border border-purple-500/30"
@@ -396,7 +402,9 @@ export default function HomePage() {
                           <div className="w-full h-full flex flex-col items-center justify-center"
                             style={{ background: 'linear-gradient(135deg, rgba(147,51,234,0.3), rgba(219,39,119,0.2))' }}>
                             <span className="text-2xl font-serif text-purple-200">
-                              {ZODIAC_GLYPHS[m.zodiac || m.sun || ''] || m.name?.[0]?.toUpperCase()}
+                              {m.zodiac || m.sun
+                                ? <ZodiacIcon sign={m.zodiac || m.sun} label={`Cung ${m.zodiac || m.sun}`} className="text-2xl text-purple-200" />
+                                : m.name?.[0]?.toUpperCase()}
                             </span>
                           </div>
                         )}

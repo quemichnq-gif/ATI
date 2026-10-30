@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { db } from '../services/firebase';
 import { RootState } from '../store';
 import { formatTimestamp } from '../utils/date';
+import UiIcon from '../components/UiIcon';
 
 export default function ChatListPage() {
   const profile = useSelector((s: RootState) => s.profile);
@@ -30,7 +31,7 @@ export default function ChatListPage() {
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold gradient-text font-display">💬 Trò Chuyện</h1>
+        <h1 className="text-3xl font-bold gradient-text font-display"><UiIcon name="message" label="Trò chuyện" className="mr-2 inline" />Trò Chuyện</h1>
         <p className="text-purple-300 opacity-70 mt-1">{chats.length} cuộc trò chuyện</p>
       </motion.div>
 
@@ -48,11 +49,11 @@ export default function ChatListPage() {
         </div>
       ) : chats.length === 0 ? (
         <div className="glass-card p-12 text-center">
-          <div className="text-5xl mb-4">💌</div>
+          <div className="text-5xl mb-4"><UiIcon name="mail" label="Chưa có cuộc trò chuyện" /></div>
           <p className="text-white font-semibold mb-2">Chưa có cuộc trò chuyện nào</p>
           <p className="text-purple-300 text-sm opacity-70 mb-4">Kết nối với người tương hợp để bắt đầu!</p>
           <button onClick={() => navigate('/match')} className="btn-cosmic px-6 py-2.5 text-sm">
-            💫 Tìm Người Tương Hợp
+            <UiIcon name="search" label="Tìm người tương hợp" className="mr-2 inline" />Tìm Người Tương Hợp
           </button>
         </div>
       ) : (
@@ -66,6 +67,8 @@ export default function ChatListPage() {
                 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05 }}
                 whileHover={{ x: 4 }}
+                role="link" tabIndex={0} aria-label={`Mở cuộc trò chuyện với ${otherName}`}
+                onKeyDown={e => { if (e.key === 'Enter') navigate(`/chat/${chat.id}`, { state: { chatName: otherName } }); }}
                 className="glass-card p-4 flex items-center gap-4 cursor-pointer card-hover"
                 onClick={() => navigate(`/chat/${chat.id}`, { state: { chatName: otherName } })}
               >

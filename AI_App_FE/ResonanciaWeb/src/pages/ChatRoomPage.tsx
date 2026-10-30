@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../services/firebase';
 import { RootState } from '../store';
 import { formatTimestamp } from '../utils/date';
+import UiIcon from '../components/UiIcon';
 
 export default function ChatRoomPage() {
   const { chatId } = useParams<{ chatId: string }>();
@@ -20,6 +21,7 @@ export default function ChatRoomPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,8 +40,8 @@ export default function ChatRoomPage() {
   const handleSend = async () => {
     if (!input.trim() || !chatId || sending) return;
     const text = input.trim();
-    setInput('');
     setSending(true);
+    setSendError('');
     try {
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         senderId: profile.uid,
@@ -48,11 +50,17 @@ export default function ChatRoomPage() {
         timestamp: serverTimestamp(),
         read: false,
       });
-      await updateDoc(doc(db, 'chats', chatId), {
-        lastMessage: text,
-        lastTimestamp: Date.now(),
-      });
-    } catch (e) { console.error(e); }
+      setInput('');
+      try {
+        await updateDoc(doc(db, 'chats', chatId), {
+          lastMessage: text,
+          lastTimestamp: Date.now(),
+        });
+      } catch (e) { console.error('Không thể cập nhật phần xem trước cuộc trò chuyện:', e); }
+    } catch (e) {
+      console.error(e);
+      setSendError('Không gửi được tin nhắn. Nội dung vẫn được giữ lại để bạn thử lại.');
+    }
     finally { setSending(false); }
   };
 
@@ -107,6 +115,8 @@ export default function ChatRoomPage() {
       <div className="mt-4 flex gap-3 items-end">
         <div className="flex-1 relative">
           <textarea
+            aria-label="Nhập tin nhắn"
+            aria-describedby={sendError ? 'chat-send-error' : undefined}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -119,9 +129,10 @@ export default function ChatRoomPage() {
         <button onClick={handleSend} disabled={!input.trim() || sending}
           className="btn-cosmic px-5 py-3 flex-shrink-0 disabled:opacity-40"
           style={{ height: '48px' }}>
-          {sending ? '⏳' : '💬'}
+          <UiIcon name={sending ? 'hourglass' : 'send'} label={sending ? 'Đang gửi' : 'Gửi tin nhắn'} />
         </button>
       </div>
+      {sendError && <p id="chat-send-error" role="alert" aria-live="assertive" className="mt-2 text-xs text-red-400">{sendError}</p>}
     </div>
   );
 }
