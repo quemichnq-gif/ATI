@@ -10,6 +10,8 @@ import UiIcon, { type IconName } from '../components/UiIcon';
 import ZodiacIcon from '../components/ZodiacIcon';
 
 const ELEMENT_ICONS: Record<string, IconName> = {
+  'Hoả': 'flame',
+  'Thuỷ': 'water',
   'Lửa': 'flame',
   'Nước': 'water',
   'Khí': 'wind',
