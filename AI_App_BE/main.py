@@ -1741,6 +1741,42 @@ DEFAULT_MATCH_CANDIDATES = [
     }
 ]
 
+# Tải kho 100 mock users đa dạng nếu có
+try:
+    mock_users_file = os.path.abspath(os.path.join(base_dir, "../AI_App_FE/ResonanciaWeb/src/mocks/usersMockData.json"))
+    if os.path.exists(mock_users_file):
+        with open(mock_users_file, "r", encoding="utf-8") as f_mock:
+            raw_mock_users = json.load(f_mock)
+            zodiac_elements = {
+                "Bạch Dương": "Lửa", "Sư Tử": "Lửa", "Nhân Mã": "Lửa",
+                "Kim Ngưu": "Đất", "Xử Nữ": "Đất", "Ma Kết": "Đất",
+                "Song Tử": "Khí", "Thiên Bình": "Khí", "Bảo Bình": "Khí",
+                "Cự Giải": "Nước", "Bọ Cạp": "Nước", "Song Ngư": "Nước"
+            }
+            parsed_candidates = []
+            for u in raw_mock_users:
+                z_sign = u.get("zodiacSign", "Bạch Dương")
+                elem = zodiac_elements.get(z_sign, "Đất")
+                parsed_candidates.append({
+                    "uid": u.get("id"),
+                    "name": u.get("fullName"),
+                    "zodiac": z_sign,
+                    "sun": z_sign,
+                    "moon": "Xử Nữ" if z_sign != "Xử Nữ" else "Kim Ngưu",
+                    "age": 2026 - int(u.get("dateOfBirth", "2000-01-01")[:4]),
+                    "gender": u.get("gender", ""),
+                    "element": elem,
+                    "avatar": u.get("avatar", ""),
+                    "personality": u.get("bio", "Chân thành, ấm áp"),
+                    "planets": {"sun": z_sign, "moon": "Xử Nữ"},
+                    "elements": {"fire": 25, "earth": 25, "air": 25, "water": 25}
+                })
+            if parsed_candidates:
+                DEFAULT_MATCH_CANDIDATES = parsed_candidates
+                safe_print(f"✅ Đã nạp thành công {len(DEFAULT_MATCH_CANDIDATES)} ứng viên đa dạng từ usersMockData.json!")
+except Exception as e_load_mock:
+    safe_print(f"⚠️ Không thể nạp usersMockData.json: {e_load_mock}")
+
 # ------------------------------------------------------
 #  Route: Phân tích chiêm tinh ghép cặp theo tag
 # ------------------------------------------------------
@@ -1785,77 +1821,116 @@ def love_matching_single(match_type):
             "houses": extract_houses(user_data_req)
         }
 
-        # Sử dụng danh sách ứng viên chiêm tinh chuẩn
-        others = [c for c in DEFAULT_MATCH_CANDIDATES if c.get("uid") != uid][:5]
-        candidate_avatar_map = {c["uid"]: c.get("avatar", "") for c in others}
+        # Thuật toán tính góc chiếu chiêm tinh chính xác giữa 2 cung hoàng đạo
+        ZODIAC_ORDER = [
+            "Bạch Dương", "Kim Ngưu", "Song Tử", "Cự Giải",
+            "Sư Tử", "Xử Nữ", "Thiên Bình", "Bọ Cạp",
+            "Nhân Mã", "Ma Kết", "Bảo Bình", "Song Ngư"
+        ]
+        
+        def calculate_synastry(s1, s2, target_tag):
+            if s1 not in ZODIAC_ORDER or s2 not in ZODIAC_ORDER:
+                return 75, "Năng lượng hai cung hoàng đạo mang lại cơ hội gắn kết.", 75, 75, 75, 75
+            i1 = ZODIAC_ORDER.index(s1)
+            i2 = ZODIAC_ORDER.index(s2)
+            diff = abs(i1 - i2)
+            dist = min(diff, 12 - diff) # 0 to 6
+            
+            # Góc chiếu
+            if dist == 4: # Tam hợp Trine 120° (cùng nguyên tố)
+                base = 95
+                reason = f"Góc tam hợp 120° giữa {s1} và {s2} mang lại sự đồng điệu tâm hồn sâu sắc và bình yên tự nhiên."
+                love, trust, comm, marr = 96, 95, 93, 94
+                suitability = {"greenflag": 100, "twinflame": 95, "destiny": 90, "karmic": 70, "redflag": 40}
+            elif dist == 2: # Lục hợp Sextile 60° (nguyên tố bổ trợ Lửa-Khí, Đất-Nước)
+                base = 90
+                reason = f"Góc lục hợp 60° giữa {s1} và {s2} kích thích cảm hứng sáng tạo và sự tôn trọng lẫn nhau."
+                love, trust, comm, marr = 89, 91, 93, 88
+                suitability = {"greenflag": 95, "destiny": 88, "twinflame": 85, "karmic": 75, "redflag": 45}
+            elif dist == 6: # Đối đỉnh Opposition 180° (trục bổ khuyết)
+                base = 88
+                reason = f"Trục đối đỉnh 180° giữa {s1} và {s2} tạo lực hút nam châm mãnh liệt, vừa bù trừ vừa định mệnh."
+                love, trust, comm, marr = 93, 82, 85, 90
+                suitability = {"destiny": 98, "twinflame": 92, "greenflag": 80, "karmic": 85, "redflag": 65}
+            elif dist == 0: # Trùng tụ Conjunction 0° (cùng cung)
+                base = 92
+                reason = f"Cùng mang cung {s1}, hai bạn như hai mảnh gương phản chiếu chính xác cảm xúc và suy nghĩ của nhau."
+                love, trust, comm, marr = 92, 90, 94, 89
+                suitability = {"twinflame": 100, "greenflag": 88, "destiny": 85, "karmic": 78, "redflag": 50}
+            elif dist == 3: # Vuông góc Square 90° (xung khắc phương thức)
+                base = 62
+                reason = f"Góc vuông 90° giữa {s1} và {s2} tạo ra lực hút bốc đồng ban đầu nhưng đòi hỏi rất nhiều bao dung để hóa giải bất đồng."
+                love, trust, comm, marr = 68, 58, 60, 56
+                suitability = {"redflag": 100, "karmic": 82, "destiny": 60, "greenflag": 50, "twinflame": 45}
+            elif dist == 5: # Bất đồng vị Quincunx 150° (duyên nợ chuyển hóa)
+                base = 78
+                reason = f"Góc 150° báo hiệu mối liên kết nghiệp duyên sâu sắc, giúp cả hai đối diện và chữa lành tổn thương nội tâm."
+                love, trust, comm, marr = 79, 76, 75, 80
+                suitability = {"karmic": 100, "destiny": 82, "redflag": 78, "greenflag": 65, "twinflame": 60}
+            else: # dist == 1: Bán lục hợp 30°
+                base = 74
+                reason = f"Hai cung kề cận mang năng lượng kế thừa bài học cuộc sống, cần thời gian để thấu hiểu sự khác biệt."
+                love, trust, comm, marr = 75, 76, 78, 73
+                suitability = {"karmic": 88, "greenflag": 72, "redflag": 70, "destiny": 68, "twinflame": 65}
+                
+            rank_score = suitability.get(target_tag, base)
+            return rank_score, reason, love, trust, comm, marr
 
-        # --- AI SYNTHESIS PROMPT ---
-        prompt = f"""
-Phân tích tương hợp loại kết nối: {match_type}.
-Người A: {json.dumps(me, ensure_ascii=False)}
-Danh sách người B: {json.dumps(others, ensure_ascii=False)}
+        # Lọc ứng viên từ kho (loại trừ bản thân)
+        my_gender = user_data_req.get("gender", "")
+        my_sign = me["zodiac"]
+        pool = [c for c in DEFAULT_MATCH_CANDIDATES if c.get("uid") != uid and c.get("name") != me["name"]]
+        
+        # Nếu biết giới tính, ưu tiên ghép khác giới
+        if my_gender in ["Nam", "Nữ"]:
+            target_gender = "Nữ" if my_gender == "Nam" else "Nam"
+            gender_filtered = [c for c in pool if c.get("gender") == target_gender]
+            if len(gender_filtered) >= 5:
+                pool = gender_filtered
 
-Trả về JSON dạng LIST gồm đúng 5 người, không văn bản ngoài JSON:
-[
-  {{
-    "uid": "...",
-    "name": "...",
-    "zodiac": "...",
-    "age": 22,
-    "element": "...",
-    "personality": "...",
-    "reason": "<1-2 câu giải thích lý do tương hợp theo góc chiếu hành tinh>",
-    "compatibility_score": <số từ 60-98>,
-    "love": <số 60-98>,
-    "trust": <số 60-98>,
-    "communication": <số 60-98>,
-    "marriage": <số 60-98>
-  }}
-]
-"""
+        # Tính điểm chiêm tinh cho từng ứng viên đối với người đang đăng nhập
+        scored_candidates = []
+        for c in pool:
+            cand_sign = c.get("zodiac") or c.get("sun") or "Bạch Dương"
+            score, reason, love, trust, comm, marr = calculate_synastry(my_sign, cand_sign, match_type)
+            scored_candidates.append({
+                "candidate": c,
+                "score": score,
+                "reason": reason,
+                "love": love,
+                "trust": trust,
+                "comm": comm,
+                "marr": marr
+            })
+
+        # Sắp xếp theo độ phù hợp với match_type từ cao xuống thấp
+        scored_candidates.sort(key=lambda x: x["score"], reverse=True)
+        
+        # Lấy top ứng viên phù hợp nhất (lấy ngẫu nhiên trong top 10 người điểm cao nhất để mỗi lần bấm có thể đổi mới nhẹ)
+        import random
+        top_slice = scored_candidates[:12] if len(scored_candidates) >= 12 else scored_candidates
+        selected_pairs = random.sample(top_slice, min(5, len(top_slice))) if len(top_slice) >= 5 else top_slice
+        # Sắp xếp lại 5 người được chọn theo thứ tự điểm giảm dần
+        selected_pairs.sort(key=lambda x: x["score"], reverse=True)
 
         result = []
-        try:
-            model = genai.GenerativeModel(MODEL_NAME)
-            raw = model.generate_content(prompt, request_options={"timeout": 2.5}).text.strip()
-            clean = re.sub(r"(```json|```)", "", raw).strip()
-            if not clean.startswith("["):
-                start = clean.find("[")
-                end = clean.rfind("]") + 1
-                clean = clean[start:end]
-            result = json.loads(clean)
-        except BaseException as gemini_err:
-            safe_print("⚠️ Gemini Matchmaking Error/Quota (kích hoạt công cụ tổng hợp chiêm tinh dự phòng):", gemini_err)
-            result = []
-            tag_configs = {
-                "greenflag": {"base": 92, "reason": "Mặt Trời và Mặt Trăng tạo góc tam hợp 120 độ, mang lại sự thấu cảm tự nhiên và bình yên dài lâu."},
-                "redflag": {"base": 58, "reason": "Vị trí sao Hỏa và sao Kim tạo góc vuông 90 độ, lực hút ban đầu mãnh liệt nhưng cần học cách nhường nhịn."},
-                "karmic": {"base": 82, "reason": "Sao Thổ tương tác mạnh mẽ với cung Nhà số 7, báo hiệu mối duyên tiền định mang lại bài học trưởng thành sâu sắc."},
-                "destiny": {"base": 95, "reason": "Điểm Mọc và Mặt Trời kết hợp hoàn hảo theo vòng cung hoàng đạo, tựa như sự an bài của vũ trụ."},
-                "twinflame": {"base": 97, "reason": "Tần số năng lượng linh hồn đối xứng, kích hoạt sức mạnh nội tâm và gắn kết tâm linh kỳ diệu."}
-            }
-            cfg = tag_configs.get(match_type, {"base": 88, "reason": "Năng lượng ngũ hành và góc chiếu hành tinh hài hòa, mở ra cơ hội gắn kết bền vững."})
-
-            for idx, c in enumerate(others):
-                score = max(50, min(99, cfg["base"] - idx * 4))
-                result.append({
-                    "uid": c["uid"],
-                    "name": c["name"],
-                    "zodiac": c["zodiac"],
-                    "age": c.get("age") or 22,
-                    "element": c.get("element") or "Khí",
-                    "personality": c.get("personality") or "Chân thành, ấm áp và thấu hiểu",
-                    "reason": cfg["reason"],
-                    "compatibility_score": score,
-                    "love": max(50, score - 2),
-                    "trust": min(99, score + 2),
-                    "communication": max(50, score - 3),
-                    "marriage": max(50, score - 1)
-                })
-
-        # Gắn kèm avatar vào từng ứng viên
-        for item in result:
-            item["avatar"] = candidate_avatar_map.get(item["uid"], "")
+        for p in selected_pairs:
+            c = p["candidate"]
+            result.append({
+                "uid": c.get("uid", ""),
+                "name": c.get("name", "Người dùng"),
+                "zodiac": c.get("zodiac", ""),
+                "age": c.get("age", 22),
+                "element": c.get("element", "Đất"),
+                "personality": c.get("personality", ""),
+                "reason": p["reason"],
+                "compatibility_score": p["score"],
+                "love": p["love"],
+                "trust": p["trust"],
+                "communication": p["comm"],
+                "marriage": p["marr"],
+                "avatar": c.get("avatar", "")
+            })
 
         return jsonify({
             "success": True,
@@ -1864,7 +1939,7 @@ Trả về JSON dạng LIST gồm đúng 5 người, không văn bản ngoài JS
         })
 
     except BaseException as e:
-        safe_print("🔥 ERROR:", e)
+        safe_print("🔥 ERROR in love_matching:", e)
         return jsonify({"error": str(e)}), 500
 
 
