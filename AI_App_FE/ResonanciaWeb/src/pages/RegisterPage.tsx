@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { motion } from 'framer-motion';
 import { auth } from '../services/firebase';
 import StarField from '../components/StarField';
+import UiIcon from '../components/UiIcon';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -45,30 +46,30 @@ export default function RegisterPage() {
       >
         <div className="glass-card p-8" style={{ border: '1px solid rgba(255,110,180,0.3)' }}>
           <div className="text-center mb-8">
-            <div className="text-5xl mb-4">⭐</div>
+            <div className="text-5xl mb-4"><UiIcon name="star" label="Tạo tài khoản" /></div>
             <h1 className="text-3xl font-bold font-display gradient-text">Tạo Tài Khoản</h1>
             <p className="text-purple-300 text-sm mt-2 opacity-80">Bắt đầu hành trình chiêm tinh của bạn</p>
           </div>
 
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-purple-300 text-sm mb-2">Email</label>
-              <input type="email" className="cosmic-input" placeholder="email@example.com"
+              <label htmlFor="register-email" className="block text-purple-300 text-sm mb-2">Email</label>
+              <input id="register-email" type="email" autoComplete="email" required className="cosmic-input" placeholder="email@example.com"
                 value={email} onChange={e => setEmail(e.target.value)} />
             </div>
             <div>
-              <label className="block text-purple-300 text-sm mb-2">Mật khẩu</label>
-              <input type="password" className="cosmic-input" placeholder="Tối thiểu 6 ký tự"
+              <label htmlFor="register-password" className="block text-purple-300 text-sm mb-2">Mật khẩu</label>
+              <input id="register-password" type="password" autoComplete="new-password" required className="cosmic-input" placeholder="Tối thiểu 6 ký tự"
                 value={password} onChange={e => setPassword(e.target.value)} />
             </div>
             <div>
-              <label className="block text-purple-300 text-sm mb-2">Xác nhận mật khẩu</label>
-              <input type="password" className="cosmic-input" placeholder="Nhập lại mật khẩu"
+              <label htmlFor="register-confirm" className="block text-purple-300 text-sm mb-2">Xác nhận mật khẩu</label>
+              <input id="register-confirm" type="password" autoComplete="new-password" required className="cosmic-input" placeholder="Nhập lại mật khẩu"
                 value={confirm} onChange={e => setConfirm(e.target.value)} />
             </div>
 
             {error && (
-              <p className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg px-4 py-2">{error}</p>
+              <p role="alert" className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg px-4 py-2">{error}</p>
             )}
 
             <button type="submit" disabled={loading} className="btn-cosmic w-full py-3 text-base mt-2"
@@ -78,7 +79,7 @@ export default function RegisterPage() {
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Đang tạo...
                 </span>
-              ) : '🚀 Tiếp Theo'}
+              ) : <><UiIcon name="rocket" label="Tiếp theo" className="mr-2 inline" />Tiếp Theo</>}
             </button>
           </form>
 

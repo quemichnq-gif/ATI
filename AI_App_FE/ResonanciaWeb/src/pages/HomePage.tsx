@@ -3,9 +3,11 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RootState } from '../store';
-import { ELEMENT_MAP, ELEMENT_COLORS, ZODIAC_EMOJIS } from '../constants/astrologyMap';
+import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
 import { apiGenerate, apiLoveMatchingHistory } from '../services/api';
 import { getVietnameseDate } from '../utils/date';
+import UiIcon from '../components/UiIcon';
+import ZodiacIcon from '../components/ZodiacIcon';
 
 export default function HomePage() {
   const profile = useSelector((s: RootState) => s.profile);
@@ -21,7 +23,6 @@ export default function HomePage() {
 
   const element = ELEMENT_MAP[profile.sun || ''] || 'Không xác định';
   const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS['Không xác định'];
-  const zodiacEmoji = ZODIAC_EMOJIS[profile.sun || ''] || '✨';
 
   // Load green flag matches
   useEffect(() => {
@@ -76,12 +77,12 @@ export default function HomePage() {
       <div className="flex justify-center">
         <div className="glass rounded-full p-1 flex gap-1">
           {(['astro', 'love'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
+            <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}
               className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${
                 tab === t ? 'text-white' : 'text-purple-300 hover:text-white'
               }`}
               style={tab === t ? { background: 'linear-gradient(135deg, rgba(157,78,221,0.5), rgba(255,110,180,0.4))', border: '1px solid rgba(157,78,221,0.4)' } : {}}>
-              {t === 'astro' ? '🔮 Chiêm Tinh' : '💕 Tình Duyên'}
+              <UiIcon name={t === 'astro' ? 'chart' : 'heart'} label={t === 'astro' ? 'Chiêm tinh' : 'Tình duyên'} className="mr-1 inline" />{t === 'astro' ? 'Chiêm Tinh' : 'Tình Duyên'}
             </button>
           ))}
         </div>
@@ -100,11 +101,11 @@ export default function HomePage() {
               <div className="grid grid-cols-2 gap-8 mb-8 relative">
                 <div className="text-center">
                   <p className="text-purple-300 text-xs mb-1 uppercase tracking-widest">Mặt Trời</p>
-                  <p className="text-white text-2xl font-bold">{zodiacEmoji} {profile.sun || '...'}</p>
+                  <p className="text-white text-2xl font-bold"><ZodiacIcon sign={profile.sun} label={profile.sun ? `Cung ${profile.sun}` : 'Cung Mặt Trời'} className="mr-1 inline" />{profile.sun || '...'}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-purple-300 text-xs mb-1 uppercase tracking-widest">Mặt Trăng</p>
-                  <p className="text-white text-2xl font-bold">🌙 {profile.moon || '...'}</p>
+                  <p className="text-white text-2xl font-bold"><UiIcon name="moon" label="Mặt Trăng" className="mr-1 inline" />{profile.moon || '...'}</p>
                 </div>
               </div>
 
@@ -117,18 +118,18 @@ export default function HomePage() {
                 <div className="orbit-ring orbit-ring-1 absolute inset-0" />
                 <div className="orbit-ring orbit-ring-2 absolute inset-4" style={{ border: '1px solid rgba(255,110,180,0.25)' }} />
                 <div className="absolute inset-0 flex items-center justify-center text-6xl">
-                  {zodiacEmoji}
+                  <ZodiacIcon sign={profile.sun} label={profile.sun ? `Cung ${profile.sun}` : 'Cung Mặt Trời'} />
                 </div>
               </motion.div>
 
               <div className="grid grid-cols-2 gap-8 mb-8">
                 <div className="text-center">
                   <p className="text-purple-300 text-xs mb-1 uppercase tracking-widest">Điểm Mọc</p>
-                  <p className="text-white text-xl font-bold">⬆️ {profile.ascendant || '...'}</p>
+                  <p className="text-white text-xl font-bold"><UiIcon name="arrow-up" label="Điểm Mọc" className="mr-1 inline" />{profile.ascendant || '...'}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-purple-300 text-xs mb-1 uppercase tracking-widest">Nguyên Tố</p>
-                  <p className="text-xl font-bold" style={{ color: colors[0] }}>🌟 {element}</p>
+                  <p className="text-xl font-bold" style={{ color: colors[0] }}><UiIcon name="sparkles" label="Nguyên tố" className="mr-1 inline" />{element}</p>
                 </div>
               </div>
 
@@ -140,21 +141,25 @@ export default function HomePage() {
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Đang đọc vũ trụ...
                   </span>
-                ) : '✨ Xem Dự Đoán Hôm Nay'}
+                ) : <><UiIcon name="sparkles" label="Xem dự đoán hôm nay" className="mr-1 inline" />Xem Dự Đoán Hôm Nay</>}
               </button>
             </div>
 
             {/* Quick links */}
             <div className="grid grid-cols-2 gap-4">
-              <motion.div whileHover={{ scale: 1.02 }} className="glass-card p-5 cursor-pointer card-hover"
+              <motion.div role="link" tabIndex={0} aria-label="Mở Natal Chart"
+                onKeyDown={e => { if (e.key === 'Enter') navigate('/natal'); }}
+                whileHover={{ scale: 1.02 }} className="glass-card p-5 cursor-pointer card-hover"
                 onClick={() => navigate('/natal')}>
-                <div className="text-3xl mb-2">🗺️</div>
+                <div className="text-3xl mb-2"><UiIcon name="chart" label="Natal Chart" /></div>
                 <h3 className="text-white font-semibold mb-1">Natal Chart</h3>
                 <p className="text-purple-300 text-xs opacity-70">Phân tích chiêm tinh sâu</p>
               </motion.div>
-              <motion.div whileHover={{ scale: 1.02 }} className="glass-card p-5 cursor-pointer card-hover"
+              <motion.div role="link" tabIndex={0} aria-label="Mở trang tìm kiếm người tương hợp"
+                onKeyDown={e => { if (e.key === 'Enter') navigate('/match'); }}
+                whileHover={{ scale: 1.02 }} className="glass-card p-5 cursor-pointer card-hover"
                 onClick={() => navigate('/match')}>
-                <div className="text-3xl mb-2">💘</div>
+                <div className="text-3xl mb-2"><UiIcon name="search" label="Tìm kiếm" /></div>
                 <h3 className="text-white font-semibold mb-1">Tìm Kiếm</h3>
                 <p className="text-purple-300 text-xs opacity-70">Khám phá người tương hợp</p>
               </motion.div>
@@ -168,7 +173,7 @@ export default function HomePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="glass-card p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-2xl">💕</span>
+                  <span className="text-2xl"><UiIcon name="heart" label="Tình duyên" /></span>
                   <h3 className="text-white font-semibold">Tình Duyên</h3>
                 </div>
                 {loadingMetrics ? (
@@ -188,7 +193,7 @@ export default function HomePage() {
 
               <div className="glass-card p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-2xl">💫</span>
+                  <span className="text-2xl"><UiIcon name="sparkles" label="Cung hợp" /></span>
                   <h3 className="text-white font-semibold">Cung Hợp</h3>
                 </div>
                 {loadingMetrics ? (
@@ -198,7 +203,7 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <>
-                    <p className="text-white text-xl font-bold">{ZODIAC_EMOJIS[loveMetrics?.best_match || ''] || '⭐'} {loveMetrics?.best_match || '—'}</p>
+                    <p className="text-white text-xl font-bold"><ZodiacIcon sign={loveMetrics?.best_match} label={loveMetrics?.best_match ? `Cung ${loveMetrics.best_match}` : 'Cung tương hợp'} className="mr-1 inline" />{loveMetrics?.best_match || '—'}</p>
                     <p className="text-pink-300 text-sm">{loveMetrics?.compatibility ?? '...'}% tương hợp</p>
                   </>
                 )}
@@ -208,7 +213,7 @@ export default function HomePage() {
             {/* Quote */}
             {loveMetrics?.quote && (
               <div className="glass-card p-5" style={{ border: '1px solid rgba(255,110,180,0.2)' }}>
-                <p className="text-purple-300 text-xs uppercase tracking-widest mb-2">💬 Lời Vũ Trụ</p>
+                <p className="text-purple-300 text-xs uppercase tracking-widest mb-2"><UiIcon name="message" label="Lời vũ trụ" className="mr-1 inline" />Lời Vũ Trụ</p>
                 <p className="text-white text-base italic leading-relaxed opacity-90">"{loveMetrics.quote}"</p>
               </div>
             )}
@@ -216,7 +221,7 @@ export default function HomePage() {
             {/* Matches preview */}
             <div className="glass-card p-5">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-white font-semibold">💚 Người Tương Hợp</h3>
+                <h3 className="text-white font-semibold"><UiIcon name="heart" label="Người tương hợp" className="mr-1 inline" />Người Tương Hợp</h3>
                 <button onClick={() => navigate('/match')}
                   className="text-pink-400 text-sm hover:text-pink-300">Xem tất cả →</button>
               </div>
@@ -229,7 +234,9 @@ export default function HomePage() {
               ) : matches.length > 0 ? (
                 <div className="flex gap-3 overflow-x-auto pb-2">
                   {matches.slice(0, 5).map((m, i) => (
-                    <motion.div key={i} whileHover={{ scale: 1.05 }}
+                    <motion.div key={i} role="link" tabIndex={0} aria-label={`Xem hồ sơ ${m.name}`}
+                      onKeyDown={e => { if (e.key === 'Enter') navigate(`/user/${m.uid}`); }}
+                      whileHover={{ scale: 1.03 }}
                       className="flex-shrink-0 w-20 cursor-pointer"
                       onClick={() => navigate(`/user/${m.uid}`)}>
                       <div className="w-20 h-20 rounded-xl overflow-hidden mb-1"

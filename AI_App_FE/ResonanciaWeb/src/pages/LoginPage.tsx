@@ -5,6 +5,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { motion } from 'framer-motion';
 import { auth, db } from '../services/firebase';
 import StarField from '../components/StarField';
+import UiIcon from '../components/UiIcon';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -72,7 +73,7 @@ export default function LoginPage() {
               animate={{ rotate: [0, 10, -10, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               className="text-6xl mb-4 inline-block"
-            >🔮</motion.div>
+            ><UiIcon name="chart" label="Biểu đồ chiêm tinh" /></motion.div>
             <h1 className="text-3xl font-bold font-display gradient-text">Resonancia</h1>
             <p className="text-purple-300 text-sm mt-2 opacity-80">Vũ trụ đang chờ bạn khám phá</p>
           </div>
@@ -80,9 +81,12 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-purple-300 text-sm mb-2 font-medium">Email</label>
+              <label htmlFor="login-email" className="block text-purple-300 text-sm mb-2 font-medium">Email</label>
               <input
+                id="login-email"
                 type="email"
+                autoComplete="email"
+                required
                 className="cosmic-input"
                 placeholder="email@example.com"
                 value={email}
@@ -90,9 +94,12 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-purple-300 text-sm mb-2 font-medium">Mật khẩu</label>
+              <label htmlFor="login-password" className="block text-purple-300 text-sm mb-2 font-medium">Mật khẩu</label>
               <input
+                id="login-password"
                 type="password"
+                autoComplete="current-password"
+                required
                 className="cosmic-input"
                 placeholder="••••••••"
                 value={password}
@@ -104,6 +111,7 @@ export default function LoginPage() {
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
+                role="alert"
                 className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg px-4 py-2"
               >{error}</motion.p>
             )}
@@ -119,7 +127,7 @@ export default function LoginPage() {
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Đang đăng nhập...
                 </span>
-              ) : '✨ Đăng Nhập'}
+              ) : <><UiIcon name="sparkles" label="Đăng nhập" className="mr-2 inline" />Đăng Nhập</>}
             </button>
           </form>
 

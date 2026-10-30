@@ -5,11 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../services/firebase';
 import { fetchAstrologyData } from '../services/astrologyService';
 import StarField from '../components/StarField';
+import UiIcon from '../components/UiIcon';
 
 const steps = [
-  { id: 1, label: 'Thông Tin Cá Nhân', icon: '👤' },
-  { id: 2, label: 'Ngày & Giờ Sinh', icon: '📅' },
-  { id: 3, label: 'Nơi Sinh', icon: '📍' },
+  { id: 1, label: 'Thông Tin Cá Nhân', icon: 'user' },
+  { id: 2, label: 'Ngày & Giờ Sinh', icon: 'calendar' },
+  { id: 3, label: 'Nơi Sinh', icon: 'pin' },
 ];
 
 export default function RegisterStep2Page() {
@@ -38,7 +39,7 @@ export default function RegisterStep2Page() {
 
     setLoading(true); setError('');
     try {
-      setLoadingMsg('🔮 Đang tính toán biểu đồ chiêm tinh...');
+      setLoadingMsg('Đang tính toán biểu đồ chiêm tinh...');
       let astro: Record<string, any> = {};
       try {
         astro = await fetchAstrologyData(birthDate, birthTime, birthPlace);
@@ -47,7 +48,7 @@ export default function RegisterStep2Page() {
         astro = { age: new Date().getFullYear() - year };
       }
 
-      setLoadingMsg('💾 Đang lưu thông tin...');
+      setLoadingMsg('Đang lưu thông tin...');
       await setDoc(doc(db, 'users', uid), {
         name: fullName, age: astro.age || 0, gender,
         birthDate, birthTime, birthPlace, email: email || '',
@@ -103,7 +104,7 @@ export default function RegisterStep2Page() {
                 background: 'linear-gradient(135deg, rgba(157,78,221,0.4), rgba(255,110,180,0.3))',
                 border: '1px solid rgba(157,78,221,0.4)',
               } : {}}>
-                <span>{s.icon}</span>
+                <UiIcon name={s.icon as 'user'} label={s.label} />
                 <span className="hidden sm:inline">{s.label}</span>
               </div>
               {i < steps.length - 1 && (
@@ -115,7 +116,7 @@ export default function RegisterStep2Page() {
 
         <div className="glass-card p-8" style={{ border: '1px solid rgba(157,78,221,0.3)' }}>
           <div className="text-center mb-6">
-            <div className="text-4xl mb-2">{steps[step - 1].icon}</div>
+            <div className="text-4xl mb-2"><UiIcon name={steps[step - 1].icon as 'user'} label={steps[step - 1].label} /></div>
             <h2 className="text-2xl font-bold gradient-text">{steps[step - 1].label}</h2>
             <p className="text-purple-300 text-sm opacity-70 mt-1">Bước {step} / {steps.length}</p>
           </div>
@@ -127,15 +128,16 @@ export default function RegisterStep2Page() {
               {step === 1 && (
                 <>
                   <div>
-                    <label className="block text-purple-300 text-sm mb-2">Họ và tên đầy đủ</label>
-                    <input className="cosmic-input" placeholder="Nguyễn Văn A"
+                    <label htmlFor="register-full-name" className="block text-purple-300 text-sm mb-2">Họ và tên đầy đủ</label>
+                    <input id="register-full-name" autoComplete="name" className="cosmic-input" placeholder="Nguyễn Văn A"
                       value={fullName} onChange={e => setFullName(e.target.value)} />
                   </div>
                   <div>
-                    <label className="block text-purple-300 text-sm mb-2">Giới tính</label>
-                    <div className="grid grid-cols-3 gap-3">
+                    <p className="block text-purple-300 text-sm mb-2">Giới tính</p>
+                    <div role="group" aria-label="Giới tính" className="grid grid-cols-3 gap-3">
                       {['Nam', 'Nữ', 'Khác'].map(g => (
                         <button key={g} type="button"
+                            aria-pressed={gender === g}
                           onClick={() => setGender(g)}
                           className={`py-2 rounded-xl text-sm font-medium transition-all ${
                             gender === g ? 'text-white' : 'text-purple-300 bg-white/5'
@@ -152,14 +154,14 @@ export default function RegisterStep2Page() {
               {step === 2 && (
                 <>
                   <div>
-                    <label className="block text-purple-300 text-sm mb-2">Ngày sinh (YYYY-MM-DD)</label>
-                    <input className="cosmic-input" placeholder="2001-06-27" type="date"
+                    <label htmlFor="register-birth-date" className="block text-purple-300 text-sm mb-2">Ngày sinh (YYYY-MM-DD)</label>
+                    <input id="register-birth-date" className="cosmic-input" placeholder="2001-06-27" type="date"
                       value={birthDate} onChange={e => setBirthDate(e.target.value)} />
                     <p className="text-xs text-purple-400 mt-1 opacity-60">VD: 2001-06-27</p>
                   </div>
                   <div>
-                    <label className="block text-purple-300 text-sm mb-2">Giờ sinh (HH:MM)</label>
-                    <input className="cosmic-input" placeholder="03:20" type="time"
+                    <label htmlFor="register-birth-time" className="block text-purple-300 text-sm mb-2">Giờ sinh (HH:MM)</label>
+                    <input id="register-birth-time" className="cosmic-input" placeholder="03:20" type="time"
                       value={birthTime} onChange={e => setBirthTime(e.target.value)} />
                     <p className="text-xs text-purple-400 mt-1 opacity-60">Giờ sinh chính xác để tính ascendant</p>
                   </div>
@@ -169,8 +171,8 @@ export default function RegisterStep2Page() {
               {step === 3 && (
                 <>
                   <div>
-                    <label className="block text-purple-300 text-sm mb-2">Nơi sinh</label>
-                    <input className="cosmic-input" placeholder="Hà Nội, Việt Nam"
+                    <label htmlFor="register-birth-place" className="block text-purple-300 text-sm mb-2">Nơi sinh</label>
+                    <input id="register-birth-place" autoComplete="address-level2" className="cosmic-input" placeholder="Hà Nội, Việt Nam"
                       value={birthPlace} onChange={e => setBirthPlace(e.target.value)} />
                     <p className="text-xs text-purple-400 mt-1 opacity-60">Tên thành phố hoặc địa chỉ đầy đủ</p>
                   </div>
@@ -194,12 +196,12 @@ export default function RegisterStep2Page() {
               className="flex items-center gap-3 mt-4 p-3 rounded-xl"
               style={{ background: 'rgba(157,78,221,0.1)' }}>
               <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin flex-shrink-0" />
-              <p className="text-purple-300 text-sm">{loadingMsg}</p>
+              <p role="status" aria-live="polite" className="text-purple-300 text-sm">{loadingMsg}</p>
             </motion.div>
           )}
 
           {error && (
-            <p className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg px-4 py-2 mt-4">{error}</p>
+            <p role="alert" className="text-red-400 text-sm text-center bg-red-500/10 rounded-lg px-4 py-2 mt-4">{error}</p>
           )}
 
           {/* Buttons */}
@@ -228,7 +230,7 @@ export default function RegisterStep2Page() {
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Đang xử lý...
                 </span>
-              ) : step < 3 ? 'Tiếp Theo →' : '🚀 Hoàn Tất'}
+              ) : step < 3 ? 'Tiếp Theo →' : <><UiIcon name="check" label="Hoàn tất" className="mr-1 inline" />Hoàn Tất</>}
             </button>
           </div>
         </div>

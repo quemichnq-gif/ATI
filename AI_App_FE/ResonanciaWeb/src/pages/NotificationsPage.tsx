@@ -5,13 +5,14 @@ import { RootState } from '../store';
 import { apiGetNotifications, apiMarkNotificationRead, apiDeleteNotification } from '../services/api';
 import { formatTimestamp } from '../utils/date';
 import { Notification } from '../types';
+import UiIcon from '../components/UiIcon';
 
-const NOTIF_ICONS: Record<string, string> = {
-  match_request: '💌',
-  match_accepted: '🎉',
-  match_rejected: '💔',
-  breakup: '🌧️',
-  message: '💬',
+const NOTIF_ICONS: Record<string, 'mail' | 'check' | 'heart' | 'cloud-rain' | 'message'> = {
+  match_request: 'mail',
+  match_accepted: 'check',
+  match_rejected: 'heart',
+  breakup: 'cloud-rain',
+  message: 'message',
 };
 
 export default function NotificationsPage() {
@@ -42,7 +43,7 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold gradient-text font-display">🔔 Thông Báo</h1>
+        <h1 className="text-3xl font-bold gradient-text font-display"><UiIcon name="bell" label="Thông báo" className="mr-2 inline" />Thông Báo</h1>
         <p className="text-purple-300 opacity-70 mt-1">
           {unread > 0 ? `${unread} thông báo chưa đọc` : 'Tất cả đã đọc'}
         </p>
@@ -64,7 +65,7 @@ export default function NotificationsPage() {
         </div>
       ) : notifications.length === 0 ? (
         <div className="glass-card p-12 text-center">
-          <div className="text-5xl mb-4">🔕</div>
+          <div className="text-5xl mb-4"><UiIcon name="bell" label="Không có thông báo" /></div>
           <p className="text-white font-semibold">Không có thông báo nào</p>
           <p className="text-purple-300 text-sm opacity-60 mt-1">Vũ trụ đang yên lặng...</p>
         </div>
@@ -84,7 +85,7 @@ export default function NotificationsPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className="text-2xl flex-shrink-0 mt-0.5">
-                    {NOTIF_ICONS[n.type] || '📢'}
+                    <UiIcon name={NOTIF_ICONS[n.type] || 'bell'} label={n.title} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
