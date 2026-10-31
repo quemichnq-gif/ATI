@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import StarField from './StarField';
+import ErrorBoundary from './ErrorBoundary';
 
 export default function MainLayout() {
   return (
@@ -9,7 +10,9 @@ export default function MainLayout() {
       <Sidebar />
       <main className="ml-64 min-h-screen relative z-10">
         <div className="max-w-5xl mx-auto px-6 py-8">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
     </div>

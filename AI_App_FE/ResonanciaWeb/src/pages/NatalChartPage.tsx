@@ -9,15 +9,18 @@ import type { IconName } from '../components/UiIcon';
 import NatalChartSVG from '../components/NatalChartSVG';
 
 const SECTIONS = [
-  { key: 'personality', label: 'Tính Cách', icon: 'user' },
-  { key: 'emotions', label: 'Cảm Xúc', icon: 'heart' },
-  { key: 'career', label: 'Sự Nghiệp', icon: 'briefcase' },
-  { key: 'love', label: 'Tình Yêu', icon: 'heart' },
-  { key: 'strengths', label: 'Điểm Mạnh', icon: 'sparkles' },
-  { key: 'elements', label: 'Nguyên Tố', icon: 'water' },
-  { key: 'advice', label: 'Lời Khuyên', icon: 'chart' },
-  { key: 'idealPartner', label: 'Người Lý Tưởng', icon: 'user' },
+  { key: 'overview', label: 'Tổng Quan', icon: 'sparkles', desc: 'Toàn cảnh tính cách, cảm xúc & sự nghiệp' },
+  { key: 'personality', label: 'Tính Cách', icon: 'user', desc: 'Bản sắc, cái tôi và cách hành xử' },
+  { key: 'emotions', label: 'Cảm Xúc', icon: 'heart', desc: 'Thế giới nội tâm, tâm lý & nhu cầu an toàn' },
+  { key: 'career', label: 'Sự Nghiệp', icon: 'briefcase', desc: 'Định hướng công danh, sở trường & tài chính' },
+  { key: 'love', label: 'Tình Yêu', icon: 'heart', desc: 'Ngôn ngữ tình cảm & cách xây dựng kết nối' },
+  { key: 'strengths', label: 'Điểm Mạnh', icon: 'star', desc: 'Năng khiếu bẩm sinh & lợi thế vũ trụ' },
+  { key: 'elements', label: 'Nguyên Tố', icon: 'water', desc: 'Tương quan 4 nguyên tố trong bản mệnh' },
+  { key: 'advice', label: 'Lời Khuyên', icon: 'chart', desc: 'Kim chỉ nam phát triển bản thân' },
+  { key: 'idealPartner', label: 'Người Lý Tưởng', icon: 'user', desc: 'Mẫu người đồng điệu về tần số' },
 ];
+
+const DETAIL_SECTIONS = SECTIONS.filter(s => s.key !== 'overview');
 
 const PAGE_TABS = [
   { id: 'chart', label: 'Biểu Đồ Sao' },
@@ -25,12 +28,34 @@ const PAGE_TABS = [
   { id: 'career', label: 'Hướng Nghiệp' },
 ];
 
+function cleanSectionText(text: string) {
+  if (!text) return '';
+  return text
+    .replace(/^([#]{1,4}|\*\*|\d+\.|#)+\s*[\d.\s\w\p{L}–\-:]+(\n|\*\*)+/u, '')
+    .trim();
+}
+
 function parseAnalysisSections(text: string) {
   const sections: Record<string, string> = {};
-  const parts = text.split(/\n(?=\d\.|##|\*\*[A-ZÁÀẢ])/);
+  if (!text) return sections;
+  const parts = text.split(/\n(?=\d+\.|#{1,3}\s*\d*|\*\*[0-9A-ZÁÀẢ])/);
+  const keys = ['personality', 'emotions', 'career', 'love', 'strengths', 'elements', 'advice', 'idealPartner'];
+  
   parts.forEach((part, i) => {
-    const key = SECTIONS[i]?.key;
-    if (key) sections[key] = part.trim();
+    const trimmed = part.trim();
+    if (!trimmed) return;
+    const lower = trimmed.toLowerCase();
+    if (lower.includes('tính cách')) sections['personality'] = trimmed;
+    else if (lower.includes('cảm xúc')) sections['emotions'] = trimmed;
+    else if (lower.includes('sự nghiệp')) sections['career'] = trimmed;
+    else if (lower.includes('tình yêu')) sections['love'] = trimmed;
+    else if (lower.includes('điểm mạnh')) sections['strengths'] = trimmed;
+    else if (lower.includes('nguyên tố')) sections['elements'] = trimmed;
+    else if (lower.includes('lời khuyên')) sections['advice'] = trimmed;
+    else if (lower.includes('người lý tưởng')) sections['idealPartner'] = trimmed;
+    else if (keys[i]) {
+      sections[keys[i]] = trimmed;
+    }
   });
   if (Object.keys(sections).length === 0) sections['personality'] = text;
   return sections;
@@ -41,7 +66,8 @@ export default function NatalChartPage() {
   const [pageTab, setPageTab] = useState('chart');
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [sections, setSections] = useState<Record<string, string>>({});
-  const [activeSection, setActiveSection] = useState('personality');
+  const [activeSection, setActiveSection] = useState('overview');
+  const [overviewMode, setOverviewMode] = useState<'cards' | 'full'>('cards');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [careerAnalysis, setCareerAnalysis] = useState('');
@@ -294,24 +320,187 @@ export default function NatalChartPage() {
                   background: `linear-gradient(135deg, ${colors[0]}66, ${colors[1]}44)`,
                   border: `1px solid ${colors[0]}66`,
                 } : {}}>
-                <UiIcon name={s.icon as 'user'} label={s.label} className="mr-1 inline" />{s.label}
+                <UiIcon name={s.icon as any} label={s.label} className="mr-1.5 inline" />{s.label}
               </button>
             ))}
           </div>
 
           {/* Section content */}
           <AnimatePresence mode="wait">
-            <motion.div key={activeSection}
-              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}
-              className="glass-card p-6">
-              <h3 className="text-white font-bold text-lg mb-4">
-                {(() => { const section = SECTIONS.find(s => s.key === activeSection); return section && <><UiIcon name={section.icon as 'user'} label={section.label} className="mr-2 inline" />{section.label}</>; })()}
-              </h3>
-              <p className="text-purple-100 leading-relaxed whitespace-pre-wrap text-sm opacity-90">
-                {sections[activeSection] || analysis}
-              </p>
-            </motion.div>
+            {activeSection === 'overview' ? (
+              <motion.div
+                key="overview"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                {/* Header Tổng Quan Năng Lượng */}
+                <div className="glass-card p-6" style={{ background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.15), rgba(219, 39, 119, 0.1))', border: `1px solid ${colors[0]}55` }}>
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h3 className="text-white font-bold text-xl flex items-center gap-2">
+                        <UiIcon name="sparkles" label="Tổng quan" className="text-yellow-400" />
+                        Tổng Quan Vận Mệnh & Năng Lượng Bản Đồ Sao
+                      </h3>
+                      <p className="text-purple-300 text-xs mt-1 opacity-80">
+                        Bức tranh tổng hợp đa chiều về Tính Cách, Cảm Xúc, Sự Nghiệp và Tình Yêu của bạn
+                      </p>
+                    </div>
+
+                    {/* Chế độ xem */}
+                    <div className="flex gap-1.5 p-1 rounded-xl glass bg-purple-950/40 text-xs">
+                      <button
+                        onClick={() => setOverviewMode('cards')}
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                          overviewMode === 'cards' ? 'bg-purple-600/60 text-white shadow' : 'text-purple-300 hover:text-white'
+                        }`}
+                      >
+                        📊 Dạng Thẻ Tổng Hợp
+                      </button>
+                      <button
+                        onClick={() => setOverviewMode('full')}
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                          overviewMode === 'full' ? 'bg-purple-600/60 text-white shadow' : 'text-purple-300 hover:text-white'
+                        }`}
+                      >
+                        📄 Đọc Toàn Văn
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Highlights Tam Trụ Hoàng Đạo (Big 3) & Nguyên tố */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-purple-500/20">
+                    <div className="glass p-3 rounded-xl text-center">
+                      <span className="text-purple-300 text-[11px] block">Mặt Trời (Bản ngã)</span>
+                      <span className="text-white font-bold text-sm mt-0.5 block">{profile.sun || 'Kim Ngưu'}</span>
+                    </div>
+                    <div className="glass p-3 rounded-xl text-center">
+                      <span className="text-purple-300 text-[11px] block">Mặt Trăng (Cảm xúc)</span>
+                      <span className="text-white font-bold text-sm mt-0.5 block">{profile.moon || 'Xử Nữ'}</span>
+                    </div>
+                    <div className="glass p-3 rounded-xl text-center">
+                      <span className="text-purple-300 text-[11px] block">Cung Mọc (Diện mạo)</span>
+                      <span className="text-white font-bold text-sm mt-0.5 block">{profile.ascendant || 'Ma Kết'}</span>
+                    </div>
+                    <div className="glass p-3 rounded-xl text-center">
+                      <span className="text-purple-300 text-[11px] block">Nguyên Tố Trội</span>
+                      <span className="text-white font-bold text-sm mt-0.5 block">
+                        {profile.earthRatio && profile.earthRatio >= 30 ? 'Thổ' : profile.fireRatio && profile.fireRatio >= 30 ? 'Hoả' : profile.waterRatio && profile.waterRatio >= 30 ? 'Thuỷ' : 'Khí'} (Chủ đạo)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chế độ 1: Dạng Thẻ Lưới Tổng Hợp */}
+                {overviewMode === 'cards' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {DETAIL_SECTIONS.map((s, idx) => {
+                      const content = sections[s.key];
+                      const cleaned = cleanSectionText(content);
+                      return (
+                        <motion.div
+                          key={s.key}
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.04 }}
+                          className="glass-card p-5 flex flex-col justify-between hover:border-purple-400/40 transition-all card-hover"
+                          style={{ border: '1px solid rgba(168, 85, 247, 0.2)' }}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+                                  style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.3), rgba(236,72,153,0.2))' }}>
+                                  <UiIcon name={s.icon as any} label={s.label} />
+                                </div>
+                                <h4 className="text-white font-bold text-base">{s.label}</h4>
+                              </div>
+                              <span className="text-[10px] text-purple-300/60 font-mono">0{idx + 1}</span>
+                            </div>
+
+                            <p className="text-[11px] text-purple-300/70 mb-2 italic">{s.desc}</p>
+                            
+                            <p className="text-purple-100 text-xs leading-relaxed opacity-90 line-clamp-4">
+                              {cleaned || 'Đang cập nhật phân tích chiêm tinh học...'}
+                            </p>
+                          </div>
+
+                          <div className="pt-3 mt-3 border-t border-purple-500/15 flex justify-end">
+                            <button
+                              onClick={() => setActiveSection(s.key)}
+                              className="text-xs font-medium text-pink-400 hover:text-pink-300 transition-colors flex items-center gap-1"
+                            >
+                              <span>Xem chi tiết {s.label}</span>
+                              <span>→</span>
+                            </button>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Chế độ 2: Đọc Toàn Văn Báo Cáo Liền Mạch */}
+                {overviewMode === 'full' && (
+                  <div className="glass-card p-6 md:p-8 space-y-8">
+                    {DETAIL_SECTIONS.map((s, idx) => {
+                      const content = sections[s.key];
+                      const cleaned = cleanSectionText(content);
+                      return (
+                        <div key={s.key} className={idx > 0 ? 'pt-6 border-t border-purple-500/20' : ''}>
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-white font-bold text-lg flex items-center gap-2">
+                              <UiIcon name={s.icon as any} label={s.label} className="text-purple-400" />
+                              <span>{idx + 1}. {s.label}</span>
+                            </h4>
+                            <button
+                              onClick={() => setActiveSection(s.key)}
+                              className="text-xs text-purple-400 hover:text-white glass px-2.5 py-1 rounded-lg transition-all"
+                            >
+                              Tab riêng ↗
+                            </button>
+                          </div>
+                          <p className="text-purple-100 text-sm leading-relaxed whitespace-pre-wrap opacity-90">
+                            {cleaned || content || analysis}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            ) : (
+              /* Chi Tiết Từng Mục */
+              <motion.div
+                key={activeSection}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="glass-card p-6 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-purple-500/20">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    {(() => {
+                      const section = SECTIONS.find(s => s.key === activeSection);
+                      return section && <><UiIcon name={section.icon as any} label={section.label} className="mr-1 inline text-purple-400" />{section.label}</>;
+                    })()}
+                  </h3>
+                  <button
+                    onClick={() => setActiveSection('overview')}
+                    className="glass px-3 py-1.5 rounded-xl text-xs text-purple-300 hover:text-white transition-all flex items-center gap-1.5"
+                  >
+                    <span>← Về Tổng Quan</span>
+                  </button>
+                </div>
+
+                <p className="text-purple-100 leading-relaxed whitespace-pre-wrap text-sm opacity-90">
+                  {cleanSectionText(sections[activeSection]) || sections[activeSection] || analysis}
+                </p>
+              </motion.div>
+            )}
           </AnimatePresence>
 
           <button onClick={handleAnalyze}

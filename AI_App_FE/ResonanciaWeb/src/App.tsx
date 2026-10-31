@@ -1,4 +1,3 @@
-import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,18 +17,11 @@ import ProfilePage from './pages/ProfilePage';
 import UserProfilePage from './pages/UserProfilePage';
 import PredictionPage from './pages/PredictionPage';
 
-// Lazy-loaded new feature pages
-const SynastryPage = lazy(() => import('./pages/SynastryPage'));
-const TransitPage = lazy(() => import('./pages/TransitPage'));
-const TarotPage = lazy(() => import('./pages/TarotPage'));
-const GlossaryPage = lazy(() => import('./pages/GlossaryPage'));
-const CosmicJournalPage = lazy(() => import('./pages/CosmicJournalPage'));
-
-const PageFallback = () => (
-  <div className="flex items-center justify-center py-20">
-    <div className="cosmic-spinner" />
-  </div>
-);
+import SynastryPage from './pages/SynastryPage';
+import TransitPage from './pages/TransitPage';
+import TarotPage from './pages/TarotPage';
+import GlossaryPage from './pages/GlossaryPage';
+import CosmicJournalPage from './pages/CosmicJournalPage';
 
 export default function App() {
   useAuth();
@@ -62,12 +54,12 @@ export default function App() {
         <Route path="/user/:userId" element={<UserProfilePage />} />
         <Route path="/prediction" element={<PredictionPage />} />
 
-        {/* ✨ New feature routes */}
-        <Route path="/synastry" element={<Suspense fallback={<PageFallback />}><SynastryPage /></Suspense>} />
-        <Route path="/transit" element={<Suspense fallback={<PageFallback />}><TransitPage /></Suspense>} />
-        <Route path="/tarot" element={<Suspense fallback={<PageFallback />}><TarotPage /></Suspense>} />
-        <Route path="/glossary" element={<Suspense fallback={<PageFallback />}><GlossaryPage /></Suspense>} />
-        <Route path="/journal" element={<Suspense fallback={<PageFallback />}><CosmicJournalPage /></Suspense>} />
+        {/* Feature routes */}
+        <Route path="/synastry" element={<SynastryPage />} />
+        <Route path="/transit" element={<TransitPage />} />
+        <Route path="/tarot" element={<TarotPage />} />
+        <Route path="/glossary" element={<GlossaryPage />} />
+        <Route path="/journal" element={<CosmicJournalPage />} />
       </Route>
 
       {/* Fallback */}
