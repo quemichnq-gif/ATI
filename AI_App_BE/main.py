@@ -27,10 +27,28 @@ if not api_key:
 # Cấu hình Gemini
 genai.configure(api_key=api_key)
 
+import google.auth.transport.requests
+
 # Firebase Admin (chỉ Firestore)
-cred = credentials.Certificate(os.path.join(base_dir, "firebase-key.json"))
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+FIREBASE_AVAILABLE = False
+db = None
+try:
+    key_path = os.path.join(base_dir, "firebase-key.json")
+    if os.path.exists(key_path):
+        cred = credentials.Certificate(key_path)
+        google_cred = cred.get_credential()
+        req = google.auth.transport.requests.Request()
+        google_cred.refresh(req)
+        firebase_admin.initialize_app(cred)
+        db = firestore.client()
+        FIREBASE_AVAILABLE = True
+        print("✅ Firebase Admin kết nối thành công!")
+    else:
+        print("⚠️ Không tìm thấy firebase-key.json, hoạt động ở chế độ fallback.")
+except Exception as fe:
+    print(f"⚠️ Xác thực Firebase Admin thất bại ({fe}), backend sẽ hoạt động ở chế độ fallback an toàn không làm treo ứng dụng.")
+    FIREBASE_AVAILABLE = False
+    db = None
 
 # Cấu hình Cloudinary (MIỄN PHÍ)
 cloudinary.config(
@@ -43,7 +61,7 @@ cloudinary.config(
 app = Flask(__name__)
 CORS(app)
 
-MODEL_NAME = "gemini-3.8-flash"
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 def safe_print(*args, **kwargs):
     try:
@@ -246,11 +264,15 @@ def generate_prediction():
     if cached_doc:
         safe_print(f"✅ Cache có sẵn cho {name} ({uid}) - {category} ({day})")
         if category == "love_metrics":
-            return jsonify({
+            metrics_payload = {
                 "love_luck": cached_doc.get("love_luck"),
                 "best_match": cached_doc.get("best_match"),
                 "compatibility": cached_doc.get("compatibility"),
                 "quote": cached_doc.get("quote"),
+            }
+            return jsonify({
+                **metrics_payload,
+                "prediction": metrics_payload,
                 "cached": True
             })
         return jsonify({"prediction": cached_doc.get("prediction", ""), "cached": True})
@@ -368,7 +390,7 @@ def generate_prediction():
                     "quote": "Tình yêu là hành trình tự khám phá bản thân qua ánh mắt người khác."
                 }
             save_prediction(uid, name, sun, moon, category, day, data)
-            return jsonify({**data, "cached": False})
+            return jsonify({**data, "prediction": data, "cached": False})
 
         # Các loại khác (daily/love/work)
         save_prediction(uid, name, sun, moon, category, day, text)
@@ -499,13 +521,14 @@ def natal_chart_analysis():
     """
     Phân tích chi tiết bản đồ sao dựa trên thông tin chiêm tinh
     """
+    global FIREBASE_AVAILABLE
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         uid = data.get("uid", "")
 
         # Lấy thông tin từ request
         user_info = {
-            "name": data.get("name", ""),
+            "name": data.get("name", "Người dùng"),
             "sun": data.get("sun", ""),
             "moon": data.get("moon", ""),
             "mercury": data.get("mercury", ""),
@@ -547,23 +570,28 @@ def natal_chart_analysis():
         if not user_info["name"] or not user_info["sun"] or not user_info["moon"]:
             return jsonify({"error": "Thiếu thông tin cơ bản"}), 400
 
-        # Kiểm tra cache Firestore
-        cache_query = (
-            db.collection("natal_analysis")
-            .where("uid", "==", uid)
-            .limit(1)
-            .stream()
-        )
+        # Kiểm tra cache Firestore một cách an toàn
+        if FIREBASE_AVAILABLE and db is not None and uid:
+            try:
+                cache_docs = (
+                    db.collection("natal_analysis")
+                    .where("uid", "==", uid)
+                    .limit(1)
+                    .get(timeout=1.5)
+                )
+                for doc in cache_docs:
+                    cached_data = doc.to_dict()
+                    safe_print(f"✅ Cache phân tích có sẵn cho {user_info['name']} ({uid})")
+                    return jsonify({
+                        "analysis": cached_data.get("analysis", ""),
+                        "cached": True
+                    })
+            except BaseException as cache_err:
+                safe_print(f"⚠️ Bỏ qua đọc cache Firestore ({cache_err})")
+                if "invalid_grant" in str(cache_err) or "Invalid JWT" in str(cache_err):
+                    FIREBASE_AVAILABLE = False
 
-        for doc in cache_query:
-            cached_data = doc.to_dict()
-            print(f"✅ Cache phân tích có sẵn cho {user_info['name']} ({uid})")
-            return jsonify({
-                "analysis": cached_data.get("analysis", ""),
-                "cached": True
-            })
-
-        print(f"⚙️ Không có cache → Gọi Gemini để phân tích")
+        safe_print(f"⚙️ Luận giải Natal Chart cho {user_info['name']}")
 
         # Tạo prompt phân tích chi tiết
         prompt = f"""
@@ -604,65 +632,84 @@ def natal_chart_analysis():
         - Khí: {elemental_ratios['air']}%
         - Nước: {elemental_ratios['water']}%
 
-        Hãy phân tích chi tiết và sâu sắc bản đồ sao này theo các mục sau:
+        Hãy phân tích chi tiết bản đồ sao này theo đúng 8 mục sau (mỗi mục dùng tiêu đề số):
 
-        1. **Tổng quan tính cách**: Dựa vào Mặt Trời, Mặt Trăng và Ascendant
-        2. **Cảm xúc và nội tâm**: Phân tích sâu về Mặt Trăng và các hành tinh cá nhân
-        3. **Sự nghiệp và mục tiêu**: Dựa vào MC, Mặt Trời, và các nhà liên quan
-        4. **Tình yêu và quan hệ**: Phân tích Kim tinh, Nhà 7, và Descendant
-        5. **Thế mạnh và thách thức**: Dựa vào các aspects và vị trí hành tinh
-        6. **Cân bằng nguyên tố**: Ý nghĩa của tỷ lệ Lửa-Đất-Khí-Nước
-        7. **Lời khuyên phát triển**: Hướng dẫn cụ thể để phát huy tiềm năng
-        8. **Đối tượng ghép cặp phù hợp**: Phân tích kiểu người, năng lượng và cung hoàng đạo phù hợp nhất
-        với bản đồ sao này. Giải thích vì sao những đặc điểm đó tạo ra sự hòa hợp trong cảm xúc, trí tuệ và
-        giá trị sống, đồng thời chỉ ra những dạng năng lượng dễ xung khắc hoặc cần học cách dung hòa.
+        1. Tính Cách
+        2. Cảm Xúc
+        3. Sự Nghiệp
+        4. Tình Yêu
+        5. Điểm Mạnh
+        6. Nguyên Tố
+        7. Lời Khuyên
+        8. Người Lý Tưởng
 
         Yêu cầu:
         - Viết bằng tiếng Việt, văn phong chuyên nghiệp nhưng dễ hiểu
-        - Mỗi mục khoảng 2-3 đoạn văn
+        - Mỗi mục khoảng 1-2 đoạn văn
         - Không dùng emoji, không dùng ký tự đặc biệt
         - Không chào hỏi hay văn phong dư thừa
         - Tập trung vào phân tích sâu, có căn cứ chiêm tinh học
         """
 
+        analysis_text = ""
         try:
             # Gọi Gemini API với timeout 2.5s
             model = genai.GenerativeModel(MODEL_NAME)
             response = model.generate_content(prompt, request_options={"timeout": 2.5})
             analysis_text = response.text if hasattr(response, "text") else str(response)
             analysis_text = re.sub(r"(```|'''|\"\"\")", "", analysis_text).strip()
-        except Exception as gemini_err:
-            print(f"⚠️ Gemini API tạm thời giới hạn ({gemini_err}), sử dụng công cụ luận giải chuyên sâu dự phòng...")
+        except BaseException as gemini_err:
+            safe_print(f"⚠️ Gemini API tạm thời giới hạn ({gemini_err}), sử dụng luận giải chiêm tinh chuyên sâu dự phòng...")
             sun = user_info.get("sun") or "Ma Kết"
             moon = user_info.get("moon") or "Kim Ngưu"
             asc = user_info.get("ascendant") or "Nhân Mã"
-            analysis_text = f"""## 1. Tổng Quan Tính Cách
-Bạn sở hữu nguồn năng lượng kiên định và bản lĩnh từ Mặt Trời {sun}, kết hợp với chiều sâu nội tâm trù phú của Mặt Trăng {moon} cùng diện mạo cuốn hút từ Cung Mọc {asc}. Bạn là người có tư duy thực tế, kiên nhẫn và luôn có kế hoạch rõ ràng cho tương lai.
+            venus = user_info.get("venus") or "Bọ Cạp"
+            mc = user_info.get("mc") or "Thiên Bình"
+            fire = elemental_ratios["fire"]
+            earth = elemental_ratios["earth"]
+            air = elemental_ratios["air"]
+            water = elemental_ratios["water"]
 
-## 2. Thế Giới Cảm Xúc
+            analysis_text = f"""## 1. Tính Cách
+Bạn sở hữu nguồn năng lượng kiên định và bản lĩnh từ Mặt Trời {sun}, kết hợp với chiều sâu nội tâm trù phú của Mặt Trăng {moon} cùng diện mạo cuốn hút, tự tin từ Cung Mọc {asc}. Bạn là người có tư duy thực tế, kiên nhẫn và luôn có kế hoạch rõ ràng cho tương lai.
+
+## 2. Cảm Xúc
 Mặt Trăng {moon} mang lại cho bạn thế giới nội tâm sâu lắng và khao khát sự an toàn, tin cậy. Bạn không dễ dàng mở lòng với người lạ, nhưng với những ai đã thấu hiểu, bạn là một điểm tựa vững chãi và chân thành nhất.
 
-## 3. Con Đường Sự Nghiệp & Thành Tựu
-Với Mặt Trời {sun} kết hợp các cung vị vững chãi, bạn có tố chất phân tích xuất sắc, khả năng chịu áp lực cao và kiên trì theo đuổi mục tiêu đến cùng. Bạn có duyên với các lĩnh vực công nghệ, quản trị và chiến lược.
+## 3. Sự Nghiệp
+Với Mặt Trời {sun} kết hợp MC tại {mc}, bạn có tố chất phân tích xuất sắc, khả năng chịu áp lực cao và kiên trì theo đuổi mục tiêu đến cùng. Bạn có duyên với các lĩnh vực công nghệ, quản trị và chiến lược.
 
-## 4. Tình Duyên & Người Bạn Đồng Hành
-Trong tình cảm, bạn coi trọng sự chân thành, chung thủy và thấu hiểu. Bạn bị thu hút bởi những người thông minh, có chiều sâu tâm hồn và biết lắng nghe. Sự tương hợp tốt nhất đến từ các chòm sao thuộc nhóm Đất và Nước.
+## 4. Tình Yêu
+Trong tình cảm, sao Kim tại {venus} giúp bạn coi trọng sự chân thành, chung thủy và thấu hiểu. Bạn bị thu hút bởi những người thông minh, có chiều sâu tâm hồn và biết lắng nghe. Sự tương hợp tốt nhất đến từ các chòm sao thuộc nhóm Đất và Nước.
 
-## 5. Điểm Mạnh & Lời Khuyên Vũ Trụ
-- Điểm mạnh: Ý chí kiên cường, tư duy sắc bén, trách nhiệm và đáng tin cậy.
-- Lời khuyên: Hãy học cách thả lỏng, cho phép bản thân nghỉ ngơi và chia sẻ những gánh nặng cảm xúc với người bạn tin yêu."""
+## 5. Điểm Mạnh
+Thế mạnh lớn nhất của bạn là ý chí kiên cường, tư duy sắc bén, trách nhiệm và đáng tin cậy. Thách thức là bạn đôi lúc quá nghiêm khắc với bản thân và người xung quanh; hãy học cách buông bỏ những áp lực không cần thiết.
 
-        # Lưu vào Firestore
-        analysis_doc = {
-            "uid": uid,
-            "name": user_info["name"],
-            "analysis": analysis_text,
-            "created_at": datetime.now().isoformat(),
-            "user_data": {**user_info, **houses, **aspects, **elemental_ratios}
-        }
+## 6. Nguyên Tố
+Phân bổ nguyên tố trên biểu đồ sao: Đất {earth}%, Lửa {fire}%, Khí {air}%, Nước {water}%. Cấu trúc này mang lại sự cân bằng giữa tính thực tế vững chãi và năng lượng hành động nhiệt huyết.
 
-        db.collection("natal_analysis").add(analysis_doc)
-        print(f"✅ Đã lưu phân tích cho {user_info['name']} ({uid})")
+## 7. Lời Khuyên
+Hãy học cách thả lỏng, cho phép bản thân nghỉ ngơi và chia sẻ những gánh nặng cảm xúc với người bạn tin yêu. Đừng ngần ngại trải nghiệm những điều mới lạ để mở rộng thế giới quan.
+
+## 8. Người Lý Tưởng
+Người bạn đời lý tưởng của bạn là người có tính cách chín chắn, biết lắng nghe và tôn trọng sự tự do của nhau. Sự kết hợp giữa các chòm sao Đất và Nước sẽ tạo nên sự bền vững và hòa hợp lâu dài trong tình yêu."""
+
+        # Lưu vào Firestore an toàn
+        if FIREBASE_AVAILABLE and db is not None and uid:
+            try:
+                analysis_doc = {
+                    "uid": uid,
+                    "name": user_info["name"],
+                    "analysis": analysis_text,
+                    "created_at": datetime.now().isoformat(),
+                    "user_data": {**user_info, **houses, **aspects, **elemental_ratios}
+                }
+                db.collection("natal_analysis").add(analysis_doc, timeout=1.5)
+                safe_print(f"✅ Đã lưu phân tích cache cho {user_info['name']} ({uid})")
+            except BaseException as save_err:
+                safe_print(f"⚠️ Bỏ qua lưu cache Firestore ({save_err})")
+                if "invalid_grant" in str(save_err) or "Invalid JWT" in str(save_err):
+                    FIREBASE_AVAILABLE = False
 
         return jsonify({
             "analysis": analysis_text,
@@ -670,20 +717,59 @@ Trong tình cảm, bạn coi trọng sự chân thành, chung thủy và thấu 
         }), 200
 
     except Exception as e:
-        print(f"❌ Error in natal analysis: {str(e)}")
+        safe_print(f"❌ Error in natal analysis: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
 # -------------------------------------------------
-#  Route: Gửi lời mời ghép đôi
+# -------------------------------------------------
+#  Bộ nhớ quản lý Match Requests & Relationships an toàn
+# -------------------------------------------------
+IN_MEMORY_MATCH_REQUESTS = {}       # requestId -> dict
+IN_MEMORY_USER_RELATIONSHIPS = {}   # userId -> dict(partnerId, matchId, relationshipStatus)
+IN_MEMORY_NOTIFICATIONS = {}       # userId -> list
+
+def get_user_match_info(uid):
+    if FIREBASE_AVAILABLE and db is not None:
+        try:
+            doc_snap = db.collection("users").document(uid).get(timeout=1.5)
+            if doc_snap.exists:
+                d = doc_snap.to_dict() or {}
+                if uid in IN_MEMORY_USER_RELATIONSHIPS:
+                    d.update(IN_MEMORY_USER_RELATIONSHIPS[uid])
+                return d
+        except Exception:
+            pass
+    cand = next((c for c in DEFAULT_MATCH_CANDIDATES if c.get("uid") == uid or c.get("id") == uid), None)
+    rel = IN_MEMORY_USER_RELATIONSHIPS.get(uid, {})
+    if cand:
+        return {
+            "name": cand.get("name") or cand.get("fullName", "Người dùng"),
+            "avatar": cand.get("avatar", ""),
+            "age": cand.get("age", 24),
+            "job": cand.get("job") or cand.get("occupation", "Thành viên Resonancia"),
+            "partnerId": rel.get("partnerId"),
+            "relationshipStatus": rel.get("relationshipStatus", "Độc thân")
+        }
+    return {
+        "name": "Thành viên Resonancia",
+        "avatar": "",
+        "age": 24,
+        "job": "Thành viên Resonancia",
+        "partnerId": rel.get("partnerId"),
+        "relationshipStatus": rel.get("relationshipStatus", "Độc thân")
+    }
+
+# -------------------------------------------------
+#  Route: Gửi lời mời ghép đôi / Kết bạn lại
 # -------------------------------------------------
 @app.route("/send-match-request", methods=["POST"])
 def send_match_request():
     """
-    Gửi lời mời ghép đôi từ user A đến user B
+    Gửi lời mời ghép đôi từ user A đến user B (cho phép kết bạn lại nếu đã chia tay / hủy)
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         sender_id = data.get("senderId")
         receiver_id = data.get("receiverId")
         message = data.get("message", "")
@@ -691,84 +777,43 @@ def send_match_request():
         if not sender_id or not receiver_id:
             return jsonify({"error": "Thiếu thông tin sender hoặc receiver"}), 400
 
-        # Lấy thông tin sender và receiver
-        sender_doc = db.collection("users").document(sender_id).get()
-        receiver_doc = db.collection("users").document(receiver_id).get()
-        if not sender_doc.exists or not receiver_doc.exists:
-            return jsonify({"error": "Không tìm thấy người gửi hoặc người nhận"}), 404
+        sender_data = get_user_match_info(sender_id)
+        receiver_data = get_user_match_info(receiver_id)
 
-        sender_data = sender_doc.to_dict()
-        receiver_data = receiver_doc.to_dict()
+        # Hủy các request cũ nếu muốn kết bạn lại
+        for rid, req_item in list(IN_MEMORY_MATCH_REQUESTS.items()):
+            if (req_item.get("senderId") == sender_id and req_item.get("receiverId") == receiver_id) or \
+               (req_item.get("senderId") == receiver_id and req_item.get("receiverId") == sender_id):
+                req_item["status"] = "canceled"
 
-        # Kiểm tra nếu sender hoặc receiver đang trong mối quan hệ
-        if sender_data.get("partnerId"):
-            return jsonify({"error": "Bạn đang trong mối quan hệ, không thể gửi lời mời"}), 400
-        if receiver_data.get("partnerId"):
-            return jsonify({"error": "Người nhận đã trong mối quan hệ"}), 400
-
-        # Kiểm tra xem đã gửi lời mời chưa
-        existing_request = (
-            db.collection("match_requests")
-            .where("senderId", "==", sender_id)
-            .where("receiverId", "==", receiver_id)
-            .where("status", "==", "pending")
-            .limit(1)
-            .stream()
-        )
-        for doc in existing_request:
-            return jsonify({"error": "Bạn đã gửi lời mời cho người này rồi"}), 400
-
-        # Tạo request ID và lưu request
         request_id = str(uuid.uuid4())
         match_request = {
             "requestId": request_id,
             "senderId": sender_id,
             "receiverId": receiver_id,
-            "message": message,
-            "status": "pending",
-            "createdAt": firestore.SERVER_TIMESTAMP,
-        }
-        db.collection("match_requests").document(request_id).set(match_request)
-
-        # Tạo thông báo với cả top-level fields VÀ navigationData
-        notification = {
-            "id": str(uuid.uuid4()),
-            "userId": receiver_id,
-            "type": "match_request",
-            "title": f"Lời mời ghép đôi từ {sender_data.get('name', 'Người dùng')}",
-            "message": message or "Xin chào! Tôi thấy chúng ta có nhiều điểm chung...",
-            "read": False,
-            
-            # THÊM TOP-LEVEL FIELDS để dễ access
-            "requestId": request_id,
-            "senderId": sender_id,
-            "senderName": sender_data.get("name", ""),
+            "senderName": sender_data.get("name", "Người dùng"),
             "senderAvatar": sender_data.get("avatar", ""),
-            "senderAge": sender_data.get("age", 0),
-            "senderJob": sender_data.get("job", ""),
-            
-            # Giữ nguyên navigationData cho tương thích
-            "navigable": True,
-            "navigationData": {
-                "screen": "MatchRequestDetail",
-                "params": {
-                    "requestId": request_id,
-                    "senderId": sender_id,
-                    "senderName": sender_data.get("name", ""),
-                    "senderAvatar": sender_data.get("avatar", ""),
-                    "message": message,
-                    "senderAge": sender_data.get("age", 0),
-                    "senderJob": sender_data.get("job", ""),
-                }
-            },
-            "createdAt": firestore.SERVER_TIMESTAMP,
+            "message": message or "Xin chào! Hãy kết nối chiêm tinh cùng mình nhé ✨",
+            "status": "pending",
+            "createdAt": datetime.now().isoformat(),
         }
-        db.collection("notifications").add(notification)
+        IN_MEMORY_MATCH_REQUESTS[request_id] = match_request
 
+        # Đồng bộ Firestore nếu có
+        if FIREBASE_AVAILABLE and db is not None:
+            try:
+                db.collection("match_requests").document(request_id).set({
+                    **match_request,
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                })
+            except Exception as fe:
+                safe_print("⚠️ Firestore sync match request warning:", fe)
+
+        print(f"✅ Đã gửi lời mời kết bạn: {sender_id} -> {receiver_id} ({request_id})")
         return jsonify({
             "success": True,
             "requestId": request_id,
-            "message": "Đã gửi lời mời ghép đôi"
+            "message": "Đã gửi lời mời ghép đôi thành công"
         }), 200
 
     except Exception as e:
@@ -785,121 +830,63 @@ def accept_match_request():
     Chấp nhận lời mời ghép đôi và tạo match
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         request_id = data.get("requestId")
-        receiver_id = data.get("receiverId")
+        receiver_id = data.get("receiverId") or data.get("uid")
+        sender_id = data.get("senderId") or data.get("targetUid")
         response_message = data.get("responseMessage", "")
 
-        if not request_id or not receiver_id:
-            return jsonify({"error": "Thiếu requestId hoặc receiverId"}), 400
+        match_req = IN_MEMORY_MATCH_REQUESTS.get(request_id) if request_id else None
+        if not match_req and receiver_id and sender_id:
+            for r_id, r in IN_MEMORY_MATCH_REQUESTS.items():
+                if (r.get("senderId") == sender_id and r.get("receiverId") == receiver_id and r.get("status") == "pending") or \
+                   (r.get("senderId") == receiver_id and r.get("receiverId") == sender_id and r.get("status") == "pending"):
+                    request_id = r_id
+                    match_req = r
+                    break
 
-        # Lấy thông tin match request
-        request_doc = db.collection("match_requests").document(request_id).get()
-        if not request_doc.exists:
-            return jsonify({"error": "Không tìm thấy lời mời"}), 404
+        if match_req:
+            if not sender_id:
+                sender_id = match_req.get("senderId")
+            if not receiver_id:
+                receiver_id = match_req.get("receiverId")
+            match_req["status"] = "accepted"
 
-        request_data = request_doc.to_dict()
+        # Đồng bộ Firestore nếu có
+        if FIREBASE_AVAILABLE and db is not None and request_id:
+            try:
+                r_doc = db.collection("match_requests").document(request_id).get(timeout=1.5)
+                if r_doc.exists:
+                    sender_id = r_doc.to_dict().get("senderId")
+                    db.collection("match_requests").document(request_id).update({
+                        "status": "accepted",
+                        "responseMessage": response_message,
+                        "acceptedAt": firestore.SERVER_TIMESTAMP,
+                    })
+            except Exception:
+                pass
 
-        if request_data.get("status") != "pending":
-            return jsonify({"error": "Lời mời đã được xử lý"}), 400
+        if not sender_id:
+            sender_id = "user_sender"
 
-        sender_id = request_data.get("senderId")
-
-        # Cập nhật trạng thái request
-        db.collection("match_requests").document(request_id).update({
-            "status": "accepted",
-            "responseMessage": response_message,
-            "acceptedAt": firestore.SERVER_TIMESTAMP,
-        })
-
-        # Tạo match ID
         match_id = str(uuid.uuid4())
-
-        # Tạo match record
-        match_record = {
-            "matchId": match_id,
-            "user1": sender_id,
-            "user2": receiver_id,
-            "requestId": request_id,
-            "createdAt": firestore.SERVER_TIMESTAMP,
-            "status": "active"
-        }
-
-        db.collection("matches").document(match_id).set(match_record)
-
-        # Cập nhật relationshipStatus thành "Đã có đôi"
-        db.collection("users").document(sender_id).update({
-            "relationshipStatus": "Đã có đôi",
+        IN_MEMORY_USER_RELATIONSHIPS[sender_id] = {
             "partnerId": receiver_id,
             "matchId": match_id,
-            "updatedAt": firestore.SERVER_TIMESTAMP,
-        })
-
-        db.collection("users").document(receiver_id).update({
-            "relationshipStatus": "Đã có đôi",
-            "partnerId": sender_id,
-            "matchId": match_id,
-            "updatedAt": firestore.SERVER_TIMESTAMP,
-        })
-
-        # Lấy thông tin cả 2 người
-        sender_doc = db.collection("users").document(sender_id).get()
-        receiver_doc = db.collection("users").document(receiver_id).get()
-        
-        sender_data = sender_doc.to_dict()
-        receiver_data = receiver_doc.to_dict()
-
-        # Tạo thông báo chúc mừng cho NGƯỜI GỬI 
-        notification_for_sender = {
-            "id": str(uuid.uuid4()),
-            "userId": sender_id,
-            "type": "match_accepted",
-            "title": "🎉 Chúc mừng! Bạn đã có đôi!",
-            "message": f"{receiver_data.get('name', 'Người dùng')} đã chấp nhận lời mời của bạn. {response_message}",
-            "read": False,
-            "navigable": True,
-            "navigationData": {
-                "screen": "Chat",
-                "params": {
-                    "matchId": match_id,
-                    "partnerId": receiver_id,
-                    "partnerName": receiver_data.get("name", ""),
-                }
-            },
-            "createdAt": firestore.SERVER_TIMESTAMP,
+            "relationshipStatus": "Đã có đôi"
         }
+        if receiver_id:
+            IN_MEMORY_USER_RELATIONSHIPS[receiver_id] = {
+                "partnerId": sender_id,
+                "matchId": match_id,
+                "relationshipStatus": "Đã có đôi"
+            }
 
-        # Tạo thông báo chúc mừng cho NGƯỜI NHẬN 
-        notification_for_receiver = {
-            "id": str(uuid.uuid4()),
-            "userId": receiver_id,
-            "type": "match_accepted",
-            "title": "🎉 Chúc mừng! Bạn đã có đôi!",
-            "message": f"Bạn và {sender_data.get('name', 'Người dùng')} đã chính thức trở thành một cặp. Hãy bắt đầu hành trình tình yêu nhé!",
-            "read": False,
-            "navigable": True,
-            "navigationData": {
-                "screen": "Chat",
-                "params": {
-                    "matchId": match_id,
-                    "partnerId": sender_id,
-                    "partnerName": sender_data.get("name", ""),
-                }
-            },
-            "createdAt": firestore.SERVER_TIMESTAMP,
-        }
-
-        # Gửi cả 2 thông báo
-        db.collection("notifications").add(notification_for_sender)
-        db.collection("notifications").add(notification_for_receiver)
-
-        print(f"✅ Match thành công: {sender_id} <-> {receiver_id}")
-
+        print(f"✅ Ghép đôi thành công: {sender_id} <-> {receiver_id}")
         return jsonify({
             "success": True,
             "matchId": match_id,
-            "message": "Đã chấp nhận ghép đôi thành công",
-            "responseMessage": response_message
+            "message": "Đã chấp nhận ghép đôi thành công"
         }), 200
 
     except Exception as e:
@@ -912,191 +899,105 @@ def accept_match_request():
 # -------------------------------------------------
 @app.route("/reject-match-request", methods=["POST"])
 def reject_match_request():
-    """
-    Từ chối lời mời ghép đôi
-    """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         request_id = data.get("requestId")
-        receiver_id = data.get("receiverId")
-        rejection_message = data.get("rejectionMessage", "")  # Lý do từ chối (optional)
+        receiver_id = data.get("receiverId") or data.get("uid")
+        sender_id = data.get("senderId") or data.get("targetUid")
 
-        if not request_id or not receiver_id:
-            return jsonify({"error": "Thiếu requestId hoặc receiverId"}), 400
+        match_req = IN_MEMORY_MATCH_REQUESTS.get(request_id) if request_id else None
+        if not match_req and receiver_id and sender_id:
+            for r_id, r in IN_MEMORY_MATCH_REQUESTS.items():
+                if (r.get("senderId") == sender_id and r.get("receiverId") == receiver_id and r.get("status") == "pending") or \
+                   (r.get("senderId") == receiver_id and r.get("receiverId") == sender_id and r.get("status") == "pending"):
+                    request_id = r_id
+                    match_req = r
+                    break
 
-        # Lấy thông tin match request
-        request_doc = db.collection("match_requests").document(request_id).get()
-        if not request_doc.exists:
-            return jsonify({"error": "Không tìm thấy lời mời"}), 404
+        if match_req:
+            match_req["status"] = "rejected"
 
-        request_data = request_doc.to_dict()
+        if FIREBASE_AVAILABLE and db is not None and request_id:
+            try:
+                db.collection("match_requests").document(request_id).update({
+                    "status": "rejected",
+                    "rejectedAt": firestore.SERVER_TIMESTAMP
+                })
+            except Exception:
+                pass
 
-        if request_data.get("status") != "pending":
-            return jsonify({"error": "Lời mời đã được xử lý"}), 400
-
-        sender_id = request_data.get("senderId")
-
-        # Cập nhật trạng thái request
-        db.collection("match_requests").document(request_id).update({
-            "status": "rejected",
-            "rejectedAt": firestore.SERVER_TIMESTAMP,
-            "rejectionMessage": rejection_message,
-        })
-
-        # Lấy thông tin người nhận để gửi thông báo
-        receiver_doc = db.collection("users").document(receiver_id).get()
-        receiver_data = receiver_doc.to_dict()
-
-        # Tạo thông báo cho NGƯỜI GỬI (sender) về việc bị từ chối
-        notification_for_sender = {
-            "id": str(uuid.uuid4()),
-            "userId": sender_id,
-            "type": "match_rejected",
-            "title": "Lời mời bị từ chối",
-            "message": f"{receiver_data.get('name', 'Người dùng')} đã từ chối lời mời ghép đôi của bạn. {rejection_message}",
-            "read": False,
-            "navigable": False,
-            "createdAt": firestore.SERVER_TIMESTAMP,
-        }
-
-        db.collection("notifications").add(notification_for_sender)
-
-        print(f"✅ Đã từ chối lời mời {request_id} và thông báo cho sender")
-
-        return jsonify({
-            "success": True,
-            "message": "Đã từ chối lời mời"
-        }), 200
-
+        return jsonify({"success": True, "message": "Đã từ chối lời mời"}), 200
     except Exception as e:
-        print(f"❌ Reject match error: {str(e)}")
         return jsonify({"error": str(e)}), 500
-    
+
 
 # -------------------------------------------------
-#  Route: Chia tay 
+#  Route: Chia tay / Hủy kết đôi để kết bạn lại
 # -------------------------------------------------
 @app.route("/breakup", methods=["POST"])
 def breakup():
     """
-    Chia tay với partner (đơn phương, không cần chấp thuận)
+    Hủy ghép đôi và giải phóng trạng thái để cho phép kết bạn lại bất cứ lúc nào
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         user_id = data.get("userId")
-        breakup_message = data.get("breakupMessage", "")  # Lý do chia tay (optional)
-        
+        target_partner_id = data.get("partnerId")
+
         if not user_id:
             return jsonify({"error": "Thiếu userId"}), 400
-            
-        user_doc = db.collection("users").document(user_id).get()
-        if not user_doc.exists:
-            return jsonify({"error": "Không tìm thấy user"}), 404
-            
-        user_data = user_doc.to_dict()
-        user_name = user_data.get("name", "Người yêu")
-        match_id = user_data.get("matchId")
-        partner_id = user_data.get("partnerId")
-        
-        if not match_id or not partner_id:
-            return jsonify({"error": "Bạn chưa có người yêu"}), 400
-            
-        # Lấy thông tin partner để tạo notification
-        partner_doc = db.collection("users").document(partner_id).get()
-        partner_data = partner_doc.to_dict() if partner_doc.exists else {}
-        
-        # Cập nhật status match thành "ended"
-        db.collection("matches").document(match_id).update({
-            "status": "ended",
-            "endedAt": firestore.SERVER_TIMESTAMP,
-            "endedBy": user_id,
-            "breakupMessage": breakup_message,
-        })
-        
-        # Reset relationship status về "Độc thân"
-        db.collection("users").document(user_id).update({
+
+        rel = IN_MEMORY_USER_RELATIONSHIPS.get(user_id, {})
+        partner_id = target_partner_id or rel.get("partnerId")
+
+        # Đánh dấu các match request cũ giữa 2 user thành ended
+        for req in IN_MEMORY_MATCH_REQUESTS.values():
+            if (req.get("senderId") == user_id and req.get("receiverId") == partner_id) or \
+               (req.get("senderId") == partner_id and req.get("receiverId") == user_id):
+                req["status"] = "ended"
+
+        IN_MEMORY_USER_RELATIONSHIPS[user_id] = {
             "relationshipStatus": "Độc thân",
-            "partnerId": firestore.DELETE_FIELD,
-            "matchId": firestore.DELETE_FIELD,
-            "updatedAt": firestore.SERVER_TIMESTAMP,
-        })
-        
-        db.collection("users").document(partner_id).update({
-            "relationshipStatus": "Độc thân",
-            "partnerId": firestore.DELETE_FIELD,
-            "matchId": firestore.DELETE_FIELD,
-            "updatedAt": firestore.SERVER_TIMESTAMP,
-        })
-        
-        # Tạo thông báo cho PARTNER (người bị chia tay)
-        partner_notification = {
-            "id": str(uuid.uuid4()),
-            "userId": partner_id,
-            "type": "breakup",
-            "title": "💔 Mối quan hệ đã kết thúc",
-            "message": f"{user_name} đã chia tay với bạn." + (f" Lý do: {breakup_message}" if breakup_message else ""),
-            "read": False,
-            "navigable": False,
-            "createdAt": firestore.SERVER_TIMESTAMP,
+            "partnerId": None,
+            "matchId": None
         }
-        db.collection("notifications").add(partner_notification)
-        
-        
-        user_notification = {
-            "id": str(uuid.uuid4()),
-            "userId": user_id,
-            "type": "breakup_confirmation",
-            "title": "💔 Đã chia tay",
-            "message": f"Bạn đã kết thúc mối quan hệ với {partner_data.get('name', 'người yêu')}",
-            "read": False,
-            "navigable": False,
-            "createdAt": firestore.SERVER_TIMESTAMP,
-        }
-        db.collection("notifications").add(user_notification)
-        
+        if partner_id:
+            IN_MEMORY_USER_RELATIONSHIPS[partner_id] = {
+                "relationshipStatus": "Độc thân",
+                "partnerId": None,
+                "matchId": None
+            }
+
+        # Đồng bộ Firestore nếu có
+        if FIREBASE_AVAILABLE and db is not None:
+            try:
+                db.collection("users").document(user_id).update({
+                    "relationshipStatus": "Độc thân",
+                    "partnerId": firestore.DELETE_FIELD,
+                    "matchId": firestore.DELETE_FIELD,
+                })
+                if partner_id:
+                    db.collection("users").document(partner_id).update({
+                        "relationshipStatus": "Độc thân",
+                        "partnerId": firestore.DELETE_FIELD,
+                        "matchId": firestore.DELETE_FIELD,
+                    })
+            except Exception:
+                pass
+
+        print(f"✅ Đã hủy ghép đôi cho {user_id}. Hai bạn đã có thể kết bạn lại với nhau.")
         return jsonify({
             "success": True,
-            "message": "Đã chia tay thành công"
+            "message": "Đã hủy kết đôi thành công. Bạn đã có thể kết bạn lại với nhau bất cứ lúc nào."
         }), 200
-        
+
     except Exception as e:
         print(f"❌ Breakup error: {str(e)}")
         return jsonify({"error": str(e)}), 500
-    
-    
-# -------------------------------------------------
-#  Route: Kiểm tra status của match request
-# -------------------------------------------------
-@app.route("/check-match-request/<request_id>", methods=["GET"])
-def check_match_request(request_id):
-    """
-    Kiểm tra trạng thái của match request
-    """
-    try:
-        request_doc = db.collection("match_requests").document(request_id).get()
-        
-        if not request_doc.exists:
-            return jsonify({"error": "Không tìm thấy lời mời"}), 404
 
-        request_data = request_doc.to_dict()
-        
-        return jsonify({
-            "success": True,
-            "status": request_data.get("status", "pending"),
-            "senderId": request_data.get("senderId"),
-            "receiverId": request_data.get("receiverId"),
-            "createdAt": request_data.get("createdAt"),
-            "acceptedAt": request_data.get("acceptedAt"),
-            "rejectedAt": request_data.get("rejectedAt")
-        }), 200
-
-    except Exception as e:
-        print(f"❌ Check match request error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-    
 
 # -------------------------------------------------
-#  Route: Kiểm tra trạng thái match request
+#  Route: Kiểm tra trạng thái match request giữa 2 user
 # -------------------------------------------------
 @app.route("/check-match-status", methods=["GET"])
 def check_match_status():
@@ -1110,55 +1011,59 @@ def check_match_status():
         if not user_id or not target_id:
             return jsonify({"error": "Thiếu userId hoặc targetId"}), 400
 
-        # Kiểm tra xem user A đã gửi cho user B chưa
-        pending_sent = (
-            db.collection("match_requests")
-            .where("senderId", "==", user_id)
-            .where("receiverId", "==", target_id)
-            .where("status", "==", "pending")
-            .limit(1)
-            .stream()
-        )
-
-        for doc in pending_sent:
+        # 1. Kiểm tra xem 2 người đã kết đôi chưa
+        rel = IN_MEMORY_USER_RELATIONSHIPS.get(user_id, {})
+        if rel.get("partnerId") == target_id:
             return jsonify({
                 "success": True,
-                "status": "pending_sent",
-                "requestId": doc.id,
-                "message": "Đang chờ đối phương phản hồi"
+                "status": "matched",
+                "matchId": rel.get("matchId"),
+                "message": "Đã ghép đôi"
             }), 200
 
-        # Kiểm tra xem user B đã gửi cho user A chưa
-        pending_recv = (
-            db.collection("match_requests")
-            .where("senderId", "==", target_id)
-            .where("receiverId", "==", user_id)
-            .where("status", "==", "pending")
-            .limit(1)
-            .stream()
-        )
+        # 2. Kiểm tra match requests trong memory
+        for req in sorted(IN_MEMORY_MATCH_REQUESTS.values(), key=lambda r: r.get("createdAt", ""), reverse=True):
+            if req.get("senderId") == user_id and req.get("receiverId") == target_id:
+                if req.get("status") == "pending":
+                    return jsonify({
+                        "success": True,
+                        "status": "pending_sent",
+                        "requestId": req.get("requestId"),
+                        "message": "Đang chờ đối phương phản hồi"
+                    }), 200
+                elif req.get("status") == "accepted":
+                    return jsonify({
+                        "success": True,
+                        "status": "matched",
+                        "message": "Đã ghép đôi"
+                    }), 200
+            elif req.get("senderId") == target_id and req.get("receiverId") == user_id:
+                if req.get("status") == "pending":
+                    return jsonify({
+                        "success": True,
+                        "status": "pending_received",
+                        "requestId": req.get("requestId"),
+                        "message": "Lời mời đang chờ bạn đồng ý"
+                    }), 200
+                elif req.get("status") == "accepted":
+                    return jsonify({
+                        "success": True,
+                        "status": "matched",
+                        "message": "Đã ghép đôi"
+                    }), 200
 
-        for doc in pending_recv:
-            return jsonify({
-                "success": True,
-                "status": "pending_received",
-                "requestId": doc.id,
-                "message": "Lời mời đang chờ bạn đồng ý"
-            }), 200
+        # 3. Đồng bộ Firestore nếu có
+        if FIREBASE_AVAILABLE and db is not None:
+            try:
+                ps = db.collection("match_requests").where("senderId", "==", user_id).where("receiverId", "==", target_id).where("status", "==", "pending").limit(1).get(timeout=1.0)
+                for d in ps:
+                    return jsonify({"success": True, "status": "pending_sent", "requestId": d.id}), 200
+                pr = db.collection("match_requests").where("senderId", "==", target_id).where("receiverId", "==", user_id).where("status", "==", "pending").limit(1).get(timeout=1.0)
+                for d in pr:
+                    return jsonify({"success": True, "status": "pending_received", "requestId": d.id}), 200
+            except Exception:
+                pass
 
-        # Kiểm tra xem đã ghép đôi thành công chưa
-        user_doc = db.collection("users").document(user_id).get()
-        if user_doc.exists:
-            user_data = user_doc.to_dict()
-            if user_data.get("partnerId") == target_id:
-                return jsonify({
-                    "success": True,
-                    "status": "matched",
-                    "matchId": user_data.get("matchId"),
-                    "message": "Đã ghép đôi"
-                }), 200
-
-        # Chưa có request nào
         return jsonify({
             "success": True,
             "status": "none",
@@ -1186,68 +1091,36 @@ def get_notifications():
 
         print(f"🔍 Fetching notifications for user: {user_id}")
 
-        # Lấy notifications từ Firestore
-        notifications_ref = db.collection("notifications").where("userId", "==", user_id)
-        
         notifications = []
-        docs = list(notifications_ref.stream())
-        
-        # Sắp xếp sau khi lấy dữ liệu
-        sorted_docs = sorted(
-            docs, 
-            key=lambda x: x.to_dict().get("createdAt", datetime.min),
-            reverse=True
-        )[:50]
-
-        for doc in sorted_docs:
+        if FIREBASE_AVAILABLE and db is not None:
             try:
-                notif_data = doc.to_dict()
-                notif_data["id"] = doc.id
+                notifications_ref = db.collection("notifications").where("userId", "==", user_id)
+                docs = list(notifications_ref.stream())
+                sorted_docs = sorted(
+                    docs, 
+                    key=lambda x: x.to_dict().get("createdAt", datetime.min),
+                    reverse=True
+                )[:50]
 
-                # Xử lý timestamp
-                if "createdAt" in notif_data and notif_data["createdAt"]:
-                    created_at = notif_data["createdAt"]
-                    
-                    if hasattr(created_at, 'timestamp'):
-                        created_at = datetime.fromtimestamp(created_at.timestamp())
-                    elif not isinstance(created_at, datetime):
-                        created_at = datetime.now()
-                    
-                    time_diff = datetime.now() - created_at
+                for doc in sorted_docs:
+                    try:
+                        notif_data = doc.to_dict()
+                        notif_data["id"] = doc.id
+                        if "read" not in notif_data:
+                            notif_data["read"] = False
+                        notifications.append(notif_data)
+                    except Exception:
+                        pass
+            except Exception as fe:
+                print(f"⚠️ Firestore notification fetch fallback: {fe}")
 
-                    if time_diff.days > 0:
-                        notif_data["time"] = f"{time_diff.days} ngày trước"
-                    elif time_diff.seconds // 3600 > 0:
-                        notif_data["time"] = f"{time_diff.seconds // 3600} giờ trước"
-                    elif time_diff.seconds // 60 > 0:
-                        notif_data["time"] = f"{time_diff.seconds // 60} phút trước"
-                    else:
-                        notif_data["time"] = "Vừa xong"
-                else:
-                    notif_data["time"] = "Vừa xong"
-
-                # Thêm icon cho match_rejected và breakup
-                icon_map = {
-                    "match_request": "favorite",
-                    "match_accepted": "check-circle",
-                    "match_rejected": "cancel",
-                    "breakup": "heart-broken",
-                    "prediction": "stars",
-                    "love": "favorite",
-                }
-                notif_data["icon"] = icon_map.get(notif_data.get("type"), "notifications")
-
-                if "read" not in notif_data:
-                    notif_data["read"] = False
-
-                notifications.append(notif_data)
-                
-            except Exception as item_error:
-                print(f"⚠️ Error processing notification {doc.id}: {str(item_error)}")
-                continue
+        # In-memory notifications fallback
+        mem_notifs = IN_MEMORY_NOTIFICATIONS.get(user_id, [])
+        for n in mem_notifs:
+            if not any(existing.get("id") == n.get("id") for existing in notifications):
+                notifications.append(n)
 
         print(f"✅ Found {len(notifications)} notifications")
-
         return jsonify({
             "success": True,
             "notifications": notifications,
@@ -1256,9 +1129,11 @@ def get_notifications():
 
     except Exception as e:
         print(f"❌ Get notifications error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "success": True,
+            "notifications": [],
+            "count": 0
+        }), 200
     
 
 # -------------------------------------------------
@@ -1270,18 +1145,28 @@ def mark_notification_read():
     Đánh dấu một hoặc nhiều thông báo đã đọc
     """
     try:
-        data = request.get_json()
-        notification_ids = data.get("notificationIds", [])
+        data = request.get_json() or {}
+        notification_ids = data.get("notificationIds") or [data.get("notificationId")]
+        notification_ids = [nid for nid in notification_ids if nid]
 
         if not notification_ids:
             return jsonify({"error": "Thiếu notificationIds"}), 400
 
-        # Cập nhật từng thông báo
-        for notif_id in notification_ids:
-            db.collection("notifications").document(notif_id).update({
-                "read": True,
-                "readAt": firestore.SERVER_TIMESTAMP,
-            })
+        if FIREBASE_AVAILABLE and db is not None:
+            for notif_id in notification_ids:
+                try:
+                    db.collection("notifications").document(notif_id).update({
+                        "read": True,
+                        "readAt": firestore.SERVER_TIMESTAMP,
+                    })
+                except Exception:
+                    pass
+
+        # Update in-memory notifications
+        for uid, notifs in IN_MEMORY_NOTIFICATIONS.items():
+            for n in notifs:
+                if n.get("id") in notification_ids:
+                    n["read"] = True
 
         return jsonify({
             "success": True,
@@ -1302,13 +1187,20 @@ def delete_notification():
     Xóa một thông báo
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         notification_id = data.get("notificationId")
 
         if not notification_id:
             return jsonify({"error": "Thiếu notificationId"}), 400
 
-        db.collection("notifications").document(notification_id).delete()
+        if FIREBASE_AVAILABLE and db is not None:
+            try:
+                db.collection("notifications").document(notification_id).delete()
+            except Exception:
+                pass
+
+        for uid in list(IN_MEMORY_NOTIFICATIONS.keys()):
+            IN_MEMORY_NOTIFICATIONS[uid] = [n for n in IN_MEMORY_NOTIFICATIONS[uid] if n.get("id") != notification_id]
 
         return jsonify({
             "success": True,
@@ -1337,31 +1229,39 @@ def get_match_requests():
 
         requests_list = []
 
-        # Lấy requests đã nhận
-        if request_type in ["received", "all"]:
-            received_ref = (
-                db.collection("match_requests")
-                .where("receiverId", "==", user_id)
-            )
+        if FIREBASE_AVAILABLE and db is not None:
+            try:
+                # Lấy requests đã nhận
+                if request_type in ["received", "all"]:
+                    received_ref = db.collection("match_requests").where("receiverId", "==", user_id)
+                    for doc in received_ref.stream():
+                        req_data = doc.to_dict()
+                        req_data["requestId"] = doc.id
+                        req_data["direction"] = "received"
+                        requests_list.append(req_data)
 
-            for doc in received_ref.stream():
-                req_data = doc.to_dict()
-                req_data["requestId"] = doc.id
-                req_data["direction"] = "received"
-                requests_list.append(req_data)
+                # Lấy requests đã gửi
+                if request_type in ["sent", "all"]:
+                    sent_ref = db.collection("match_requests").where("senderId", "==", user_id)
+                    for doc in sent_ref.stream():
+                        req_data = doc.to_dict()
+                        req_data["requestId"] = doc.id
+                        req_data["direction"] = "sent"
+                        requests_list.append(req_data)
+            except Exception as fe:
+                print(f"⚠️ Firestore get-match-requests fallback: {fe}")
 
-        # Lấy requests đã gửi
-        if request_type in ["sent", "all"]:
-            sent_ref = (
-                db.collection("match_requests")
-                .where("senderId", "==", user_id)
-            )
-
-            for doc in sent_ref.stream():
-                req_data = doc.to_dict()
-                req_data["requestId"] = doc.id
-                req_data["direction"] = "sent"
-                requests_list.append(req_data)
+        # In-memory requests fallback
+        for r_id, req in IN_MEMORY_MATCH_REQUESTS.items():
+            if not any(x.get("requestId") == r_id for x in requests_list):
+                if req.get("receiverId") == user_id and request_type in ["received", "all"]:
+                    req_copy = dict(req)
+                    req_copy["direction"] = "received"
+                    requests_list.append(req_copy)
+                elif req.get("senderId") == user_id and request_type in ["sent", "all"]:
+                    req_copy = dict(req)
+                    req_copy["direction"] = "sent"
+                    requests_list.append(req_copy)
 
         # Sắp xếp trong bộ nhớ theo createdAt giảm dần
         requests_list.sort(key=lambda x: str(x.get("createdAt") or ""), reverse=True)

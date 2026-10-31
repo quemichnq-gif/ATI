@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { RootState } from '../store';
 import { MATCH_TAGS, ZODIAC_SIGNS } from '../constants/astrologyMap';
-import { apiLoveMatching } from '../services/api';
+import { apiLoveMatching, apiSendMatchRequest } from '../services/api';
 import { MatchTagType } from '../types';
 import UiIcon from '../components/UiIcon';
 import ZodiacIcon from '../components/ZodiacIcon';
@@ -23,6 +23,32 @@ export default function MatchPage() {
   const [loading, setLoading] = useState(false);
   const [loadedTag, setLoadedTag] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [requestLoading, setRequestLoading] = useState<Record<string, boolean>>({});
+  const [sentStatusMap, setSentStatusMap] = useState<Record<string, boolean>>({});
+  const [toastMsg, setToastMsg] = useState('');
+
+  const handleQuickMatch = async (c: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!profile.uid || !c.uid) return;
+    setRequestLoading(prev => ({ ...prev, [c.uid]: true }));
+    try {
+      await apiSendMatchRequest({
+        senderId: profile.uid,
+        receiverId: c.uid,
+        message: `Xin chào ${c.name}! Mình thấy cung hoàng đạo của chúng ta rất tương hợp, hãy cùng kết bạn nhé ✨`,
+      });
+      const alreadySent = !!sentStatusMap[c.uid];
+      setSentStatusMap(prev => ({ ...prev, [c.uid]: true }));
+      setToastMsg(alreadySent ? `Đã gửi lại lời mời kết bạn tới ${c.name}! ✨` : `Đã gửi lời mời kết bạn tới ${c.name}! ✨`);
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (err) {
+      console.error('Lỗi gửi kết bạn:', err);
+      setToastMsg('Không thể gửi lời mời kết bạn. Vui lòng thử lại!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } finally {
+      setRequestLoading(prev => ({ ...prev, [c.uid]: false }));
+    }
+  };
 
   const handleStartChat = async (c: any, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -224,9 +250,9 @@ export default function MatchPage() {
                     transition={{ delay: i * 0.08 }}
                     whileHover={{ y: -4 }}
                     role="link" tabIndex={0} aria-label={`Xem hồ sơ ${c.name}`}
-                    onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) navigate(`/user/${c.uid}`); }}
+                    onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) navigate(`/user/${c.uid}`, { state: { candidate: c } }); }}
                     className="glass-card p-5 cursor-pointer card-hover"
-                    onClick={() => navigate(`/user/${c.uid}`)}
+                    onClick={() => navigate(`/user/${c.uid}`, { state: { candidate: c } })}
                     style={{ border: `1px solid ${tagInfo.color}33` }}
                   >
                     {/* Avatar */}
@@ -266,21 +292,46 @@ export default function MatchPage() {
                   {c.reason && (
                     <p className="text-purple-200 text-xs leading-relaxed opacity-80 italic">"{c.reason}"</p>
                   )}
-                  <div className="flex gap-2 mt-3">
+                  <div className="space-y-2 mt-3">
                     <button
-                      onClick={(e) => handleStartChat(c, e)}
-                      className="flex-1 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
-                      style={{ background: `linear-gradient(135deg, ${tagInfo.color}66, ${tagInfo.color}44)` }}>
-                      <UiIcon name="message" label="Nhắn tin" className="mr-1 inline" />Nhắn Tin
+                      onClick={(e) => handleQuickMatch(c, e)}
+                      disabled={requestLoading[c.uid]}
+                      className="w-full py-2 rounded-xl text-xs font-semibold text-white transition-all flex items-center justify-center gap-1.5 shadow-sm hover:opacity-95 active:scale-95"
+                      style={{
+                        background: sentStatusMap[c.uid]
+                          ? 'linear-gradient(135deg, rgba(76, 201, 240, 0.4), rgba(76, 201, 240, 0.2))'
+                          : `linear-gradient(135deg, ${tagInfo.color}, ${tagInfo.color}cc)`,
+                        border: `1px solid ${sentStatusMap[c.uid] ? 'rgba(76, 201, 240, 0.5)' : tagInfo.color + '66'}`,
+                      }}>
+                      {requestLoading[c.uid] ? (
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : sentStatusMap[c.uid] ? (
+                        <>
+                          <UiIcon name="check" label="Đã gửi" className="inline text-green-300" />
+                          <span>Đã gửi (Bấm để gửi lại)</span>
+                        </>
+                      ) : (
+                        <>
+                          <UiIcon name="heart" label="Kết bạn" className="inline" />
+                          <span>Kết Bạn & Ghép Đôi</span>
+                        </>
+                      )}
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/user/${c.uid}`);
-                      }}
-                      className="flex-1 py-2 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/10">
-                      <UiIcon name="user" label="Xem hồ sơ" className="mr-1 inline" />Xem Hồ Sơ
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => handleStartChat(c, e)}
+                        className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
+                        <UiIcon name="message" label="Nhắn tin" className="inline" />Nhắn Tin
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/user/${c.uid}`, { state: { candidate: c } });
+                        }}
+                        className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
+                        <UiIcon name="user" label="Xem hồ sơ" className="inline" />Xem Hồ Sơ
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               );
@@ -295,6 +346,22 @@ export default function MatchPage() {
             <div className="text-5xl mb-4"><UiIcon name="compass" label="Chưa có kết quả phù hợp" /></div>
             <p className="text-white font-semibold mb-2">Chưa tìm thấy ai</p>
             <p className="text-purple-300 text-sm opacity-70">Vũ trụ đang chuẩn bị... Hãy thử lại sau!</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Toast Feedback */}
+      <AnimatePresence>
+        {toastMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 right-6 z-50 glass-card px-4 py-3 border border-purple-500/40 shadow-2xl flex items-center gap-2 text-sm text-white"
+            style={{ background: 'rgba(26, 0, 48, 0.95)' }}
+          >
+            <UiIcon name="sparkles" label="Thông báo" className="text-yellow-400" />
+            <span>{toastMsg}</span>
           </motion.div>
         )}
       </AnimatePresence>
