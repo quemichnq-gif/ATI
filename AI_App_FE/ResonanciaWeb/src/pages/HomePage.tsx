@@ -19,11 +19,38 @@ const ELEMENT_ICONS: Record<string, IconName> = {
   'Thổ': 'earth',
 };
 
+const BEST_MATCH_MAP: Record<string, { best_match: string; love_luck: number; compatibility: number; quote: string }> = {
+  'Ma Kết': { best_match: 'Kim Ngưu', love_luck: 88, compatibility: 94, quote: 'Sự kiên định và chân thành sẽ mở ra cánh cửa định mệnh mà bạn tìm kiếm bấy lâu.' },
+  'Kim Ngưu': { best_match: 'Xử Nữ', love_luck: 90, compatibility: 96, quote: 'Tình yêu bền chặt nảy mầm từ những thấu hiểu bình dị và lòng chung thủy sâu sắc.' },
+  'Xử Nữ': { best_match: 'Ma Kết', love_luck: 86, compatibility: 93, quote: 'Khi hai tâm hồn đồng điệu cùng sẻ chia, mọi chi tiết nhỏ đều hóa thành hạnh phúc.' },
+  'Cự Giải': { best_match: 'Song Ngư', love_luck: 92, compatibility: 97, quote: 'Sóng biển đại dương luôn tìm về bến đỗ ấm êm và chở che trong tim người thương.' },
+  'Bọ Cạp': { best_match: 'Cự Giải', love_luck: 89, compatibility: 95, quote: 'Ngọn lửa cảm xúc sâu lắng sẽ thấu suốt mọi rào cản khi gặp đúng người đồng điệu.' },
+  'Song Ngư': { best_match: 'Bọ Cạp', love_luck: 91, compatibility: 96, quote: 'Trực giác mách bảo rằng những giấc mơ lãng mạn nhất sắp trở thành hiện thực.' },
+  'Bạch Dương': { best_match: 'Sư Tử', love_luck: 87, compatibility: 92, quote: 'Nhiệt huyết đam mê sẽ bùng cháy rực rỡ bên người cùng chí hướng và niềm kiêu hãnh.' },
+  'Sư Tử': { best_match: 'Nhân Mã', love_luck: 93, compatibility: 95, quote: 'Tỏa sáng rực rỡ nhất khi được đồng hành cùng người tôn trọng và thấu hiểu ánh hào quang của bạn.' },
+  'Nhân Mã': { best_match: 'Bạch Dương', love_luck: 88, compatibility: 91, quote: 'Hành trình khám phá chân trời mới sẽ thêm phần ý nghĩa khi có một trái tim tự do cùng sải bước.' },
+  'Song Tử': { best_match: 'Thiên Bình', love_luck: 85, compatibility: 90, quote: 'Những cuộc trò chuyện bất tận chính là chiếc cầu nối trái tim kỳ diệu nhất.' },
+  'Thiên Bình': { best_match: 'Bảo Bình', love_luck: 89, compatibility: 93, quote: 'Sự cân bằng hoàn hảo đạt được khi tình yêu hòa quyện cùng sự tôn trọng và bình đẳng.' },
+  'Bảo Bình': { best_match: 'Song Tử', love_luck: 86, compatibility: 92, quote: 'Tâm hồn độc bản luôn tìm thấy tiếng vọng chân thành từ người có tư duy cởi mở.' },
+};
+
+function getDefaultLoveMetrics(sun?: string) {
+  if (sun && BEST_MATCH_MAP[sun]) {
+    return BEST_MATCH_MAP[sun];
+  }
+  return {
+    love_luck: 88,
+    best_match: 'Kim Ngưu',
+    compatibility: 92,
+    quote: 'Tình yêu đích thực không phải là tìm kiếm một người hoàn hảo, mà là học cách nhìn nhận sự hoàn hảo trong một linh hồn đồng điệu.'
+  };
+}
+
 export default function HomePage() {
   const profile = useSelector((s: RootState) => s.profile);
   const navigate = useNavigate();
   const [tab, setTab] = useState<'astro' | 'love'>('astro');
-  const [loveMetrics, setLoveMetrics] = useState<any>(null);
+  const [loveMetrics, setLoveMetrics] = useState<any>(() => getDefaultLoveMetrics(profile.sun));
   const [loadingPred, setLoadingPred] = useState(false);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [matches, setMatches] = useState<any[]>([]);
@@ -49,14 +76,28 @@ export default function HomePage() {
 
   // Load love metrics
   useEffect(() => {
-    if (!profile.uid || !hasAstro) return;
+    if (!profile.uid || !hasAstro) {
+      if (profile.sun) {
+        setLoveMetrics(getDefaultLoveMetrics(profile.sun));
+      }
+      return;
+    }
     setLoadingMetrics(true);
     apiGenerate({
       userData: { uid: profile.uid, name: profile.name, sun: profile.sun, moon: profile.moon, birthDate: profile.birthDate },
       category: 'love_metrics',
       day: new Date().toISOString().split('T')[0],
-    }).then(res => setLoveMetrics(res.data?.prediction))
-      .catch(() => {})
+    }).then(res => {
+      const data = res.data?.prediction || res.data;
+      if (data && (data.love_luck != null || data.best_match)) {
+        setLoveMetrics(data);
+      } else {
+        setLoveMetrics(getDefaultLoveMetrics(profile.sun));
+      }
+    })
+      .catch(() => {
+        setLoveMetrics(getDefaultLoveMetrics(profile.sun));
+      })
       .finally(() => setLoadingMetrics(false));
   }, [profile.uid, hasAstro, profile.sun, profile.moon, profile.birthDate, profile.name]);
 
@@ -486,10 +527,10 @@ export default function HomePage() {
                 <div className="flex gap-3.5 overflow-x-auto pb-2">
                   {matches.slice(0, 5).map((m, i) => (
                     <motion.div key={i} role="link" tabIndex={0} aria-label={`Xem hồ sơ ${m.name}`}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/user/${m.uid}`); } }}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/user/${m.uid}`, { state: { candidate: m } }); } }}
                       whileHover={{ y: -3 }}
                       className="flex-shrink-0 w-24 cursor-pointer"
-                      onClick={() => navigate(`/user/${m.uid}`)}>
+                      onClick={() => navigate(`/user/${m.uid}`, { state: { candidate: m } })}>
                       <div className="w-24 h-24 rounded-2xl overflow-hidden mb-2 border border-purple-500/30"
                         style={{ background: 'rgba(255,255,255,0.03)' }}>
                         {m.avatar ? (

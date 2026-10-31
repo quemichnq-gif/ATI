@@ -6,8 +6,8 @@ export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5
 export const ASTROLOGY_API_KEY = 'ByNqfA4kvD1EBGyi6ZlUC8aekqCi7FgF8VuJ8SF1';
 export const ASTROLOGY_BASE_URL = 'https://json.freeastrologyapi.com/western';
 
-// Axios instance với auto auth token
-const api = axios.create({ baseURL: BASE_URL });
+// Axios instance với auto auth token và timeout 15s an toàn
+const api = axios.create({ baseURL: BASE_URL, timeout: 15000 });
 
 api.interceptors.request.use(async (config) => {
   const user = auth.currentUser;
