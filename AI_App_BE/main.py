@@ -13,6 +13,7 @@ import cloudinary
 import cloudinary.uploader
 from datetime import datetime, timedelta
 import uuid
+from astrology_insights import generate_career_insight_text, generate_natal_depth_analysis
 
 # Load biến môi trường
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -59,6 +60,7 @@ cloudinary.config(
 
 # Flask setup
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False
 CORS(app)
 
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
@@ -314,11 +316,42 @@ def generate_prediction():
         Chỉ trả lời JSON thuần, không thêm giải thích ngoài.
         """
     elif category == "career_chart":
+        mc = extra.get("mc") or user_data.get("mc", "Ma Kết")
+        house10 = extra.get("house10") or user_data.get("house10", "Ma Kết")
+        saturn = extra.get("saturn") or user_data.get("saturn", "Sao Thổ")
+        jupiter = extra.get("jupiter") or user_data.get("jupiter", "Sao Mộc")
+        mercury = extra.get("mercury") or user_data.get("mercury", "Sao Thủy")
+        asc = extra.get("ascendant") or user_data.get("ascendant", "Nhân Mã")
         prompt = f"""
-        Phân tích hướng nghiệp qua lá số chiêm tinh cho {name} (Mặt Trời {sun}, Mặt Trăng {moon}).
-        Tập trung vào: Nhà 10 (Midheaven), Saturn, Jupiter.
-        Phân tích: (1) Tài năng bẩm sinh (2) Ngành nghề phù hợp (3) Môi trường làm việc lý tưởng (4) Lời khuyên phát triển sự nghiệp.
-        Viết bằng tiếng Việt, khoảng 200 từ, giỏi văn, không dùng emoji.
+        Bạn là chuyên gia chiêm tinh học hướng nghiệp phương Tây. Hãy phân tích chuyên sâu bản đồ hướng nghiệp (Career Astrology) cho {name}:
+        - Mặt Trời: {sun}, Mặt Trăng: {moon}, Cung Mọc: {asc}
+        - Trung Thiên (Midheaven - MC): {mc}
+        - Nhà 10 (Sự nghiệp & Danh tiếng): {house10}
+        - Sao Thổ (Kỷ luật & Bài học thử thách): {saturn}
+        - Sao Mộc (Cơ hội & May mắn mở rộng): {jupiter}
+        - Sao Thủy (Tư duy & Kỹ năng làm việc): {mercury}
+
+        Yêu cầu nghiêm ngặt:
+        - Đây là phân tích ĐỊNH HƯỚNG NGHỀ NGHIỆP DÀI HẠN. TUYỆT ĐỐI KHÔNG dự đoán vận hạn hằng ngày hay quan hệ tình cảm.
+        - Trình bày 4 phần rõ ràng:
+          1. Khí Chất Nghề Nghiệp & Thương Hiệu Cá Nhân (phân tích MC tại {mc})
+          2. Sở Trường Năng Lực Bẩm Sinh (kết hợp {sun}, {moon} và {mercury})
+          3. Các Ngành Nghề & Môi Trường Bứt Phá Phù Hợp Nhất
+          4. Thách Thức Cần Vượt Qua & Kim Chỉ Nam Sự Nghiệp (tác động của {saturn} và {jupiter})
+        - Viết bằng tiếng Việt sâu sắc, chuyên môn cao, truyền cảm hứng và tính ứng dụng thực tế. Không dùng emoji.
+        """
+    elif category == "love_metrics":
+        prompt = f"""
+        Bạn là chuyên gia chiêm tinh học tình cảm. Hãy phân tích chỉ số tình cảm hôm nay cho {name} (Mặt Trời {sun}, Mặt Trăng {moon}).
+        Trả lời DUY NHẤT một đối tượng JSON hợp lệ (không kèm markdown) theo cấu trúc:
+        {{"love_luck": 88, "best_match": "Kim Ngưu", "compatibility": 92, "quote": "Sự kiên định và chân thành sẽ mở ra cánh cửa định mệnh mà bạn tìm kiếm bấy lâu."}}
+
+        Quy định:
+        - love_luck: số nguyên 72-98 (chỉ số may mắn tình duyên).
+        - best_match: tên một cung hoàng đạo tương hợp nhất bằng tiếng Việt chuẩn (Bạch Dương, Kim Ngưu, Song Tử, Cự Giải, Sư Tử, Xử Nữ, Thiên Bình, Bọ Cạp, Nhân Mã, Ma Kết, Bảo Bình, Song Ngư).
+        - compatibility: số nguyên 80-99 (mức độ hòa hợp).
+        - quote: một câu thông điệp vũ trụ chiêm tinh thi vị, sâu sắc, truyền cảm hứng về tình yêu và kết nối tâm hồn, viết bằng tiếng Việt chuẩn ngữ pháp, có dấu đầy đủ, giàu cảm xúc, không bị lặp từ.
+        Chỉ trả lời JSON thuần.
         """
     elif category.startswith("tarot_"):
         card_name = category.replace("tarot_", "").replace("_", " ").title()
@@ -353,27 +386,48 @@ def generate_prediction():
     Không dùng emoji, không ký tự đặc biệt, không mở đầu hay kết thúc dư thừa.
     """
 
-
-
     try:
         text = ""
         try:
             model = genai.GenerativeModel(MODEL_NAME)
-            response = model.generate_content(prompt, request_options={"timeout": 2.5})
+            response = model.generate_content(prompt, request_options={"timeout": 10.0})
             text = response.text if hasattr(response, "text") else str(response)
             text = re.sub(r"(```json|```|'''|\"\"\")", "", text).strip()
         except BaseException as gemini_err:
             safe_print("⚠️ Gemini Error trong /generate (sử dụng engine dự phòng):", gemini_err)
-            if category == "love":
+            if category == "career_chart":
+                mc = extra.get("mc") or user_data.get("mc", "Ma Kết")
+                house10 = extra.get("house10") or user_data.get("house10", "Ma Kết")
+                saturn = extra.get("saturn") or user_data.get("saturn", "Sao Thổ")
+                jupiter = extra.get("jupiter") or user_data.get("jupiter", "Sao Mộc")
+                mercury = extra.get("mercury") or user_data.get("mercury", "Sao Thủy")
+                asc = extra.get("ascendant") or user_data.get("ascendant", "Nhân Mã")
+                text = generate_career_insight_text(name, sun, moon, asc, mc, house10, saturn, jupiter, mercury)
+            elif category == "love":
                 text = f"Năng lượng sao Kim và Mặt Trăng mang đến luồng gió mới cho chuyện tình cảm của {sun}. Hôm nay bạn cảm nhận rõ nét sự ấm áp, dễ mở lòng chia sẻ và thấu cảm với đối phương. Đối với người độc thân, một cuộc gặp gỡ tình cờ có thể nhóm lên tia lửa đồng điệu; với người đã có đôi, sự lắng nghe chân thành sẽ giúp hai bạn thêm gắn kết bền chặt."
             elif category == "work":
                 text = f"Vận trình sự nghiệp của {sun} hôm nay có nhiều tín hiệu khởi sắc nhờ sự hỗ trợ đắc lực từ sao Thủy. Bạn có khả năng tập trung cao độ, xử lý thông suốt các nhiệm vụ phức tạp và đưa ra quyết định chuẩn xác. Hãy tự tin đề xuất ý tưởng mới, năng lực của bạn đang được đồng nghiệp và cấp trên đánh giá rất cao."
             elif category == "love_metrics":
+                love_fallbacks = {
+                    "Bạch Dương": {"match": "Thiên Bình", "luck": 89, "comp": 94, "quote": "Ngọn lửa chân thành từ trái tim bạn sẽ sưởi ấm và thu hút người tri kỷ đích thực."},
+                    "Kim Ngưu": {"match": "Ma Kết", "luck": 92, "comp": 96, "quote": "Sự kiên định và bình yên trong tâm hồn là thỏi nam châm mạnh mẽ nhất kết nối nhân duyên."},
+                    "Song Tử": {"match": "Bảo Bình", "luck": 88, "comp": 93, "quote": "Khi hai tâm hồn đồng điệu về tần số, mọi khoảng cách đều biến thành nhịp cầu thấu hiểu."},
+                    "Cự Giải": {"match": "Song Ngư", "luck": 95, "comp": 97, "quote": "Sự thấu cảm dịu dàng là bến đỗ an yên nhất giữa những thăng trầm của cuộc đời."},
+                    "Sư Tử": {"match": "Nhân Mã", "luck": 91, "comp": 95, "quote": "Tình yêu đích thực là cùng nhau tỏa sáng và tự do là chính mình trong ánh mắt người kia."},
+                    "Xử Nữ": {"match": "Kim Ngưu", "luck": 87, "comp": 94, "quote": "Những cử chỉ quan tâm âm thầm và tinh tế luôn chạm đến nơi sâu lắng nhất của trái tim."},
+                    "Thiên Bình": {"match": "Song Tử", "luck": 90, "comp": 95, "quote": "Khoảnh khắc bạn tìm thấy sự an yên nội tại cũng là lúc vũ trụ dẫn lối người đồng điệu bước vào."},
+                    "Bọ Cạp": {"match": "Cự Giải", "luck": 94, "comp": 98, "quote": "Lòng trung thành và sự thấu suốt sâu sắc sẽ biến mọi thử thách thành minh chứng cho tình yêu bền chặt."},
+                    "Nhân Mã": {"match": "Bạch Dương", "luck": 89, "comp": 93, "quote": "Hành trình ý nghĩa nhất của cuộc đời là cùng người bạn thương khám phá những chân trời mới."},
+                    "Ma Kết": {"match": "Xử Nữ", "luck": 93, "comp": 96, "quote": "Sự đồng hành bền bỉ và trách nhiệm sắt son là nền tảng vững chãi nhất của một mái ấm tri kỷ."},
+                    "Bảo Bình": {"match": "Thiên Bình", "luck": 88, "comp": 92, "quote": "Tôn trọng thế giới quan của nhau là dạng thức biểu đạt cao quý nhất của tình yêu tự do."},
+                    "Song Ngư": {"match": "Bọ Cạp", "luck": 96, "comp": 98, "quote": "Hãy lắng nghe tiếng gọi của trực giác; những mảnh ghép định mệnh luôn tìm thấy nhau đúng thời điểm."},
+                }
+                fb = love_fallbacks.get(sun, {"match": "Kim Ngưu", "luck": 88, "comp": 92, "quote": "Sự kiên định và chân thành sẽ mở ra cánh cửa định mệnh mà bạn tìm kiếm bấy lâu."})
                 text = json.dumps({
-                    "love_luck": 88,
-                    "best_match": "Kim Ngưu" if sun in ["Ma Kết", "Xử Nữ"] else "Cự Giải",
-                    "compatibility": 92,
-                    "quote": "Sự kiên định và chân thành sẽ mở ra cánh cửa định mệnh mà bạn tìm kiếm bấy lâu."
+                    "love_luck": fb["luck"],
+                    "best_match": fb["match"],
+                    "compatibility": fb["comp"],
+                    "quote": fb["quote"]
                 }, ensure_ascii=False)
             else:
                 text = f"Hôm nay Mặt Trời {sun} kết hợp hài hòa với Mặt Trăng {moon}, mang lại cho bạn nguồn sinh khí dồi dào và tinh thần lạc quan. Trực giác nhạy bén giúp bạn dễ dàng đưa ra những lựa chọn đúng đắn trong các mối quan hệ xã hội. Hãy giữ vững sự điềm tĩnh và tự tin đón nhận những cơ hội tốt lành đang tới!"
@@ -644,55 +698,22 @@ def natal_chart_analysis():
         8. Người Lý Tưởng
 
         Yêu cầu:
-        - Viết bằng tiếng Việt, văn phong chuyên nghiệp nhưng dễ hiểu
-        - Mỗi mục khoảng 1-2 đoạn văn
-        - Không dùng emoji, không dùng ký tự đặc biệt
-        - Không chào hỏi hay văn phong dư thừa
-        - Tập trung vào phân tích sâu, có căn cứ chiêm tinh học
+        - Viết bằng tiếng Việt, văn phong chiêm tinh học tâm lý chiều sâu (Depth Psychological Astrology).
+        - Đưa ra những insight sâu sắc, chạm đến tiềm thức: mâu thuẫn giữa bản ngã và cảm xúc, cơ chế phòng vệ tâm lý, ngôn ngữ tình cảm đích thực và kim chỉ nam khai phóng sự nghiệp.
+        - Mỗi mục khoảng 1-2 đoạn văn súc tích, giàu hàm lượng tri thức.
+        - Không dùng emoji, không dùng ký tự đặc biệt, không chào hỏi dư thừa.
         """
 
         analysis_text = ""
         try:
-            # Gọi Gemini API với timeout 2.5s
+            # Gọi Gemini API với timeout 10.0s
             model = genai.GenerativeModel(MODEL_NAME)
-            response = model.generate_content(prompt, request_options={"timeout": 2.5})
+            response = model.generate_content(prompt, request_options={"timeout": 10.0})
             analysis_text = response.text if hasattr(response, "text") else str(response)
             analysis_text = re.sub(r"(```|'''|\"\"\")", "", analysis_text).strip()
         except BaseException as gemini_err:
             safe_print(f"⚠️ Gemini API tạm thời giới hạn ({gemini_err}), sử dụng luận giải chiêm tinh chuyên sâu dự phòng...")
-            sun = user_info.get("sun") or "Ma Kết"
-            moon = user_info.get("moon") or "Kim Ngưu"
-            asc = user_info.get("ascendant") or "Nhân Mã"
-            venus = user_info.get("venus") or "Bọ Cạp"
-            mc = user_info.get("mc") or "Thiên Bình"
-            fire = elemental_ratios["fire"]
-            earth = elemental_ratios["earth"]
-            air = elemental_ratios["air"]
-            water = elemental_ratios["water"]
-
-            analysis_text = f"""## 1. Tính Cách
-Bạn sở hữu nguồn năng lượng kiên định và bản lĩnh từ Mặt Trời {sun}, kết hợp với chiều sâu nội tâm trù phú của Mặt Trăng {moon} cùng diện mạo cuốn hút, tự tin từ Cung Mọc {asc}. Bạn là người có tư duy thực tế, kiên nhẫn và luôn có kế hoạch rõ ràng cho tương lai.
-
-## 2. Cảm Xúc
-Mặt Trăng {moon} mang lại cho bạn thế giới nội tâm sâu lắng và khao khát sự an toàn, tin cậy. Bạn không dễ dàng mở lòng với người lạ, nhưng với những ai đã thấu hiểu, bạn là một điểm tựa vững chãi và chân thành nhất.
-
-## 3. Sự Nghiệp
-Với Mặt Trời {sun} kết hợp MC tại {mc}, bạn có tố chất phân tích xuất sắc, khả năng chịu áp lực cao và kiên trì theo đuổi mục tiêu đến cùng. Bạn có duyên với các lĩnh vực công nghệ, quản trị và chiến lược.
-
-## 4. Tình Yêu
-Trong tình cảm, sao Kim tại {venus} giúp bạn coi trọng sự chân thành, chung thủy và thấu hiểu. Bạn bị thu hút bởi những người thông minh, có chiều sâu tâm hồn và biết lắng nghe. Sự tương hợp tốt nhất đến từ các chòm sao thuộc nhóm Đất và Nước.
-
-## 5. Điểm Mạnh
-Thế mạnh lớn nhất của bạn là ý chí kiên cường, tư duy sắc bén, trách nhiệm và đáng tin cậy. Thách thức là bạn đôi lúc quá nghiêm khắc với bản thân và người xung quanh; hãy học cách buông bỏ những áp lực không cần thiết.
-
-## 6. Nguyên Tố
-Phân bổ nguyên tố trên biểu đồ sao: Đất {earth}%, Lửa {fire}%, Khí {air}%, Nước {water}%. Cấu trúc này mang lại sự cân bằng giữa tính thực tế vững chãi và năng lượng hành động nhiệt huyết.
-
-## 7. Lời Khuyên
-Hãy học cách thả lỏng, cho phép bản thân nghỉ ngơi và chia sẻ những gánh nặng cảm xúc với người bạn tin yêu. Đừng ngần ngại trải nghiệm những điều mới lạ để mở rộng thế giới quan.
-
-## 8. Người Lý Tưởng
-Người bạn đời lý tưởng của bạn là người có tính cách chín chắn, biết lắng nghe và tôn trọng sự tự do của nhau. Sự kết hợp giữa các chòm sao Đất và Nước sẽ tạo nên sự bền vững và hòa hợp lâu dài trong tình yêu."""
+            analysis_text = generate_natal_depth_analysis(user_info, houses, aspects, elemental_ratios)
 
         # Lưu vào Firestore an toàn
         if FIREBASE_AVAILABLE and db is not None and uid:

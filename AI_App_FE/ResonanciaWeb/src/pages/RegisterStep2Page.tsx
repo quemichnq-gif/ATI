@@ -8,6 +8,7 @@ import StarField from '../components/StarField';
 import UiIcon from '../components/UiIcon';
 import type { IconName } from '../components/UiIcon';
 import { RELATIONSHIP_OPTIONS } from '../constants/relationshipOptions';
+import CosmicTimePicker from '../components/CosmicTimePicker';
 
 const steps = [
   { id: 1, label: 'Thông Tin Cá Nhân', icon: 'user' },
@@ -63,7 +64,7 @@ export default function RegisterStep2Page() {
   const [gender, setGender] = useState('');
   const [relationshipStatus, setRelationshipStatus] = useState('Độc thân');
   const [birthDate, setBirthDate] = useState('');
-  const [birthTime, setBirthTime] = useState('');
+  const [birthTime, setBirthTime] = useState('06:00');
   const [birthPlace, setBirthPlace] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
@@ -222,10 +223,9 @@ export default function RegisterStep2Page() {
                     <p className="text-xs text-purple-400 mt-1 opacity-60">VD: 2001-06-27</p>
                   </div>
                   <div>
-                    <label htmlFor="register-birth-time" className="block text-purple-300 text-sm mb-2">Giờ sinh (HH:MM)</label>
-                    <input id="register-birth-time" className="cosmic-input" placeholder="03:20" type="time"
-                      value={birthTime} onChange={e => setBirthTime(e.target.value)} />
-                    <p className="text-xs text-purple-400 mt-1 opacity-60">Giờ sinh chính xác để tính ascendant</p>
+                    <label htmlFor="register-birth-time" className="block text-purple-300 text-sm mb-2">Giờ sinh</label>
+                    <CosmicTimePicker id="register-birth-time" value={birthTime} onChange={setBirthTime} />
+                    <p className="text-xs text-purple-400 mt-1 opacity-60">Giờ sinh chính xác để tính Cung Mọc (Ascendant) và các Nhà chiêm tinh</p>
                   </div>
                 </>
               )}

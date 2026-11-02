@@ -7,14 +7,46 @@ export function getVietnameseDate(type: 'today' | 'tomorrow' = 'today') {
   return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export function formatTimestamp(ts: number) {
-  const d = new Date(ts);
+export function formatTimestamp(ts: any): string {
+  if (!ts) return 'Vừa xong';
+  let ms: number;
+  if (typeof ts === 'number') {
+    ms = ts;
+  } else if (typeof ts === 'string') {
+    const safeStr = ts.includes(' ') && !ts.includes('T') ? ts.replace(' ', 'T') : ts;
+    const parsed = Date.parse(safeStr);
+    ms = isNaN(parsed) ? Date.now() : parsed;
+  } else if (typeof ts === 'object') {
+    if (typeof ts.toDate === 'function') {
+      try {
+        ms = ts.toDate().getTime();
+      } catch {
+        ms = Date.now();
+      }
+    } else if (typeof ts.seconds === 'number') {
+      ms = ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000);
+    } else if (typeof ts._seconds === 'number') {
+      ms = ts._seconds * 1000 + Math.floor((ts._nanoseconds || 0) / 1000000);
+    } else {
+      ms = Date.now();
+    }
+  } else {
+    ms = Date.now();
+  }
+
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return 'Vừa xong';
+
   const now = new Date();
   const diff = now.getTime() - d.getTime();
-  if (diff < 60000) return 'Vừa xong';
+  if (diff < 0 || diff < 60000) return 'Vừa xong';
   if (diff < 3600000) return `${Math.floor(diff / 60000)} phút trước`;
   if (diff < 86400000) return `${Math.floor(diff / 3600000)} giờ trước`;
-  return d.toLocaleDateString('vi-VN');
+  try {
+    return d.toLocaleDateString('vi-VN');
+  } catch {
+    return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+  }
 }
 
 export function todayKey() {

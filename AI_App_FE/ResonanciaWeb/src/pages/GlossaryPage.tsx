@@ -53,11 +53,11 @@ export default function GlossaryPage() {
         ))}
       </div>
 
-      {/* Term grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* Term grid - items-start prevents adjacent cards from stretching when one is expanded */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
         <AnimatePresence mode="popLayout">
           {filtered.map((term, i) => (
-            <motion.button
+            <motion.div
               key={term.id}
               layout
               initial={{ opacity: 0, scale: 0.95 }}
@@ -65,9 +65,17 @@ export default function GlossaryPage() {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ delay: i * 0.03 }}
               onClick={() => setSelected(term === selected ? null : term)}
-              className={`glass-card p-4 text-left transition-all hover:border-purple-400/40 ${
-                selected?.id === term.id ? 'border-purple-400/50 bg-purple-900/20' : ''
+              className={`glass-card p-4 text-left transition-all hover:border-purple-400/40 cursor-pointer ${
+                selected?.id === term.id ? 'border-purple-400/50 bg-purple-900/20 shadow-lg' : ''
               }`}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelected(term === selected ? null : term);
+                }
+              }}
             >
               <div className="flex items-start gap-3">
                 <span className="text-2xl flex-shrink-0">{term.emoji}</span>
@@ -106,7 +114,7 @@ export default function GlossaryPage() {
                   {selected?.id === term.id ? '▲' : '▼'}
                 </span>
               </div>
-            </motion.button>
+            </motion.div>
           ))}
         </AnimatePresence>
       </div>

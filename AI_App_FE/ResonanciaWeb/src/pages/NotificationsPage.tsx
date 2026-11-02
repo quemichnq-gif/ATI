@@ -21,21 +21,39 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!profile.uid) return;
+    if (!profile.uid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     apiGetNotifications(profile.uid)
-      .then(res => setNotifications(res.data?.notifications || []))
-      .catch(() => {})
+      .then(res => {
+        const list = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
+        setNotifications(list);
+      })
+      .catch((err) => {
+        console.warn('Lỗi tải thông báo:', err);
+        setNotifications([]);
+      })
       .finally(() => setLoading(false));
   }, [profile.uid]);
 
   const markRead = async (id: string) => {
-    await apiMarkNotificationRead({ notificationId: id });
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    try {
+      await apiMarkNotificationRead({ notificationId: id });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    } catch (e) {
+      console.warn('Lỗi đánh dấu đã đọc:', e);
+    }
   };
 
   const deleteNotif = async (id: string) => {
-    await apiDeleteNotification({ notificationId: id });
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    try {
+      await apiDeleteNotification({ notificationId: id });
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (e) {
+      console.warn('Lỗi xóa thông báo:', e);
+    }
   };
 
   const unread = notifications.filter(n => !n.read).length;
@@ -70,44 +88,47 @@ export default function NotificationsPage() {
           <p className="text-purple-300 text-sm opacity-60 mt-1">Vũ trụ đang yên lặng...</p>
         </div>
       ) : (
-        <AnimatePresence>
-          <div className="space-y-2">
+        <div className="space-y-2">
+          <AnimatePresence mode="popLayout">
             {notifications.map((n, i) => (
-              <motion.div key={n.id}
+              <motion.div key={n?.id || i}
                 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20, height: 0 }}
                 transition={{ delay: i * 0.05 }}
                 className={`glass-card p-4 cursor-pointer transition-all ${
-                  !n.read ? 'border-purple-500/30' : ''
+                  !n?.read ? 'border-purple-500/30' : ''
                 }`}
-                style={!n.read ? { border: '1px solid rgba(157,78,221,0.3)', background: 'rgba(157,78,221,0.05)' } : {}}
-                onClick={() => !n.read && markRead(n.id)}
+                style={!n?.read ? { border: '1px solid rgba(157,78,221,0.3)', background: 'rgba(157,78,221,0.05)' } : {}}
+                onClick={() => n?.id && !n.read && markRead(n.id)}
               >
                 <div className="flex items-start gap-3">
                   <div className="text-2xl flex-shrink-0 mt-0.5">
-                    <UiIcon name={NOTIF_ICONS[n.type] || 'bell'} label={n.title} />
+                    <UiIcon name={NOTIF_ICONS[n?.type || ''] || 'bell'} label={n?.title || 'Thông báo'} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className={`font-semibold text-sm ${n.read ? 'text-purple-300' : 'text-white'}`}>
-                        {n.title}
-                        {!n.read && <span className="ml-2 w-2 h-2 rounded-full bg-pink-400 inline-block" />}
+                      <h3 className={`font-semibold text-sm ${n?.read ? 'text-purple-300' : 'text-white'}`}>
+                        {n?.title || 'Thông báo mới'}
+                        {!n?.read && <span className="ml-2 w-2 h-2 rounded-full bg-pink-400 inline-block" />}
                       </h3>
                       <span className="text-purple-400 text-xs flex-shrink-0">
-                        {formatTimestamp(n.createdAt)}
+                        {formatTimestamp(n?.createdAt)}
                       </span>
                     </div>
-                    <p className="text-purple-300 text-xs mt-0.5 opacity-80">{n.body}</p>
+                    {n?.body && <p className="text-purple-300 text-xs mt-0.5 opacity-80">{n.body}</p>}
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); deleteNotif(n.id); }}
-                    className="text-purple-500 hover:text-red-400 transition-colors text-sm flex-shrink-0">
-                    ✕
-                  </button>
+                  {n?.id && (
+                    <button onClick={(e) => { e.stopPropagation(); deleteNotif(n.id); }}
+                      className="text-purple-500 hover:text-red-400 transition-colors text-sm flex-shrink-0"
+                      aria-label="Xóa thông báo">
+                      ✕
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ))}
-          </div>
-        </AnimatePresence>
+          </AnimatePresence>
+        </div>
       )}
     </div>
   );
