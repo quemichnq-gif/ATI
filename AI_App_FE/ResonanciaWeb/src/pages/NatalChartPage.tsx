@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RootState } from '../store';
@@ -7,6 +7,7 @@ import { ELEMENT_COLORS, ELEMENT_MAP } from '../constants/astrologyMap';
 import UiIcon from '../components/UiIcon';
 import type { IconName } from '../components/UiIcon';
 import NatalChartSVG from '../components/NatalChartSVG';
+import { generateClientNatalAnalysis, generateClientCareerAnalysis } from '../utils/natalFallback';
 
 const SECTIONS = [
   { key: 'overview', label: 'Tổng Quan', icon: 'sparkles', desc: 'Toàn cảnh tính cách, cảm xúc & sự nghiệp' },
@@ -77,14 +78,14 @@ export default function NatalChartPage() {
   const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS['Không xác định'];
 
   const handleAnalyze = async () => {
-    if (!profile.uid) return;
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     try {
       const res = await apiNatalAnalysis({
-        uid: profile.uid,
-        name: profile.name,
-        sun: profile.sun,
-        moon: profile.moon,
+        uid: profile.uid || 'guest_user',
+        name: profile.name || 'Người dùng',
+        sun: profile.sun || 'Ma Kết',
+        moon: profile.moon || 'Kim Ngưu',
         mercury: profile.mercury,
         venus: profile.venus,
         mars: profile.mars,
@@ -93,9 +94,9 @@ export default function NatalChartPage() {
         uranus: profile.uranus,
         neptune: profile.neptune,
         pluto: profile.pluto,
-        ascendant: profile.ascendant,
+        ascendant: profile.ascendant || 'Nhân Mã',
         descendant: profile.descendant,
-        mc: profile.mc,
+        mc: profile.mc || 'Thiên Bình',
         ic: profile.ic,
         house1: profile.house1, house2: profile.house2, house3: profile.house3, house4: profile.house4,
         house5: profile.house5, house6: profile.house6, house7: profile.house7, house8: profile.house8,
@@ -111,28 +112,72 @@ export default function NatalChartPage() {
         waterRatio: profile.waterRatio,
       });
       const text = res.data?.analysis || '';
+      if (!text) throw new Error('Empty analysis from backend');
       setAnalysis(text);
       setSections(parseAnalysisSections(text));
       setActiveSection(SECTIONS[0].key);
     } catch (e: any) {
-      setError('Không thể phân tích. Vui lòng thử lại.');
-    } finally { setLoading(false); }
+      console.warn('Backend call failed, using client-side natal fallback', e);
+      const fallbackText = generateClientNatalAnalysis(profile);
+      setAnalysis(fallbackText);
+      setSections(parseAnalysisSections(fallbackText));
+      setActiveSection(SECTIONS[0].key);
+      setError('');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCareerAnalysis = async () => {
-    if (!profile.uid) return;
     setCareerLoading(true);
     try {
       const res = await apiGenerate({
-        userData: { uid: profile.uid, name: profile.name, sun: profile.sun, moon: profile.moon, birthDate: profile.birthDate },
+        userData: {
+          uid: profile.uid || 'guest_user',
+          name: profile.name || 'Người dùng',
+          sun: profile.sun || 'Ma Kết',
+          moon: profile.moon || 'Kim Ngưu',
+          birthDate: profile.birthDate,
+        },
         category: 'career_chart',
         day: new Date().toISOString().split('T')[0],
-      });
-      setCareerAnalysis(res.data?.prediction || 'Không thể tải. Vui lòng thử lại.');
-    } catch {
-      setCareerAnalysis(`${profile.sun} của bạn được hành tinh Saturn và Jupiter chi phối sự nghiệp. Nhà thứ 10 trong lá số tiết lộ con đường phù hợp nhất với bản chất bạn.`);
-    } finally { setCareerLoading(false); }
+        extra: {
+          mc: profile.mc,
+          house10: profile.house10,
+          saturn: profile.saturn,
+          jupiter: profile.jupiter,
+          mercury: profile.mercury,
+          mars: profile.mars,
+          venus: profile.venus,
+          ascendant: profile.ascendant,
+          house2: profile.house2,
+          house6: profile.house6,
+          fireRatio: profile.fireRatio,
+          earthRatio: profile.earthRatio,
+          airRatio: profile.airRatio,
+          waterRatio: profile.waterRatio,
+        },
+      } as any);
+      const pred = res.data?.prediction;
+      if (!pred) throw new Error('Empty career prediction from backend');
+      setCareerAnalysis(pred);
+    } catch (e) {
+      console.warn('Backend career call failed, using client-side career fallback', e);
+      const fallbackCareer = generateClientCareerAnalysis(profile);
+      setCareerAnalysis(fallbackCareer);
+    } finally {
+      setCareerLoading(false);
+    }
   };
+
+  // Tự động kích hoạt phân tích khi chuyển sang tab Phân Tích AI hoặc Hướng Nghiệp
+  useEffect(() => {
+    if (pageTab === 'analysis' && !analysis && !loading) {
+      handleAnalyze();
+    } else if (pageTab === 'career' && !careerAnalysis && !careerLoading) {
+      handleCareerAnalysis();
+    }
+  }, [pageTab]);
 
   return (
     <div className="space-y-6">
@@ -179,13 +224,13 @@ export default function NatalChartPage() {
                 square: profile.squareAspect,
                 sextile: profile.sextileAspect,
               }}
-              size={320}
+              size={380}
             />
           </div>
           {/* Legend */}
           <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs">
-            {[['#fbbf24','Conjunction'],['#4ade80','Trine'],['#f87171','Opposition'],['#fb923c','Square'],['#38bdf8','Sextile']].map(([c,l])=>(
-              <span key={l} className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block rounded" style={{background:c}}/><span className="text-purple-300 opacity-70">{l}</span></span>
+            {[['#fbbf24','Trùng tụ (0°)'],['#4ade80','Tam hợp (120°)'],['#f87171','Xung đối (180°)'],['#fb923c','Vuông góc (90°)'],['#38bdf8','Lục hợp (60°)']].map(([c,l])=>(
+              <span key={l} className="flex items-center gap-1.5 glass px-2.5 py-1 rounded-full"><span className="w-2.5 h-2.5 inline-block rounded-full shadow-sm" style={{background:c}}/><span className="text-purple-200 text-xs">{l}</span></span>
             ))}
           </div>
         </div>
@@ -219,34 +264,57 @@ export default function NatalChartPage() {
       {pageTab === 'career' && (
         <div className="space-y-4">
           <div className="glass-card p-6">
-            <h2 className="text-white font-semibold mb-2">💼 Bản Đồ Hướng Nghiệp</h2>
-            <p className="text-purple-300 text-sm opacity-70 mb-4">Phân tích sự nghiệp từ Nhà 10, Midheaven và Saturn trong lá số của {profile.sun}</p>
-            {!careerAnalysis ? (
-              <button onClick={handleCareerAnalysis} disabled={careerLoading}
+            <h2 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <UiIcon name="briefcase" label="Hướng nghiệp" className="inline text-purple-400" />
+              Bản Đồ Hướng Nghiệp Chiêm Tinh
+            </h2>
+            <p className="text-purple-300 text-sm opacity-70 mb-4">
+              Phân tích chuyên sâu từ Trung Thiên (Midheaven - MC), Nhà 10 và Sao Thổ của {profile.sun || 'bạn'}
+            </p>
+
+            {careerLoading ? (
+              <div className="glass p-8 rounded-2xl text-center space-y-3" style={{ border: '1px solid rgba(168,85,247,0.3)' }}>
+                <div className="w-9 h-9 mx-auto border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin" />
+                <p className="text-white font-medium text-sm">✦ AI đang giải mã Midheaven ({profile.mc || 'MC'}) & Nhà 10...</p>
+                <p className="text-purple-300 text-xs opacity-70">Tổng hợp năng lực bẩm sinh, phong cách làm việc và lộ trình phát triển sự nghiệp</p>
+              </div>
+            ) : !careerAnalysis ? (
+              <button onClick={handleCareerAnalysis}
                 className="btn-cosmic px-8 py-3 w-full"
                 style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
-                {careerLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Đang phân tích hướng nghiệp...
-                  </span>
-                ) : '🔭 Phân Tích Hướng Nghiệp'}
+                <UiIcon name="sparkles" label="Phân tích hướng nghiệp" className="mr-2 inline" />
+                Khai Mở Bản Đồ Hướng Nghiệp
               </button>
             ) : (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <p className="text-purple-100 text-sm leading-relaxed whitespace-pre-wrap opacity-90 border-l-2 pl-4 italic"
-                  style={{ borderColor: colors[0] }}>{careerAnalysis}</p>
-                <button onClick={() => setCareerAnalysis('')} className="text-purple-400 text-xs mt-3 hover:text-purple-300 underline">↻ Phân tích lại</button>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+                <div className="p-5 rounded-2xl glass bg-purple-950/40 border border-purple-500/25">
+                  <div className="text-purple-100 text-sm leading-relaxed whitespace-pre-wrap opacity-95">
+                    {careerAnalysis}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button onClick={handleCareerAnalysis} className="text-purple-300 text-xs hover:text-white underline transition-colors">
+                    ↻ Phân tích lại hướng nghiệp
+                  </button>
+                </div>
               </motion.div>
             )}
           </div>
           <div className="glass-card p-5">
-            <h3 className="text-white font-semibold mb-3">📊 Vị Trí Liên Quan Sự Nghiệp</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[{l:'Trung Thiên (MC)',v:profile.mc},{l:'Nhà 10',v:profile.house10},{l:'Sao Thổ',v:profile.saturn},{l:'Sao Mộc',v:profile.jupiter}].map(({l,v})=>(
+            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+              <UiIcon name="chart" label="Vị trí liên quan sự nghiệp" className="inline text-purple-400" />
+              Vị Trí Trọng Yếu Trong Lá Số Sự Nghiệp
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { l: 'Trung Thiên (MC)', v: profile.mc || 'Ma Kết' },
+                { l: 'Nhà 10 (Sự nghiệp)', v: profile.house10 || profile.mc || 'Ma Kết' },
+                { l: 'Sao Thổ (Kỷ luật)', v: profile.saturn || 'Bọ Cạp' },
+                { l: 'Sao Mộc (Cơ hội)', v: profile.jupiter || 'Xử Nữ' }
+              ].map(({ l, v }) => (
                 <div key={l} className="glass p-3 rounded-xl text-center">
                   <p className="text-purple-400 text-xs mb-1">{l}</p>
-                  <p className="text-white font-semibold text-sm">{v||'—'}</p>
+                  <p className="text-white font-semibold text-sm">{v || '—'}</p>
                 </div>
               ))}
             </div>
@@ -289,19 +357,24 @@ export default function NatalChartPage() {
 
 
 
-      {/* Analyze button */}
+      {/* Analyze button / Auto loading */}
       {!analysis && (
         <div className="text-center">
-          <button onClick={handleAnalyze} disabled={loading}
-            className="btn-cosmic px-10 py-4 text-lg"
-            style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
-            {loading ? (
-              <span className="flex items-center gap-3">
-                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Đang phân tích chiêm tinh...
-              </span>
-            ) : <><UiIcon name="chart" label="Phân tích Natal Chart" className="mr-2 inline" />Phân Tích Natal Chart</>}
-          </button>
+          {loading ? (
+            <div className="glass-card p-8 rounded-2xl max-w-md mx-auto space-y-3" style={{ border: '1px solid rgba(168,85,247,0.3)' }}>
+              <div className="w-10 h-10 mx-auto border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin" />
+              <p className="text-white font-medium text-base">✦ AI đang giải mã toàn diện bản đồ sao của bạn...</p>
+              <p className="text-purple-300 text-xs opacity-75">
+                Đối chiếu 12 Nhà, Big 3 (Mặt Trời {profile.sun || ''}, Mặt Trăng {profile.moon || ''}, Cung Mọc {profile.ascendant || ''}) và phân bổ năng lượng
+              </p>
+            </div>
+          ) : (
+            <button onClick={handleAnalyze} disabled={loading}
+              className="btn-cosmic px-10 py-4 text-lg"
+              style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
+              <UiIcon name="chart" label="Phân tích Natal Chart" className="mr-2 inline" />Phân Tích Natal Chart
+            </button>
+          )}
           {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
         </div>
       )}

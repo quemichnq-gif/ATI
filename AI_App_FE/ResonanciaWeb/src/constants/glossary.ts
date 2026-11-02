@@ -21,12 +21,12 @@ export const GLOSSARY_TERMS: GlossaryTerm[] = [
     detail: 'Natal Chart là "ảnh chụp" bầu trời vào đúng khoảnh khắc bạn chào đời. Nó cho thấy vị trí của Mặt Trời, Mặt Trăng và các hành tinh trong 12 cung hoàng đạo và 12 nhà — là nền tảng của toàn bộ chiêm tinh cá nhân.',
   },
   {
-    id: 'ascendant', term: 'Ascendant (Cung Mọc)', symbol: 'AC', category: 'concept', emoji: '↑',
+    id: 'ascendant', term: 'Ascendant (Cung Mọc)', symbol: 'Asc', category: 'concept', emoji: '🌅',
     short: 'Cung hoàng đạo mọc lên ở đường chân trời phía Đông lúc bạn sinh',
     detail: 'Cung Mọc (Rising Sign) là "mặt nạ" bạn trình diện với thế giới — cách người khác nhìn nhận bạn ngay từ cái nhìn đầu tiên. Nó khác với Mặt Trời (cái tôi sâu bên trong) và ảnh hưởng mạnh đến ngoại hình và phong cách giao tiếp.',
   },
   {
-    id: 'midheaven', term: 'Midheaven / MC (Trung Thiên)', symbol: 'MC', category: 'concept', emoji: '🏔️',
+    id: 'midheaven', term: 'Midheaven / MC (Trung Thiên)', symbol: 'Mc', category: 'concept', emoji: '☀️',
     short: 'Điểm cao nhất của lá số — liên quan sự nghiệp và danh tiếng',
     detail: 'MC (Medium Coeli) là điểm cung hoàng đạo nằm ở vị trí cao nhất trong bầu trời lúc bạn sinh. Nó đại diện cho sự nghiệp, danh tiếng, mục tiêu lớn trong cuộc đời và cách xã hội nhìn nhận bạn.',
   },
