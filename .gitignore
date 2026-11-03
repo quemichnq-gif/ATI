@@ -21,3 +21,10 @@ Thumbs.db
 
 # Subfolder clone
 ATI/
+
+# Dev Container & Docker
+.devcontainer/
+docker-compose.yml
+AI_App_BE/Dockerfile
+AI_App_FE/ResonanciaWeb/Dockerfile
+**/Dockerfile

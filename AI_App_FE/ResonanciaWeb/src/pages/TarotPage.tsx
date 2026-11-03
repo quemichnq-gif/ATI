@@ -140,6 +140,19 @@ export default function TarotPage() {
         },
         category: `tarot_${categoryName}`,
         day: new Date().toISOString().split('T')[0],
+        extra: {
+          card_vi: primary.card.vi,
+          card_name: primary.card.name,
+          is_reversed: primary.isReversed,
+          position: primary.positionLabel || (cards.length > 1 ? cards.map(c => `${c.positionLabel}: ${c.card.vi} (${c.isReversed ? 'Ngược' : 'Xuôi'})`).join('; ') : 'Lá bài ngày'),
+          meaning: primary.isReversed ? primary.card.meaningReversed : primary.card.meaningUpright,
+          all_cards: cards.map(c => ({
+            name: c.card.name,
+            vi: c.card.vi,
+            isReversed: c.isReversed,
+            position: c.positionLabel,
+          })),
+        },
       });
       if (res.data?.prediction) {
         setInterpretation(res.data.prediction);

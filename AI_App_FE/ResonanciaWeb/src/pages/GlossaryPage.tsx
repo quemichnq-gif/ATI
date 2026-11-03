@@ -12,6 +12,72 @@ export default function GlossaryPage() {
     category === 'all' || t.category === category
   );
 
+  const renderCard = (term: GlossaryTerm, i: number) => {
+    const isSelected = selected?.id === term.id;
+    return (
+      <motion.div
+        key={term.id}
+        layout
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ delay: i * 0.03 }}
+        onClick={() => setSelected(isSelected ? null : term)}
+        className={`glass-card p-4 text-left transition-all cursor-pointer min-h-[96px] ${
+          isSelected
+            ? '!border-white bg-purple-900/20 shadow-lg'
+            : 'hover:border-purple-400/40'
+        }`}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setSelected(isSelected ? null : term);
+          }
+        }}
+      >
+        <div className="flex items-start gap-3">
+          <span className="text-2xl flex-shrink-0">{term.emoji}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-white font-semibold text-sm">{term.term}</h3>
+              {term.symbol && (
+                <span className="text-purple-300 text-xs font-mono bg-purple-900/40 px-1.5 py-0.5 rounded">
+                  {term.symbol}
+                </span>
+              )}
+            </div>
+            <p className="text-purple-300 text-xs opacity-80 leading-relaxed">{term.short}</p>
+
+            {/* Detail (expanded) */}
+            <AnimatePresence>
+              {isSelected && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-3 pt-3 border-t border-purple-500/20"
+                >
+                  <p className="text-purple-100 text-xs leading-relaxed opacity-90">
+                    {term.detail}
+                  </p>
+                  <span className="inline-block mt-2 text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
+                    {GLOSSARY_CATEGORIES.find(c => c.id === term.category)?.emoji} {GLOSSARY_CATEGORIES.find(c => c.id === term.category)?.label}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          <span className="text-purple-500 text-xs mt-1">
+            {isSelected ? '▲' : '▼'}
+          </span>
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -53,69 +119,24 @@ export default function GlossaryPage() {
         ))}
       </div>
 
-      {/* Term grid - items-start prevents adjacent cards from stretching when one is expanded */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-        <AnimatePresence mode="popLayout">
-          {filtered.map((term, i) => (
-            <motion.div
-              key={term.id}
-              layout
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ delay: i * 0.03 }}
-              onClick={() => setSelected(term === selected ? null : term)}
-              className={`glass-card p-4 text-left transition-all hover:border-purple-400/40 cursor-pointer ${
-                selected?.id === term.id ? 'border-purple-400/50 bg-purple-900/20 shadow-lg' : ''
-              }`}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setSelected(term === selected ? null : term);
-                }
-              }}
-            >
-              <div className="flex items-start gap-3">
-                <span className="text-2xl flex-shrink-0">{term.emoji}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-white font-semibold text-sm">{term.term}</h3>
-                    {term.symbol && (
-                      <span className="text-purple-300 text-xs font-mono bg-purple-900/40 px-1.5 py-0.5 rounded">
-                        {term.symbol}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-purple-300 text-xs opacity-80 leading-relaxed">{term.short}</p>
+      {/* Term list: 2 independent columns on sm+ so expanding one card only pushes down its own column without blank gap in the adjacent column */}
+      <div className="hidden sm:grid sm:grid-cols-2 gap-3 items-start">
+        <div className="flex flex-col gap-3">
+          <AnimatePresence mode="popLayout">
+            {filtered.filter((_, i) => i % 2 === 0).map((term, i) => renderCard(term, i * 2))}
+          </AnimatePresence>
+        </div>
+        <div className="flex flex-col gap-3">
+          <AnimatePresence mode="popLayout">
+            {filtered.filter((_, i) => i % 2 === 1).map((term, i) => renderCard(term, i * 2 + 1))}
+          </AnimatePresence>
+        </div>
+      </div>
 
-                  {/* Detail (expanded) */}
-                  <AnimatePresence>
-                    {selected?.id === term.id && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-3 pt-3 border-t border-purple-500/20"
-                      >
-                        <p className="text-purple-100 text-xs leading-relaxed opacity-90">
-                          {term.detail}
-                        </p>
-                        <span className="inline-block mt-2 text-xs px-2 py-0.5 rounded-full"
-                          style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
-                          {GLOSSARY_CATEGORIES.find(c => c.id === term.category)?.emoji} {GLOSSARY_CATEGORIES.find(c => c.id === term.category)?.label}
-                        </span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <span className="text-purple-500 text-xs mt-1">
-                  {selected?.id === term.id ? '▲' : '▼'}
-                </span>
-              </div>
-            </motion.div>
-          ))}
+      {/* Mobile single column */}
+      <div className="flex flex-col gap-3 sm:hidden">
+        <AnimatePresence mode="popLayout">
+          {filtered.map((term, i) => renderCard(term, i))}
         </AnimatePresence>
       </div>
 

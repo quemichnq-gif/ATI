@@ -353,19 +353,85 @@ def generate_prediction():
         - quote: một câu thông điệp vũ trụ chiêm tinh thi vị, sâu sắc, truyền cảm hứng về tình yêu và kết nối tâm hồn, viết bằng tiếng Việt chuẩn ngữ pháp, có dấu đầy đủ, giàu cảm xúc, không bị lặp từ.
         Chỉ trả lời JSON thuần.
         """
-    elif category.startswith("tarot_"):
-        card_name = category.replace("tarot_", "").replace("_", " ").title()
+    elif category == "transit_overview":
+        active_events = extra.get("active_events", [])
+        ascendant = user_data.get("ascendant") or extra.get("ascendant", "")
+        events_formatted = []
+        for e in active_events:
+            p_name = e.get("planet", "")
+            e_name = e.get("event", "")
+            cat = e.get("category", "")
+            imp = e.get("impact", "")
+            aff = e.get("affected", [])
+            dates = e.get("dateRange", "")
+            is_aff = sun in aff or moon in aff
+            events_formatted.append(
+                f"- {p_name} ({e_name}), thời gian: {dates}, lĩnh vực: {cat}, tác động: {imp}. "
+                f"Các cung chịu ảnh hưởng chính: {', '.join(aff)}. "
+                f"({'KÍCH HOẠT TRỰC TIẾP lên đương số' if is_aff else 'Không chiếu trực tiếp lên cung chính, tác động gián tiếp'})"
+            )
+        events_str = "\n".join(events_formatted) if events_formatted else "Các dịch chuyển hành tinh quan trọng hiện tại."
+
         prompt = f"""
-        Giải nghĩa lá Tarot '{card_name}' cho {name} với cung Mặt Trời {sun} và Mặt Trăng {moon}.
-        Tập trung vào: (1) Ý nghĩa lá bài hôm nay (2) Cách ứng dụng cho {sun} (3) Lời cảnh báo hoặc cơ hội.
-        Viết 3-4 câu nơi mở, thi vị, không dùng emoji.
+        Bạn là chuyên gia Chiêm Tinh Học phương Tây (Western Astrology) chuyên sâu về Bản Đồ Sao Cá Nhân (Natal Chart) và Vận Hạn Thiên Văn (Transits).
+        Hãy phân tích tương tác vận hạn cho đương số {name}:
+        - Bản đồ sao cá nhân: Cung Mặt Trời {sun}, Cung Mặt Trăng {moon}{f', Cung Mọc {ascendant}' if ascendant else ''}.
+        - Các sự kiện thiên văn hiện tại:
+{events_str}
+
+        QUY TẮC LUẬN GIẢI CHIÊM TINH HỌC CHUẨN XÁC:
+        1. Cơ sở dữ liệu: Dựa THUẦN TÚY trên Chiêm Tinh Học phương Tây (tương tác giữa hành tinh quá cảnh Transit và các tọa độ nhạy cảm của Natal Chart qua các góc chiếu Aspects: Trùng tụ 0°, Lục hợp 60°, Vuông góc 90°, Tam hợp 120°, Đối đỉnh 180°). TUYỆT ĐỐI KHÔNG dùng khái niệm Tử Vi, Tứ Trụ hay thuật ngữ bói toán phương Đông.
+        2. Sửa lỗi ngộ nhận tác động:
+           - Chỉ luận giải trọng tâm vào những hành tinh THỰC SỰ đang tạo góc chiếu kích hoạt đến {sun} hoặc {moon} của đương số.
+           - LƯU Ý ĐẶC BIỆT: KHÔNG tự động mặc định rằng 'Sao Thủy nghịch hành đang tác động trực tiếp' lên đương số nếu góc chiếu hoặc cung chủ quản ({sun}) không có liên kết kích hoạt (hard aspect) trực tiếp. Nếu Sao Thủy nghịch hành không chiếu trực tiếp vào {sun}, hãy luận giải đúng trọng tâm các hành tinh đang trực tiếp tác động (như Sao Hỏa, Mặt Trăng, Sao Mộc...) hoặc định hướng tích lũy năng lượng.
+        3. Kết quả yêu cầu:
+           - Đưa ra DUY NHẤT 1 câu tóm tắt định hướng tổng quan (Actionable advice) mang tính thời điểm, sắc bén, khách quan và truyền cảm hứng hành động thiết thực cho người cung {sun}.
+           - Không dùng emoji, không tiêu đề, không ngoặc kép hay mở bài/kết bài thừa. Chỉ trả lời đúng 1 câu duy nhất.
         """
     elif category.startswith("transit_"):
         transit_event = extra.get("transit_event", "Sự kiện thiên văn")
+        planet_name = extra.get("planet", "")
+        event_name = extra.get("event", "")
+        cat_type = extra.get("category", "")
+        field_hint = f"thuộc lĩnh vực {cat_type}" if cat_type else ""
         prompt = f"""
-        Phân tích ảnh hưởng của sự kiện thiên văn lên {name} (cung {sun}, Mặt Trăng {moon}).
-        Sự kiện: {transit_event}
-        Viết lời khuyên cụ thể, thiết thực cho {sun}, khoảng 2-3 câu. Không dùng emoji.
+        Bạn là chuyên gia chiêm tinh học ứng dụng. Hãy phân tích tác động của sự kiện thiên văn '{planet_name} {event_name} - {transit_event}' {field_hint} lên người dùng {name} (Mặt Trời {sun}, Mặt Trăng {moon}):
+        Yêu cầu:
+        - Đưa ra 1-2 câu hướng dẫn ứng xử cụ thể, thực tế và mang tính hành động cao cho cung {sun} trong giai đoạn này, chỉ rõ cơ hội cần nắm bắt và cạm bẫy tâm lý cần phòng tránh.
+        - Tránh hoàn toàn văn mẫu giáo điều, câu chữ sắc sảo, hiện đại và sâu sắc.
+        - Không dùng emoji, không tiêu đề thừa.
+        """
+    elif category.startswith("tarot_"):
+        card_name = category.replace("tarot_", "").replace("_", " ").title()
+        card_vi = extra.get("card_vi", card_name)
+        is_reversed = extra.get("is_reversed", False)
+        orientation_str = "Ngược (Reversed)" if is_reversed else "Xuôi (Upright)"
+        position = extra.get("position", "Lá bài ngày")
+        core_meaning = extra.get("meaning", "")
+        all_cards = extra.get("all_cards", [])
+        cards_context = ""
+        if len(all_cards) > 1:
+            card_desc_list = []
+            for c in all_cards:
+                c_pos = c.get("position", "")
+                c_vi = c.get("vi", "")
+                c_dir = "Ngược" if c.get("isReversed") else "Xuôi"
+                card_desc_list.append(f"{c_pos}: {c_vi} ({c_dir})")
+            cards_context = "Toàn bộ quẻ bài: " + "; ".join(card_desc_list)
+
+        core_meaning_line = f"- Ý nghĩa cốt lõi: {core_meaning}" if core_meaning else ""
+
+        prompt = f"""
+        Bạn là chuyên gia biểu tượng Tarot và Chiêm tinh học. Hãy giải nghĩa quẻ bài cho {name} (Mặt Trời {sun}, Mặt Trăng {moon}):
+        - Lá bài chính: {card_vi} ({card_name}) - Chiều hướng: {orientation_str}
+        - Vị trí trải bài: {position}
+        {core_meaning_line}
+        {cards_context}
+
+        Yêu cầu:
+        1. Giải nghĩa thông điệp cốt lõi của lá bài ở trạng thái {orientation_str} phù hợp với năng lượng {sun} (1-2 câu).
+        2. Đưa ra 1-2 câu hướng dẫn ứng xử hành động cụ thể, thực tế cho {name} hôm nay, nêu rõ việc nên làm hoặc thái độ tâm lý cần chuyển hóa, thay vì các câu template chung chung lặp lại.
+        - Lời văn thi vị, tinh tế nhưng sắc bén và hữu ích. Không dùng emoji, không tiêu đề thừa.
         """
     elif category.endswith("_week") or category.endswith("_month"):
         period_str = "tuần này" if category.endswith("_week") else "tháng này"
@@ -390,12 +456,40 @@ def generate_prediction():
         text = ""
         try:
             model = genai.GenerativeModel(MODEL_NAME)
-            response = model.generate_content(prompt, request_options={"timeout": 10.0})
+            generation_config = {"temperature": 0.8}
+            response = model.generate_content(prompt, generation_config=generation_config, request_options={"timeout": 10.0})
             text = response.text if hasattr(response, "text") else str(response)
             text = re.sub(r"(```json|```|'''|\"\"\")", "", text).strip()
         except BaseException as gemini_err:
             safe_print("⚠️ Gemini Error trong /generate (sử dụng engine dự phòng):", gemini_err)
-            if category == "career_chart":
+            if category == "transit_overview":
+                active_events = extra.get("active_events", [])
+                direct_events = [e for e in active_events if sun in e.get("affected", [])]
+                if direct_events:
+                    target_event = direct_events[0]
+                    t_planet = target_event.get("planet", "các hành tinh")
+                    t_event = target_event.get("event", "quá cảnh")
+                    t_cat = target_event.get("category", "career")
+                    field_map = {
+                        "career": "sự nghiệp và mục tiêu dài hạn",
+                        "energy": "năng lượng hành động và sức bền",
+                        "spiritual": "trực giác và chiều sâu nội tâm",
+                        "communication": "giao tiếp và đàm phán",
+                        "love": "các mối quan hệ và sự thấu cảm"
+                    }
+                    field_name = field_map.get(t_cat, "định hướng trọng tâm")
+                    text = f"Dưới góc chiếu kích hoạt từ {t_planet} ({t_event}), {sun} hãy tập trung củng cố {field_name}, hành động quyết đoán nhưng luôn duy trì sự điềm tĩnh và kỷ luật."
+                else:
+                    text = f"Bầu trời vận hạn hiện tại không tạo góc chiếu xung khắc lớn lên {sun}; hãy duy trì sự cân bằng nội tại, tập trung củng cố mục tiêu cá nhân và chủ động tích lũy năng lượng."
+            elif category.startswith("transit_"):
+                planet_name = extra.get("planet", "Các hành tinh")
+                text = f"Năng lượng từ {planet_name} thôi thúc {sun} tái định hình mục tiêu thực tế; hãy giữ sự kiên nhẫn, tránh nóng vội và biến áp lực thành bàn đạp phát triển."
+            elif category.startswith("tarot_"):
+                card_vi = extra.get("card_vi", "Lá bài Tarot")
+                is_reversed = extra.get("is_reversed", False)
+                orientation_str = "ngược" if is_reversed else "xuôi"
+                text = f"Lá bài {card_vi} ở chiều {orientation_str} nhắc nhở {sun} hãy lắng nghe trực giác mách bảo hôm nay; tiếp cận mọi vấn đề bằng sự thấu đáo và chủ động đón nhận chuyển biến mới."
+            elif category == "career_chart":
                 mc = extra.get("mc") or user_data.get("mc", "Ma Kết")
                 house10 = extra.get("house10") or user_data.get("house10", "Ma Kết")
                 saturn = extra.get("saturn") or user_data.get("saturn", "Sao Thổ")
