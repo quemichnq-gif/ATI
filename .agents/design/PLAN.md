@@ -17,6 +17,7 @@
 - [x] Tạo các ghi chú tham khảo và brief bảo vệ thiết kế hiện hữu.
 - [x] Tạo quy tắc, workflow, hướng dẫn Codex, prompt vai trò và skill dùng lại trong `.agents/`.
 - [x] **Nâng cấp v2:** Bổ sung nguyên tắc "trông như người làm" vào toàn bộ hệ thống agents — RULES, DESIGN_BRIEF, WORKFLOW, tất cả roles và cả 2 skills.
+- [x] **Responsive v1 (2026-11-05):** Bổ sung sidebar drawer trên mobile, header hamburger và chiều cao phù hợp cho ChatRoomPage.
 
 ---
 
@@ -36,6 +37,7 @@
 Kế hoạch này cho phép:
 - Tạo tài liệu design và file cấu hình agent/skill/workflow.
 - Thay thế emoji icon chức năng bằng SVG inline (được yêu cầu tại v2).
+- Ghi nhận pattern responsive mobile đã triển khai và các breakpoint đã kiểm tra.
 
 Không cho phép:
 - Sửa CSS ứng dụng (màu, layout, spacing).

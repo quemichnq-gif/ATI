@@ -22,6 +22,7 @@ Với mỗi viewport, kiểm tra baseline:
 - Sidebar và main content không chồng nhau.
 - Không có text hoặc element bị cắt.
 - Hiệu ứng vũ trụ hiển thị đúng.
+- Trên mobile (< 768px): sidebar ẩn ban đầu, mở bằng nút hamburger; nội dung chính không bị sidebar che.
 
 ---
 
