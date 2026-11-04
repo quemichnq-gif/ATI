@@ -69,7 +69,7 @@ export default function ChatRoomPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)]">
       {/* Header */}
       <div className="flex items-center gap-4 pb-4 border-b mb-4" style={{ borderColor: 'rgba(157,78,221,0.2)' }}>
         <button onClick={() => navigate('/chat')}

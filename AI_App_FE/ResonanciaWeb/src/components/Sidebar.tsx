@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useSelector } from 'react-redux';
@@ -54,9 +55,20 @@ const astroItems = [
   { path: '/glossary', iconKey: 'glossary', label: 'Từ Điển Chiêm Tinh' },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const profile = useSelector((s: RootState) => s.profile);
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    onClose();
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -66,14 +78,17 @@ export default function Sidebar() {
   const displayName = profile.name?.trim() || (profile.email ? profile.email.split('@')[0] : 'Người dùng');
   const hasAstro = Boolean(profile.sun && profile.moon);
 
-  return (
-    <aside className="fixed left-0 top-0 h-full w-64 z-50 flex flex-col"
+  const sidebarContent = (
+    <aside
+      className={`fixed left-0 top-0 h-full w-64 z-50 flex flex-col transition-transform duration-300 ease-in-out
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       style={{
         background: 'rgba(9, 7, 18, 0.94)',
         borderRight: '1px solid rgba(168, 85, 247, 0.15)',
         backdropFilter: 'blur(24px)'
-      }}>
-      
+      }}
+      aria-label="Điều hướng chính"
+    >
       {/* Brand Header */}
       <div className="p-6 border-b" style={{ borderColor: 'rgba(168, 85, 247, 0.12)' }}>
         <div className="flex items-center gap-2.5">
@@ -178,5 +193,19 @@ export default function Sidebar() {
         </button>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {sidebarContent}
+      {/* Mobile backdrop overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+    </>
   );
 }
