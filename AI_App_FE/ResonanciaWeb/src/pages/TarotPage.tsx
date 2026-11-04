@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RootState } from '../store';
 import { apiGenerate } from '../services/api';
 import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
+import UiIcon from '../components/UiIcon';
 import {
   TarotCard,
   TAROT_CARDS,
@@ -198,7 +199,7 @@ export default function TarotPage() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => navigate('/home')}
-          className="text-purple-300 hover:text-white text-sm transition-colors flex items-center gap-1.5"
+          className="text-purple-300 hover:text-white text-sm transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0015] rounded-md px-1 py-0.5"
         >
           <span>←</span> Về Trang Chủ
         </button>
@@ -228,7 +229,7 @@ export default function TarotPage() {
             setSpreadMode('daily');
             setInterpretation('');
           }}
-          className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+          className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
             spreadMode === 'daily'
               ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
               : 'text-purple-300/80 hover:text-white hover:bg-purple-900/40'
@@ -241,7 +242,7 @@ export default function TarotPage() {
             setSpreadMode('draw1');
             handleStartDraw(1);
           }}
-          className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+          className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
             spreadMode === 'draw1'
               ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
               : 'text-purple-300/80 hover:text-white hover:bg-purple-900/40'
@@ -254,7 +255,7 @@ export default function TarotPage() {
             setSpreadMode('draw3');
             handleStartDraw(3);
           }}
-          className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+          className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
             spreadMode === 'draw3'
               ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
               : 'text-purple-300/80 hover:text-white hover:bg-purple-900/40'
@@ -264,7 +265,7 @@ export default function TarotPage() {
         </button>
         <button
           onClick={() => setSpreadMode('deck')}
-          className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+          className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
             spreadMode === 'deck'
               ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
               : 'text-purple-300/80 hover:text-white hover:bg-purple-900/40'
@@ -291,14 +292,14 @@ export default function TarotPage() {
             {!dailyCardState.isRevealed ? (
               <button
                 onClick={handleRevealDaily}
-                className="px-6 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-600/30 transition-all hover:scale-105"
+                className="px-6 py-2.5 rounded-full text-sm font-semibold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-600/30 transition-all hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0015]"
               >
                 Lật Lá Bài Hôm Nay
               </button>
             ) : (
               <button
                 onClick={handleReshuffle}
-                className="px-5 py-2 rounded-full text-xs font-medium text-purple-300 bg-purple-950/60 hover:bg-purple-900/60 border border-purple-500/30 transition-all hover:text-white"
+                className="px-5 py-2 rounded-full text-xs font-medium text-purple-300 bg-purple-950/60 hover:bg-purple-900/60 border border-purple-500/30 transition-all hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0015]"
               >
                 ↻ Rút Lá Khác
               </button>
@@ -316,8 +317,8 @@ export default function TarotPage() {
                 {/* Ý nghĩa lá bài gốc Rider-Waite */}
                 <div className="glass-card p-5">
                   <h2 className="text-white font-bold mb-2 flex items-center gap-2">
-                    <span className="text-purple-400">✨</span> Thông Điệp Lá Bài (
-                    {dailyCardState.isReversed ? 'Bài Ngược' : 'Bài Xuôi'})
+                    <UiIcon name="sparkles" label="Thông điệp lá bài" className="text-purple-400" />
+                    <span>Thông Điệp Lá Bài ({dailyCardState.isReversed ? 'Bài Ngược' : 'Bài Xuôi'})</span>
                   </h2>
                   <p className="text-purple-200 text-sm leading-relaxed opacity-95">
                     {dailyCardState.isReversed
@@ -345,7 +346,8 @@ export default function TarotPage() {
                 {/* AI Interpretation theo chiêm tinh */}
                 <div className="glass-card p-5">
                   <h2 className="text-white font-bold mb-2 flex items-center gap-2">
-                    <span className="text-pink-400">🔮</span> Giải Nghĩa Cho Cung {profile.sun || 'Bạn'}
+                    <UiIcon name="crystal-ball" label="Giải nghĩa chiêm tinh" className="text-pink-400" />
+                    <span>Giải Nghĩa Cho Cung {profile.sun || 'Bạn'}</span>
                   </h2>
                   {loadingAI ? (
                     <div className="flex items-center gap-3 py-3">
@@ -385,13 +387,13 @@ export default function TarotPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleRevealAll}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-purple-200 bg-purple-900/50 hover:bg-purple-800/60 border border-purple-500/30 transition-colors"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-purple-200 bg-purple-900/50 hover:bg-purple-800/60 border border-purple-500/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
               >
                 Lật Tất Cả
               </button>
               <button
                 onClick={handleReshuffle}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-pink-300 bg-pink-950/50 hover:bg-pink-900/60 border border-pink-500/30 transition-colors"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-pink-300 bg-pink-950/50 hover:bg-pink-900/60 border border-pink-500/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
               >
                 ↻ Rút Bộ Mới
               </button>
@@ -426,7 +428,8 @@ export default function TarotPage() {
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
               <div className="glass-card p-5 space-y-4">
                 <h3 className="text-white font-bold flex items-center gap-2 text-base">
-                  <span>✨</span> Chi Tiết Các Lá Bài Đã Lật
+                  <UiIcon name="sparkles" label="Chi tiết lá bài" className="text-purple-400" />
+                  <span>Chi Tiết Các Lá Bài Đã Lật</span>
                 </h3>
 
                 <div className="grid grid-cols-1 gap-3 divide-y divide-purple-500/20">
@@ -465,7 +468,8 @@ export default function TarotPage() {
               {/* Thông điệp AI tổng hợp */}
               <div className="glass-card p-5">
                 <h3 className="text-white font-bold flex items-center gap-2 text-base mb-2">
-                  <span>🔮</span> Thông Điệp Tổng Hợp Của Trải Bài
+                  <UiIcon name="crystal-ball" label="Thông điệp trải bài" className="text-pink-400" />
+                  <span>Thông Điệp Tổng Hợp Của Trải Bài</span>
                 </h3>
                 {loadingAI ? (
                   <div className="flex items-center gap-3 py-2">
@@ -510,7 +514,7 @@ export default function TarotPage() {
               </button>
               <button
                 onClick={() => setDeckFilter('major')}
-                className={`px-3 py-1 rounded-md transition-colors ${
+                className={`px-3 py-1 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
                   deckFilter === 'major' ? 'bg-purple-600 text-white' : 'text-purple-300 hover:text-white'
                 }`}
               >
@@ -518,7 +522,7 @@ export default function TarotPage() {
               </button>
               <button
                 onClick={() => setDeckFilter('minor')}
-                className={`px-3 py-1 rounded-md transition-colors ${
+                className={`px-3 py-1 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
                   deckFilter === 'minor' ? 'bg-purple-600 text-white' : 'text-purple-300 hover:text-white'
                 }`}
               >
@@ -532,7 +536,8 @@ export default function TarotPage() {
             {displayedDeckCards.map(card => (
               <motion.div
                 key={card.id}
-                whileHover={{ scale: 1.04, y: -4 }}
+                whileHover={{ scale: 1.02, y: -3 }}
+                transition={{ duration: 0.2 }}
                 onClick={() => setSelectedDeckCard(card)}
                 className="cursor-pointer bg-purple-950/30 rounded-xl p-2 border border-purple-500/20 hover:border-purple-400/50 transition-all flex flex-col items-center"
               >
@@ -579,7 +584,7 @@ export default function TarotPage() {
             {/* Nút đóng modal */}
             <button
               onClick={() => setSelectedDeckCard(null)}
-              className="absolute top-4 right-4 text-purple-300 hover:text-white text-base w-8 h-8 rounded-full bg-purple-900/60 hover:bg-purple-800/80 flex items-center justify-center border border-purple-400/30 transition-all z-20"
+              className="absolute top-4 right-4 text-purple-300 hover:text-white text-base w-8 h-8 rounded-full bg-purple-900/60 hover:bg-purple-800/80 flex items-center justify-center border border-purple-400/30 transition-all z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#130728]"
               title="Đóng"
             >
               ✕
@@ -634,7 +639,8 @@ export default function TarotPage() {
               {/* Ý nghĩa xuôi */}
               <div className="p-3.5 rounded-xl bg-purple-950/40 border border-purple-500/20">
                 <h4 className="text-xs font-semibold text-purple-200 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
-                  <span className="text-purple-400">✨</span> Ý Nghĩa Xuôi (Upright)
+                  <UiIcon name="sparkles" label="Ý nghĩa xuôi" className="text-purple-400" />
+                  <span>Ý Nghĩa Xuôi (Upright)</span>
                 </h4>
                 <p className="text-xs sm:text-sm text-purple-100/90 leading-relaxed">
                   {selectedDeckCard.meaningUpright}

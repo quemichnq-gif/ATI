@@ -242,14 +242,17 @@ export default function SynastryPage() {
             <div className="glass-card p-5">
               <h2 className="text-white font-semibold mb-4">Phân Tích Chi Tiết</h2>
               {[
-                { label: 'Tình Cảm', value: result.love, icon: '💕' },
-                { label: 'Giao Tiếp', value: result.communication, icon: '💬' },
-                { label: 'Đam Mê', value: result.passion, icon: '🔥' },
-                { label: 'Tâm Linh', value: result.spiritual, icon: '✨' },
+                { label: 'Tình Cảm', value: result.love, icon: 'heart' as const },
+                { label: 'Giao Tiếp', value: result.communication, icon: 'message' as const },
+                { label: 'Đam Mê', value: result.passion, icon: 'flame' as const },
+                { label: 'Tâm Linh', value: result.spiritual, icon: 'sparkles' as const },
               ].map(item => (
                 <div key={item.label} className="mb-3">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-purple-300">{item.icon} {item.label}</span>
+                    <span className="text-purple-300 flex items-center gap-1.5">
+                      <UiIcon name={item.icon} label={item.label} className="text-purple-400" />
+                      {item.label}
+                    </span>
                     <span className="font-semibold" style={{ color: scoreColor(item.value) }}>{item.value}%</span>
                   </div>
                   <div className="cosmic-progress">

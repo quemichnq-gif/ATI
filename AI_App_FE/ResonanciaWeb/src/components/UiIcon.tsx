@@ -5,7 +5,8 @@ export type IconName =
   | 'calendar' | 'clock' | 'pin' | 'briefcase' | 'heart' | 'ruler' | 'scale'
   | 'camera' | 'edit' | 'check' | 'hourglass' | 'send' | 'sparkles'
   | 'compass' | 'flame' | 'earth' | 'wind' | 'water' | 'arrow-up'
-  | 'sun' | 'moon' | 'star' | 'rocket' | 'close' | 'cloud-rain' | 'mail';
+  | 'sun' | 'moon' | 'star' | 'rocket' | 'close' | 'cloud-rain' | 'mail'
+  | 'crystal-ball';
 
 const paths: Record<IconName, ReactNode> = {
   home: <><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
@@ -41,6 +42,7 @@ const paths: Record<IconName, ReactNode> = {
   close: <><path d="m6 6 12 12M18 6 6 18"/></>,
   'cloud-rain': <><path d="M7 15a4 4 0 0 1 0-8 5 5 0 0 1 9-1 4 4 0 1 1 1 9H7Z"/><path d="m8 18-1 3m6-3-1 3m6-3-1 3"/></>,
   mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,
+  'crystal-ball': <><circle cx="12" cy="9" r="6.5"/><path d="M7.5 18 6 21h12l-1.5-3"/><path d="M9 21h6"/></>,
 };
 
 export default function UiIcon({ name, label, className = '', style }: { name: IconName; label: string; className?: string; style?: CSSProperties }) {
