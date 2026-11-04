@@ -116,8 +116,10 @@ Dự án dùng Tailwind CSS với breakpoints mặc định (không custom):
 ### 5.2 Yếu tố responsive bị khóa
 
 Cấu trúc responsive hiện tại là yếu tố bị khóa — **không được thay đổi**:
-- Grid column hiện có: `grid-cols-2`, `sm:grid-cols-3`, `lg:grid-cols-5`, `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`...
-- Sidebar: cố định `w-64` trên desktop; hành vi mobile hiện tại.
+- Grid column hiện có như `grid-cols-2`, `sm:grid-cols-3`, `lg:grid-cols-5` cần được giữ nguyên.
+- **Sidebar:** cố định `w-64` từ `md:` trở lên; dưới `md:` là drawer overlay, mở qua `mobileOpen`, đóng khi chạm backdrop hoặc đổi route.
+- **MainLayout:** main dùng `md:ml-64`; header mobile hiện dưới `md:`; nội dung có `pt-16 md:pt-0` để tránh bị header che.
+- **ChatRoomPage:** chiều cao dùng `h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)]` để tính phần header mobile.
 - Breakpoint class nào đang dùng trong codebase — giữ nguyên.
 
 Muốn thay đổi responsive phải có yêu cầu riêng và được cho phép rõ ràng.

@@ -14,6 +14,15 @@ Trước khi sửa, đọc `AGENTS.md`, `.agents/design/DESIGN_BRIEF.md`, `.agen
 - Không cài dependency mới.
 - Nếu yêu cầu cần thay đổi yếu tố đang bị khóa, nêu rõ xung đột và xin phép trước khi thực hiện phần đó.
 
+
+## Kiến trúc mobile đã thiết lập (2026-11-05)
+
+Pattern mobile drawer đã được implement và là yếu tố bị khóa:
+- **Sidebar** (`src/components/Sidebar.tsx`): nhận `mobileOpen` và `onClose` từ MainLayout. `translate-x-0` / `-translate-x-full` điều khiển drawer; `md:translate-x-0` giữ sidebar hiện trên desktop. Backdrop đóng khi chạm; route đổi thì drawer tự đóng.
+- **MainLayout** (`src/components/MainLayout.tsx`): quản lý `sidebarOpen`; header mobile có hamburger với `aria-expanded` và `aria-controls`; main dùng `md:ml-64` và `pt-16 md:pt-0`.
+- **ChatRoomPage** (`src/pages/ChatRoomPage.tsx`): chiều cao dùng `h-[calc(100vh-8rem)] md:h-[calc(100vh-4rem)]`.
+
+Khi sửa responsive mới: không phá vỡ các class trên; chỉ thêm breakpoint class cho element mới.
 ## Quy trình
 
 1. Xác định route, component, trạng thái và hành vi liên quan. Đọc các breakpoint hiện có (`sm:`, `md:`, `lg:`, `xl:`) và ghi nhận viewport đang lỗi cũng như viewport đang ổn.
