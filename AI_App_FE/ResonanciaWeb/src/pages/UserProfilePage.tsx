@@ -370,6 +370,63 @@ export default function UserProfilePage() {
         </div>
       )}
 
+      {/* Góc nhìn của đối phương: User đang dùng cũng hiện diện trong danh sách của họ */}
+      {targetUid !== profile.uid && (
+        <div className="glass-card p-5 border border-purple-500/25">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-semibold text-sm sm:text-base flex items-center gap-2">
+              <UiIcon name="sparkles" label="Kết nối 2 chiều" />
+              <span>Góc nhìn của {targetProfile.name} về bạn</span>
+            </h3>
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              Đang hiển thị tương hỗ
+            </span>
+          </div>
+
+          <div className="glass p-4 rounded-xl flex items-center justify-between gap-4 flex-wrap bg-purple-950/20">
+            {/* Người dùng hiện tại */}
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center font-bold text-white shadow-md"
+                style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}>
+                {profile.avatar ? (
+                  <img src={profile.avatar} alt={profile.name} className="w-full h-full object-cover" />
+                ) : (
+                  profile.name?.[0]?.toUpperCase() || 'B'
+                )}
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm">{profile.name || 'Bạn'} (Bạn)</p>
+                <p className="text-purple-300 text-xs">{profile.sun || 'Chiêm tinh'} · {profile.age || 22} tuổi</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-purple-300 text-xs">
+              <span className="hidden sm:inline">⇄</span>
+              <span className="px-3 py-1 rounded-full glass border border-purple-400/30 text-purple-200 font-medium">
+                {targetProfile.name} cũng thấy bạn trong danh sách tương hợp
+              </span>
+              <span className="hidden sm:inline">⇄</span>
+            </div>
+
+            {/* Target Profile */}
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-white font-semibold text-sm">{targetProfile.name}</p>
+                <p className="text-purple-300 text-xs">{targetProfile.sun} · {targetProfile.age || 23} tuổi</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center font-bold text-white shadow-md"
+                style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
+                {targetProfile.avatar ? (
+                  <img src={targetProfile.avatar} alt={targetProfile.name} className="w-full h-full object-cover" />
+                ) : (
+                  targetProfile.name?.[0]?.toUpperCase() || 'U'
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Compatibility */}
       {targetUid !== profile.uid && (
         <div className="glass-card p-5">

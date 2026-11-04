@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db } from '../services/firebase';
-import { fetchAstrologyData } from '../services/astrologyService';
+import { db, auth } from '../services/firebase';
+import { fetchAstrologyData, calculateAstrologyFallback } from '../services/astrologyService';
+import { setProfile } from '../store/profileSlice';
+import { apiUpdateProfile } from '../services/api';
 import StarField from '../components/StarField';
 import UiIcon from '../components/UiIcon';
 import type { IconName } from '../components/UiIcon';
@@ -57,14 +60,36 @@ function RelationshipIcon({ type, label, active }: { type: string; label: string
 export default function RegisterStep2Page() {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   const { uid, email } = (location.state || {}) as { uid: string; email: string };
 
   const [step, setStep] = useState(1);
   const [fullName, setFullName] = useState('');
   const [gender, setGender] = useState('');
   const [relationshipStatus, setRelationshipStatus] = useState('Độc thân');
-  const [birthDate, setBirthDate] = useState('');
+  const [birthDay, setBirthDay] = useState('');
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthYear, setBirthYear] = useState('');
   const [birthTime, setBirthTime] = useState('06:00');
+
+  const dayInputRef = useRef<HTMLInputElement>(null);
+  const monthInputRef = useRef<HTMLInputElement>(null);
+  const yearInputRef = useRef<HTMLInputElement>(null);
+  const datePickerRef = useRef<HTMLInputElement>(null);
+
+  const birthDate = (birthDay && birthMonth && birthYear)
+    ? `${birthDay.padStart(2, '0')}/${birthMonth.padStart(2, '0')}/${birthYear}`
+    : '';
+
+  const validateBirthDate = (d: string, m: string, y: string) => {
+    if (!d || !m || !y) return false;
+    const day = parseInt(d, 10);
+    const month = parseInt(m, 10);
+    const year = parseInt(y, 10);
+    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > 2099) return false;
+    const dateObj = new Date(year, month - 1, day);
+    return dateObj.getFullYear() === year && dateObj.getMonth() === month - 1 && dateObj.getDate() === day;
+  };
   const [birthPlace, setBirthPlace] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
@@ -74,8 +99,7 @@ export default function RegisterStep2Page() {
     if (!fullName || !birthDate || !birthTime || !birthPlace) {
       return setError('Vui lòng điền đầy đủ thông tin');
     }
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(birthDate)) return setError('Ngày sinh: YYYY-MM-DD (VD: 2001-06-27)');
+    if (!validateBirthDate(birthDay, birthMonth, birthYear)) return setError('Ngày sinh không hợp lệ: DD/MM/YYYY (VD: 27/06/2001)');
     const timeRegex = /^\d{1,2}:\d{2}$/;
     if (!timeRegex.test(birthTime)) return setError('Giờ sinh: HH:MM (VD: 03:20)');
 
@@ -85,38 +109,96 @@ export default function RegisterStep2Page() {
       let astro: Record<string, any> = {};
       try {
         astro = await fetchAstrologyData(birthDate, birthTime, birthPlace);
-      } catch {
-        const [year] = birthDate.split('-').map(Number);
-        astro = { age: new Date().getFullYear() - year };
+      } catch (err) {
+        console.warn('Astrology fetch error, using local engine:', err);
       }
 
-      setLoadingMsg('Đang lưu thông tin...');
-      await setDoc(doc(db, 'users', uid), {
-        name: fullName, age: astro.age || 0, gender,
-        birthDate, birthTime, birthPlace, email: email || '',
+      // Đảm bảo LUÔN CÓ đầy đủ thông tin lá số chiêm tinh từ ngày & giờ sinh
+      if (!astro || !astro.sun || !astro.ascendant) {
+        const fallbackAstro = calculateAstrologyFallback(birthDate, birthTime);
+        astro = { ...fallbackAstro, ...(astro || {}) };
+      }
+
+      const targetUid = uid || auth.currentUser?.uid || '';
+      const targetEmail = email || auth.currentUser?.email || '';
+
+      const fullProfileData = {
+        uid: targetUid,
+        name: fullName,
+        age: astro.age || 0,
+        gender,
+        birthDate,
+        birthTime,
+        birthPlace,
+        email: targetEmail,
         relationshipStatus,
-        sun: astro.sun || '', moon: astro.moon || '',
-        mercury: astro.mercury || '', venus: astro.venus || '', mars: astro.mars || '',
-        jupiter: astro.jupiter || '', saturn: astro.saturn || '',
-        uranus: astro.uranus || '', neptune: astro.neptune || '', pluto: astro.pluto || '',
-        ascendant: astro.ascendant || '', descendant: astro.descendant || '',
-        mc: astro.mc || '', ic: astro.ic || '',
-        house1: astro.house1 || '', house2: astro.house2 || '', house3: astro.house3 || '',
-        house4: astro.house4 || '', house5: astro.house5 || '', house6: astro.house6 || '',
-        house7: astro.house7 || '', house8: astro.house8 || '', house9: astro.house9 || '',
-        house10: astro.house10 || '', house11: astro.house11 || '', house12: astro.house12 || '',
+        sun: astro.sun || '',
+        moon: astro.moon || '',
+        mercury: astro.mercury || '',
+        venus: astro.venus || '',
+        mars: astro.mars || '',
+        jupiter: astro.jupiter || '',
+        saturn: astro.saturn || '',
+        uranus: astro.uranus || '',
+        neptune: astro.neptune || '',
+        pluto: astro.pluto || '',
+        ascendant: astro.ascendant || '',
+        descendant: astro.descendant || '',
+        mc: astro.mc || '',
+        ic: astro.ic || '',
+        house1: astro.house1 || '',
+        house2: astro.house2 || '',
+        house3: astro.house3 || '',
+        house4: astro.house4 || '',
+        house5: astro.house5 || '',
+        house6: astro.house6 || '',
+        house7: astro.house7 || '',
+        house8: astro.house8 || '',
+        house9: astro.house9 || '',
+        house10: astro.house10 || '',
+        house11: astro.house11 || '',
+        house12: astro.house12 || '',
         conjunctionAspect: astro.conjunctionAspect || '',
         oppositionAspect: astro.oppositionAspect || '',
         trineAspect: astro.trineAspect || '',
         squareAspect: astro.squareAspect || '',
         sextileAspect: astro.sextileAspect || '',
         natalChartImage: astro.natalChartImage || '',
-        fireRatio: astro.fireRatio || 0, earthRatio: astro.earthRatio || 0,
-        airRatio: astro.airRatio || 0, waterRatio: astro.waterRatio || 0,
-        avatar: '', coverImage: '', height: null, weight: null,
+        fireRatio: astro.fireRatio || 0,
+        earthRatio: astro.earthRatio || 0,
+        airRatio: astro.airRatio || 0,
+        waterRatio: astro.waterRatio || 0,
+        avatar: '',
+        coverImage: '',
+        height: null,
+        weight: null,
         job: '',
-        profileComplete: true, updatedAt: serverTimestamp(),
-      }, { merge: true });
+        profileComplete: true,
+      };
+
+      setLoadingMsg('Đang lưu thông tin...');
+
+      // 1. Cập nhật ngay Redux store để toàn bộ ứng dụng (Bản Đồ Sao, Trang Chủ, ...) nhận ngay lá số
+      dispatch(setProfile(fullProfileData as any));
+
+      // 2. Lưu vào Firestore
+      if (targetUid) {
+        try {
+          await setDoc(doc(db, 'users', targetUid), {
+            ...fullProfileData,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        } catch (errFs) {
+          console.warn('Lưu Firestore trực tiếp từ step2:', errFs);
+        }
+
+        // 3. Đồng bộ với Backend API
+        try {
+          await apiUpdateProfile({ uid: targetUid, fields: fullProfileData });
+        } catch (errBackend) {
+          console.warn('Đồng bộ backend profile từ step2:', errBackend);
+        }
+      }
 
       navigate('/home', { replace: true });
     } catch (err: any) {
@@ -217,10 +299,136 @@ export default function RegisterStep2Page() {
               {step === 3 && (
                 <>
                   <div>
-                    <label htmlFor="register-birth-date" className="block text-purple-300 text-sm mb-2">Ngày sinh (YYYY-MM-DD)</label>
-                    <input id="register-birth-date" className="cosmic-input" placeholder="2001-06-27" type="date"
-                      value={birthDate} onChange={e => setBirthDate(e.target.value)} />
-                    <p className="text-xs text-purple-400 mt-1 opacity-60">VD: 2001-06-27</p>
+                    <label className="block text-purple-300 text-sm mb-2">Ngày sinh (DD/MM/YYYY)</label>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      {/* Ô Ngày */}
+                      <div className="flex-1">
+                        <input
+                          ref={dayInputRef}
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Ngày"
+                          maxLength={2}
+                          className="cosmic-input text-center text-sm sm:text-base font-medium tracking-wide px-1"
+                          value={birthDay}
+                          onChange={e => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                            setBirthDay(val);
+                            if (val.length === 2) {
+                              monthInputRef.current?.focus();
+                              monthInputRef.current?.select();
+                            }
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'ArrowRight' && (e.currentTarget.selectionStart === e.currentTarget.value.length || birthDay.length === 2)) {
+                              monthInputRef.current?.focus();
+                            }
+                          }}
+                          onPaste={e => {
+                            e.preventDefault();
+                            const pasteText = e.clipboardData.getData('text');
+                            const digits = pasteText.replace(/\D/g, '');
+                            if (digits.length >= 8) {
+                              setBirthDay(digits.slice(0, 2));
+                              setBirthMonth(digits.slice(2, 4));
+                              setBirthYear(digits.slice(4, 8));
+                              yearInputRef.current?.focus();
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <span className="text-purple-400/60 font-semibold text-lg select-none">/</span>
+
+                      {/* Ô Tháng */}
+                      <div className="flex-1">
+                        <input
+                          ref={monthInputRef}
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Tháng"
+                          maxLength={2}
+                          className="cosmic-input text-center text-sm sm:text-base font-medium tracking-wide px-1"
+                          value={birthMonth}
+                          onChange={e => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                            setBirthMonth(val);
+                            if (val.length === 2) {
+                              yearInputRef.current?.focus();
+                              yearInputRef.current?.select();
+                            }
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Backspace' && !birthMonth) {
+                              dayInputRef.current?.focus();
+                            } else if (e.key === 'ArrowLeft' && e.currentTarget.selectionStart === 0) {
+                              dayInputRef.current?.focus();
+                            } else if (e.key === 'ArrowRight' && (e.currentTarget.selectionStart === e.currentTarget.value.length || birthMonth.length === 2)) {
+                              yearInputRef.current?.focus();
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <span className="text-purple-400/60 font-semibold text-lg select-none">/</span>
+
+                      {/* Ô Năm */}
+                      <div className="flex-[1.4]">
+                        <input
+                          ref={yearInputRef}
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Năm"
+                          maxLength={4}
+                          className="cosmic-input text-center text-sm sm:text-base font-medium tracking-wide px-1"
+                          value={birthYear}
+                          onChange={e => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                            setBirthYear(val);
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Backspace' && !birthYear) {
+                              monthInputRef.current?.focus();
+                            } else if (e.key === 'ArrowLeft' && e.currentTarget.selectionStart === 0) {
+                              monthInputRef.current?.focus();
+                            }
+                          }}
+                        />
+                      </div>
+
+                      {/* Nút chọn từ lịch */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            (datePickerRef.current as any)?.showPicker?.() || datePickerRef.current?.click();
+                          } catch {
+                            datePickerRef.current?.click();
+                          }
+                        }}
+                        className="h-11 px-3 rounded-xl glass hover:bg-white/10 text-purple-300 hover:text-white flex items-center justify-center cursor-pointer transition-all border-0 flex-shrink-0"
+                        title="Chọn từ lịch"
+                        aria-label="Chọn ngày từ lịch"
+                      >
+                        <UiIcon name="calendar" label="Chọn ngày" className="w-5 h-5 opacity-75 hover:opacity-100" />
+                      </button>
+                      <input
+                        ref={datePickerRef}
+                        type="date"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        className="sr-only absolute"
+                        onChange={e => {
+                          if (e.target.value) {
+                            const [y, m, d] = e.target.value.split('-');
+                            setBirthDay(d);
+                            setBirthMonth(m);
+                            setBirthYear(y);
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-purple-400 mt-1 opacity-60">VD: 27 / 06 / 2001</p>
                   </div>
                   <div>
                     <label htmlFor="register-birth-time" className="block text-purple-300 text-sm mb-2">Giờ sinh</label>
@@ -282,7 +490,10 @@ export default function RegisterStep2Page() {
                 if (step === 2 && !relationshipStatus) return setError('Vui lòng chọn tình trạng mối quan hệ');
                 if (step < 4) {
                   if (step === 1 && !fullName) return setError('Nhập họ tên');
-                  if (step === 3 && (!birthDate || !birthTime)) return setError('Nhập ngày và giờ sinh');
+                  if (step === 3) {
+                    if (!birthDay || !birthMonth || !birthYear || !birthTime) return setError('Vui lòng nhập đầy đủ ngày, tháng, năm và giờ sinh');
+                    if (!validateBirthDate(birthDay, birthMonth, birthYear)) return setError('Ngày sinh không hợp lệ: DD/MM/YYYY (VD: 27/06/2001)');
+                  }
                   setStep(s => s + 1);
                 } else handleSubmit();
               }}

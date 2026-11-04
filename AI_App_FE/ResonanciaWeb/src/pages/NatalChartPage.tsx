@@ -7,6 +7,7 @@ import { ELEMENT_COLORS, ELEMENT_MAP } from '../constants/astrologyMap';
 import UiIcon from '../components/UiIcon';
 import type { IconName } from '../components/UiIcon';
 import NatalChartSVG from '../components/NatalChartSVG';
+import FormattedMarkdown from '../components/FormattedMarkdown';
 import { generateClientNatalAnalysis, generateClientCareerAnalysis } from '../utils/natalFallback';
 
 const SECTIONS = [
@@ -287,10 +288,8 @@ export default function NatalChartPage() {
               </button>
             ) : (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-                <div className="p-5 rounded-2xl glass bg-purple-950/40 border border-purple-500/25">
-                  <div className="text-purple-100 text-sm leading-relaxed whitespace-pre-wrap opacity-95">
-                    {careerAnalysis}
-                  </div>
+                <div className="p-5 md:p-6 rounded-2xl glass bg-purple-950/40 border border-purple-500/25">
+                  <FormattedMarkdown content={careerAnalysis} />
                 </div>
                 <div className="flex justify-end">
                   <button onClick={handleCareerAnalysis} className="text-purple-300 text-xs hover:text-white underline transition-colors">
@@ -535,9 +534,7 @@ export default function NatalChartPage() {
                               Tab riêng ↗
                             </button>
                           </div>
-                          <p className="text-purple-100 text-sm leading-relaxed whitespace-pre-wrap opacity-90">
-                            {cleaned || content || analysis}
-                          </p>
+                          <FormattedMarkdown content={cleaned || content || analysis || ''} />
                         </div>
                       );
                     })}
@@ -569,9 +566,7 @@ export default function NatalChartPage() {
                   </button>
                 </div>
 
-                <p className="text-purple-100 leading-relaxed whitespace-pre-wrap text-sm opacity-90">
-                  {cleanSectionText(sections[activeSection]) || sections[activeSection] || analysis}
-                </p>
+                <FormattedMarkdown content={cleanSectionText(sections[activeSection]) || sections[activeSection] || analysis || ''} />
               </motion.div>
             )}
           </AnimatePresence>
