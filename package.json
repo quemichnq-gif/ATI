@@ -6,7 +6,7 @@
     "start": "npm run web",
     "web": "cd AI_App_FE/ResonanciaWeb && npm run dev",
     "web:build": "cd AI_App_FE/ResonanciaWeb && npm run build",
-    "be": "cd AI_App_BE && ./venv/bin/python main.py",
+    "be": "cd AI_App_BE && python main.py",
     "mobile": "cd AI_App_FE/SoulMateApp && npx expo start"
   }
 }
