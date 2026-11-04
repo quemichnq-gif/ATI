@@ -214,25 +214,35 @@ def update_profile():
             auth_updated = True
 
         # Cập nhật Authentication
-        if auth_updated:
+        if auth_updated and FIREBASE_AVAILABLE:
             try:
                 auth.update_user(uid, **auth_updates)
                 print(f"✅ Đã cập nhật Firebase Authentication cho {uid}")
-
-                # Không lưu password vào Firestore
-                if "password" in fields:
-                    del fields["password"]
-
             except Exception as e:
                 print(f"❌ Lỗi cập nhật Authentication: {str(e)}")
                 return jsonify({"error": f"Không thể cập nhật thông tin xác thực: {str(e)}"}), 500
 
+        # Không lưu password vào Firestore
+        clean_fields = {k: v for k, v in fields.items() if k != "password"}
+
         # Cập nhật Firestore (không bao gồm password)
-        if fields:
-            user_ref = db.collection("users").document(uid)
-            fields["updatedAt"] = firestore.SERVER_TIMESTAMP
-            user_ref.update(fields)
-            print(f"✅ Đã cập nhật Firestore cho user {uid}")
+        if clean_fields:
+            if FIREBASE_AVAILABLE and db is not None:
+                try:
+                    user_ref = db.collection("users").document(uid)
+                    save_data = {**clean_fields, "updatedAt": firestore.SERVER_TIMESTAMP}
+                    user_ref.set(save_data, merge=True)
+                    print(f"✅ Đã cập nhật Firestore cho user {uid}")
+                except Exception as fe:
+                    print(f"⚠️ Lỗi cập nhật Firestore cho user {uid}: {fe}")
+            else:
+                print(f"ℹ️ Firebase Admin ở chế độ fallback, đã ghi nhận cập nhật thông tin cho {uid}")
+
+        # Đồng bộ trạng thái mối quan hệ vào memory nếu có
+        if "relationshipStatus" in clean_fields:
+            if uid not in IN_MEMORY_USER_RELATIONSHIPS:
+                IN_MEMORY_USER_RELATIONSHIPS[uid] = {}
+            IN_MEMORY_USER_RELATIONSHIPS[uid]["relationshipStatus"] = clean_fields["relationshipStatus"]
 
         return jsonify({
             "success": True,
@@ -1669,6 +1679,8 @@ marriage_score: 93"""
 # ------------------------------------------------------
 #  Ứng viên mẫu chiêm tinh phong phú (fallback khi DB chưa đủ 5 user hoặc Firestore timeout)
 # ------------------------------------------------------
+REGISTERED_ACTIVE_USERS = {}  # Lưu trữ các user đang sử dụng để họ cũng xuất hiện ở màn hình của người khác
+
 DEFAULT_MATCH_CANDIDATES = [
     {
         "uid": "cand_1_nghia",
@@ -1677,7 +1689,9 @@ DEFAULT_MATCH_CANDIDATES = [
         "sun": "Bảo Bình",
         "moon": "Nhân Mã",
         "age": 23,
+        "gender": "Nam",
         "element": "Khí",
+        "job": "Product Designer & Sáng tạo nội dung",
         "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
         "personality": "Sáng tạo, tự do và cởi mở",
         "planets": {"sun": "Bảo Bình", "moon": "Nhân Mã", "mercury": "Bảo Bình", "venus": "Bạch Dương", "mars": "Song Tử"},
@@ -1691,7 +1705,9 @@ DEFAULT_MATCH_CANDIDATES = [
         "sun": "Song Ngư",
         "moon": "Cự Giải",
         "age": 21,
+        "gender": "Nữ",
         "element": "Nước",
+        "job": "Nhiếp ảnh gia & Nhà trị liệu nghệ thuật",
         "avatar": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80",
         "personality": "Dịu dàng, trực giác và lãng mạn",
         "planets": {"sun": "Song Ngư", "moon": "Cự Giải", "mercury": "Bảo Bình", "venus": "Kim Ngưu", "mars": "Song Ngư"},
@@ -1705,7 +1721,9 @@ DEFAULT_MATCH_CANDIDATES = [
         "sun": "Kim Ngưu",
         "moon": "Xử Nữ",
         "age": 22,
+        "gender": "Nữ",
         "element": "Đất",
+        "job": "Chuyên viên Phân tích Dữ liệu",
         "avatar": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80",
         "personality": "Chân thành, kiên định và ấm áp",
         "planets": {"sun": "Kim Ngưu", "moon": "Xử Nữ", "mercury": "Song Tử", "venus": "Cự Giải", "mars": "Kim Ngưu"},
@@ -1719,7 +1737,9 @@ DEFAULT_MATCH_CANDIDATES = [
         "sun": "Cự Giải",
         "moon": "Kim Ngưu",
         "age": 22,
+        "gender": "Nữ",
         "element": "Nước",
+        "job": "Giảng viên Yoga & Thiền định",
         "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80",
         "personality": "Chu đáo, biết lắng nghe và tình cảm",
         "planets": {"sun": "Cự Giải", "moon": "Kim Ngưu", "mercury": "Cự Giải", "venus": "Sư Tử", "mars": "Xử Nữ"},
@@ -1733,7 +1753,9 @@ DEFAULT_MATCH_CANDIDATES = [
         "sun": "Thiên Bình",
         "moon": "Bảo Bình",
         "age": 24,
+        "gender": "Nam",
         "element": "Khí",
+        "job": "Kiến trúc sư",
         "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
         "personality": "Lịch thiệp, hòa nhã và tinh tế",
         "planets": {"sun": "Thiên Bình", "moon": "Bảo Bình", "mercury": "Thiên Bình", "venus": "Nhân Mã", "mars": "Thiên Bình"},
@@ -1747,54 +1769,177 @@ DEFAULT_MATCH_CANDIDATES = [
         "sun": "Xử Nữ",
         "moon": "Ma Kết",
         "age": 23,
+        "gender": "Nữ",
         "element": "Đất",
+        "job": "Biên kịch & Nhà sáng tạo nội dung",
         "avatar": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80",
         "personality": "Thông minh, sắc sảo và sâu sắc",
         "planets": {"sun": "Xử Nữ", "moon": "Ma Kết", "mercury": "Xử Nữ", "venus": "Bọ Cạp", "mars": "Ma Kết"},
         "houses": {},
         "elements": {"fire": 10, "earth": 55, "air": 15, "water": 20}
+    },
+    {
+        "uid": "cand_7_hoangnam",
+        "name": "Hoàng Nam",
+        "zodiac": "Bạch Dương",
+        "sun": "Bạch Dương",
+        "moon": "Nhân Mã",
+        "age": 24,
+        "gender": "Nam",
+        "element": "Lửa",
+        "job": "Nhiếp ảnh gia đường phố & Nhà thám hiểm",
+        "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80",
+        "personality": "Năng động, quả quyết, bộc trực và nhiệt huyết",
+        "planets": {"sun": "Bạch Dương", "moon": "Nhân Mã", "mercury": "Song Ngư", "venus": "Kim Ngưu", "mars": "Bạch Dương"},
+        "houses": {},
+        "elements": {"fire": 55, "earth": 10, "air": 20, "water": 15}
+    },
+    {
+        "uid": "cand_8_thutrang",
+        "name": "Thu Trang",
+        "zodiac": "Kim Ngưu",
+        "sun": "Kim Ngưu",
+        "moon": "Ma Kết",
+        "age": 22,
+        "gender": "Nữ",
+        "element": "Đất",
+        "job": "Giảng viên Mỹ thuật & Gốm thủ công",
+        "avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80",
+        "personality": "Điềm đạm, ấm áp, kiên nhẫn và bình dị",
+        "planets": {"sun": "Kim Ngưu", "moon": "Ma Kết", "mercury": "Kim Ngưu", "venus": "Song Ngư", "mars": "Kim Ngưu"},
+        "houses": {},
+        "elements": {"fire": 10, "earth": 55, "air": 15, "water": 20}
+    },
+    {
+        "uid": "cand_9_minhtriet",
+        "name": "Minh Triết",
+        "zodiac": "Song Tử",
+        "sun": "Song Tử",
+        "moon": "Thiên Bình",
+        "age": 23,
+        "gender": "Nam",
+        "element": "Khí",
+        "job": "Kỹ sư AI & Podcaster công nghệ",
+        "avatar": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80",
+        "personality": "Hoạt ngôn, hài hước, tư duy logic nhạy bén",
+        "planets": {"sun": "Song Tử", "moon": "Thiên Bình", "mercury": "Song Tử", "venus": "Bảo Bình", "mars": "Sư Tử"},
+        "houses": {},
+        "elements": {"fire": 20, "earth": 10, "air": 55, "water": 15}
+    },
+    {
+        "uid": "cand_10_ngocanh",
+        "name": "Ngọc Ánh",
+        "zodiac": "Sư Tử",
+        "sun": "Sư Tử",
+        "moon": "Bạch Dương",
+        "age": 23,
+        "gender": "Nữ",
+        "element": "Lửa",
+        "job": "Brand Manager & Stylist thời trang",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+        "personality": "Tự tin, cuốn hút, hào phóng và tích cực",
+        "planets": {"sun": "Sư Tử", "moon": "Bạch Dương", "mercury": "Sư Tử", "venus": "Song Tử", "mars": "Nhân Mã"},
+        "houses": {},
+        "elements": {"fire": 55, "earth": 15, "air": 20, "water": 10}
+    },
+    {
+        "uid": "cand_11_tuananh",
+        "name": "Tuấn Anh",
+        "zodiac": "Bọ Cạp",
+        "sun": "Bọ Cạp",
+        "moon": "Cự Giải",
+        "age": 25,
+        "gender": "Nam",
+        "element": "Nước",
+        "job": "Chuyên viên Phân tích Đầu tư",
+        "avatar": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80",
+        "personality": "Trầm tĩnh, sâu sắc, trực giác bén nhọn",
+        "planets": {"sun": "Bọ Cạp", "moon": "Cự Giải", "mercury": "Bọ Cạp", "venus": "Ma Kết", "mars": "Bọ Cạp"},
+        "houses": {},
+        "elements": {"fire": 15, "earth": 20, "air": 15, "water": 50}
+    },
+    {
+        "uid": "cand_12_phuongthao",
+        "name": "Phương Thảo",
+        "zodiac": "Nhân Mã",
+        "sun": "Nhân Mã",
+        "moon": "Sư Tử",
+        "age": 22,
+        "gender": "Nữ",
+        "element": "Lửa",
+        "job": "Hướng dẫn viên du lịch & Blogger",
+        "avatar": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&w=400&q=80",
+        "personality": "Phóng khoáng, lạc quan và yêu tự do",
+        "planets": {"sun": "Nhân Mã", "moon": "Sư Tử", "mercury": "Bảo Bình", "venus": "Nhân Mã", "mars": "Bạch Dương"},
+        "houses": {},
+        "elements": {"fire": 50, "earth": 15, "air": 25, "water": 10}
+    },
+    {
+        "uid": "cand_13_duclong",
+        "name": "Đức Long",
+        "zodiac": "Ma Kết",
+        "sun": "Ma Kết",
+        "moon": "Kim Ngưu",
+        "age": 24,
+        "gender": "Nam",
+        "element": "Đất",
+        "job": "Quản lý Dự án Bền vững",
+        "avatar": "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80",
+        "personality": "Điềm tĩnh, có trách nhiệm và kiên trì",
+        "planets": {"sun": "Ma Kết", "moon": "Kim Ngưu", "mercury": "Ma Kết", "venus": "Xử Nữ", "mars": "Kim Ngưu"},
+        "houses": {},
+        "elements": {"fire": 10, "earth": 60, "air": 15, "water": 15}
+    },
+    {
+        "uid": "cand_14_thanhhuyen",
+        "name": "Thanh Huyền",
+        "zodiac": "Bảo Bình",
+        "sun": "Bảo Bình",
+        "moon": "Song Tử",
+        "age": 23,
+        "gender": "Nữ",
+        "element": "Khí",
+        "job": "UI/UX Designer & Nghệ sĩ minh họa",
+        "avatar": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80",
+        "personality": "Độc lập, sáng tạo và nhân hậu",
+        "planets": {"sun": "Bảo Bình", "moon": "Song Tử", "mercury": "Bảo Bình", "venus": "Bạch Dương", "mars": "Bảo Bình"},
+        "houses": {},
+        "elements": {"fire": 20, "earth": 10, "air": 55, "water": 15}
+    },
+    {
+        "uid": "cand_15_vietanh",
+        "name": "Việt Anh",
+        "zodiac": "Song Ngư",
+        "sun": "Song Ngư",
+        "moon": "Bọ Cạp",
+        "age": 23,
+        "gender": "Nam",
+        "element": "Nước",
+        "job": "Nhạc sĩ Indie & Sản xuất âm nhạc",
+        "avatar": "https://images.unsplash.com/photo-1463453091185-61582044d556?auto=format&fit=crop&w=400&q=80",
+        "personality": "Giàu cảm xúc, lãng tử và thấu cảm",
+        "planets": {"sun": "Song Ngư", "moon": "Bọ Cạp", "mercury": "Song Ngư", "venus": "Kim Ngưu", "mars": "Cự Giải"},
+        "houses": {},
+        "elements": {"fire": 10, "earth": 15, "air": 20, "water": 55}
+    },
+    {
+        "uid": "cand_16_thuyduong",
+        "name": "Thùy Dương",
+        "zodiac": "Thiên Bình",
+        "sun": "Thiên Bình",
+        "moon": "Bảo Bình",
+        "age": 24,
+        "gender": "Nữ",
+        "element": "Khí",
+        "job": "Chuyên viên Quan hệ Công chúng (PR)",
+        "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80",
+        "personality": "Thanh lịch, khéo léo và hòa nhã",
+        "planets": {"sun": "Thiên Bình", "moon": "Bảo Bình", "mercury": "Thiên Bình", "venus": "Sư Tử", "mars": "Thiên Bình"},
+        "houses": {},
+        "elements": {"fire": 20, "earth": 15, "air": 50, "water": 15}
     }
 ]
 
-# Tải kho 100 mock users đa dạng nếu có
-try:
-    mock_users_file = os.path.abspath(os.path.join(base_dir, "../AI_App_FE/ResonanciaWeb/src/mocks/usersMockData.json"))
-    if os.path.exists(mock_users_file):
-        with open(mock_users_file, "r", encoding="utf-8") as f_mock:
-            raw_mock_users = json.load(f_mock)
-            zodiac_elements = {
-                "Bạch Dương": "Lửa", "Sư Tử": "Lửa", "Nhân Mã": "Lửa",
-                "Kim Ngưu": "Đất", "Xử Nữ": "Đất", "Ma Kết": "Đất",
-                "Song Tử": "Khí", "Thiên Bình": "Khí", "Bảo Bình": "Khí",
-                "Cự Giải": "Nước", "Bọ Cạp": "Nước", "Song Ngư": "Nước"
-            }
-            parsed_candidates = []
-            for u in raw_mock_users:
-                z_sign = u.get("zodiacSign", "Bạch Dương")
-                elem = zodiac_elements.get(z_sign, "Đất")
-                parsed_candidates.append({
-                    "uid": u.get("id"),
-                    "name": u.get("fullName"),
-                    "zodiac": z_sign,
-                    "sun": z_sign,
-                    "moon": "Xử Nữ" if z_sign != "Xử Nữ" else "Kim Ngưu",
-                    "age": 2026 - int(u.get("dateOfBirth", "2000-01-01")[:4]),
-                    "gender": u.get("gender", ""),
-                    "element": elem,
-                    "avatar": u.get("avatar", ""),
-                    "personality": u.get("bio", "Chân thành, ấm áp"),
-                    "planets": {"sun": z_sign, "moon": "Xử Nữ"},
-                    "elements": {"fire": 25, "earth": 25, "air": 25, "water": 25}
-                })
-            if parsed_candidates:
-                DEFAULT_MATCH_CANDIDATES = parsed_candidates
-                safe_print(f"✅ Đã nạp thành công {len(DEFAULT_MATCH_CANDIDATES)} ứng viên đa dạng từ usersMockData.json!")
-except Exception as e_load_mock:
-    safe_print(f"⚠️ Không thể nạp usersMockData.json: {e_load_mock}")
-
-# ------------------------------------------------------
-#  Route: Phân tích chiêm tinh ghép cặp theo tag
-# ------------------------------------------------------
 @app.route("/love-matching/<match_type>", methods=["POST"])
 def love_matching_single(match_type):
     try:
@@ -1824,16 +1969,39 @@ def love_matching_single(match_type):
                 "water": u.get("waterRatio", 0)
             }
 
+        my_sign = user_data_req.get("sun") or user_data_req.get("zodiac", "Ma Kết")
+        my_gender = user_data_req.get("gender", "")
+
         me = {
             "uid": uid,
             "name": user_data_req.get("name", "Bạn"),
-            "zodiac": user_data_req.get("sun") or user_data_req.get("zodiac", "Ma Kết"),
+            "zodiac": my_sign,
             "age": user_data_req.get("age") or 22,
-            "element": user_data_req.get("mainElement", "Đất"),
-            "personality": user_data_req.get("personality", "Kiên định, chân thành"),
+            "element": user_data_req.get("element") or user_data_req.get("mainElement", "Đất"),
+            "personality": user_data_req.get("bio") or user_data_req.get("personality", "Kiên định, chân thành"),
             "planets": extract_planets(user_data_req),
             "elements": extract_elements(user_data_req),
             "houses": extract_houses(user_data_req)
+        }
+
+        # Lưu trữ user đang sử dụng vào hệ thống để user này cũng xuất hiện trên màn hình của người khác
+        REGISTERED_ACTIVE_USERS[uid] = {
+            "uid": uid,
+            "name": me["name"],
+            "zodiac": my_sign,
+            "sun": my_sign,
+            "moon": user_data_req.get("moon", "Kim Ngưu"),
+            "ascendant": user_data_req.get("ascendant", "Song Tử"),
+            "age": me["age"],
+            "gender": my_gender,
+            "element": me["element"],
+            "job": user_data_req.get("job", "Thành viên Resonancia"),
+            "avatar": user_data_req.get("avatar", ""),
+            "personality": me["personality"],
+            "planets": me["planets"],
+            "elements": me["elements"],
+            "houses": me["houses"],
+            "isRealUser": True
         }
 
         # Thuật toán tính góc chiếu chiêm tinh chính xác giữa 2 cung hoàng đạo
@@ -1891,17 +2059,22 @@ def love_matching_single(match_type):
             rank_score = suitability.get(target_tag, base)
             return rank_score, reason, love, trust, comm, marr
 
-        # Lọc ứng viên từ kho (loại trừ bản thân)
-        my_gender = user_data_req.get("gender", "")
-        my_sign = me["zodiac"]
-        pool = [c for c in DEFAULT_MATCH_CANDIDATES if c.get("uid") != uid and c.get("name") != me["name"]]
+        # Gộp kho ứng viên mẫu và tất cả các user đã đăng ký hoạt động
+        all_candidates_pool = list(DEFAULT_MATCH_CANDIDATES)
+        for act_uid, act_user in REGISTERED_ACTIVE_USERS.items():
+            if act_uid != uid and act_user.get("name") != me["name"]:
+                if not any(c.get("uid") == act_uid for c in all_candidates_pool):
+                    all_candidates_pool.append(act_user)
+
+        # Lọc ứng viên từ kho (loại trừ chính bản thân người gửi request)
+        pool = [c for c in all_candidates_pool if c.get("uid") != uid and c.get("name") != me["name"]]
         
-        # Nếu biết giới tính, ưu tiên ghép khác giới
+        # Nếu biết giới tính, ưu tiên ghép khác giới lên đầu
         if my_gender in ["Nam", "Nữ"]:
             target_gender = "Nữ" if my_gender == "Nam" else "Nam"
-            gender_filtered = [c for c in pool if c.get("gender") == target_gender]
-            if len(gender_filtered) >= 5:
-                pool = gender_filtered
+            gender_matches = [c for c in pool if c.get("gender") == target_gender]
+            other_matches = [c for c in pool if c.get("gender") != target_gender]
+            pool = gender_matches + other_matches
 
         # Tính điểm chiêm tinh cho từng ứng viên đối với người đang đăng nhập
         scored_candidates = []
@@ -1918,38 +2091,44 @@ def love_matching_single(match_type):
                 "marr": marr
             })
 
-        # Sắp xếp theo độ phù hợp với match_type từ cao xuống thấp
+        # Sắp xếp theo độ phù hợp từ cao xuống thấp (hoặc trải đều từ hợp tới thử thách)
         scored_candidates.sort(key=lambda x: x["score"], reverse=True)
         
-        # Lấy top ứng viên phù hợp nhất (lấy ngẫu nhiên trong top 10 người điểm cao nhất để mỗi lần bấm có thể đổi mới nhẹ)
-        import random
-        top_slice = scored_candidates[:12] if len(scored_candidates) >= 12 else scored_candidates
-        selected_pairs = random.sample(top_slice, min(5, len(top_slice))) if len(top_slice) >= 5 else top_slice
-        # Sắp xếp lại 5 người được chọn theo thứ tự điểm giảm dần
-        selected_pairs.sort(key=lambda x: x["score"], reverse=True)
+        # Lấy top 10 - 12 ứng viên để người dùng thấy đầy đủ các mức độ tương hợp (từ hợp nhất cho đến không hợp)
+        selected_pairs = scored_candidates[:12] if len(scored_candidates) >= 12 else scored_candidates
 
         result = []
         for p in selected_pairs:
             c = p["candidate"]
+            score = p["score"]
+            level = "high" if score >= 85 else "medium" if score >= 70 else "challenge"
+            level_text = "Tương hợp cao" if score >= 85 else "Tương hợp vừa" if score >= 70 else "Thử thách / Khác biệt"
             result.append({
                 "uid": c.get("uid", ""),
                 "name": c.get("name", "Người dùng"),
                 "zodiac": c.get("zodiac", ""),
                 "age": c.get("age", 22),
+                "gender": c.get("gender", ""),
                 "element": c.get("element", "Đất"),
+                "job": c.get("job", "Thành viên Resonancia"),
                 "personality": c.get("personality", ""),
                 "reason": p["reason"],
-                "compatibility_score": p["score"],
+                "compatibility_score": score,
+                "match_level": level,
+                "match_level_text": level_text,
                 "love": p["love"],
                 "trust": p["trust"],
                 "communication": p["comm"],
                 "marriage": p["marr"],
-                "avatar": c.get("avatar", "")
+                "avatar": c.get("avatar", ""),
+                "isRealUser": c.get("isRealUser", False)
             })
 
         return jsonify({
             "success": True,
             "type": match_type,
+            "user_sign": my_sign,
+            "total": len(result),
             "users": result
         })
 
@@ -1958,9 +2137,6 @@ def love_matching_single(match_type):
         return jsonify({"error": str(e)}), 500
 
 
-# ------------------------------------------------------
-#  Route: Lấy lịch sử phân tích ghép cặp theo tag
-# ------------------------------------------------------
 @app.route("/love-matching/history/<uid>/<match_type>", methods=["GET"])
 def get_matching_history(uid, match_type):
     # Trả về kết quả nhanh, frontend client sẽ dùng Firestore client cache trực tiếp

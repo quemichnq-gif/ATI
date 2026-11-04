@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import { doc, setDoc } from 'firebase/firestore';
@@ -16,7 +16,14 @@ export default function ProfilePage() {
   const profile = useSelector((s: RootState) => s.profile);
   const dispatch = useDispatch();
   const [editing, setEditing] = useState(false);
-  const [formData, setFormData] = useState({ name: profile.name, gender: profile.gender || '', job: profile.job || '', height: profile.height || '', weight: profile.weight || '', relationshipStatus: profile.relationshipStatus || 'Độc thân' });
+  const [formData, setFormData] = useState({
+    name: profile.name || '',
+    gender: profile.gender || '',
+    job: profile.job || '',
+    height: profile.height || '',
+    weight: profile.weight || '',
+    relationshipStatus: profile.relationshipStatus || 'Độc thân',
+  });
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -26,21 +33,50 @@ export default function ProfilePage() {
   const element = ELEMENT_MAP[profile.sun || ''] || 'Không xác định';
   const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS['Không xác định'];
 
+  useEffect(() => {
+    if (!editing) {
+      setFormData({
+        name: profile.name || '',
+        gender: profile.gender || '',
+        job: profile.job || '',
+        height: profile.height || '',
+        weight: profile.weight || '',
+        relationshipStatus: profile.relationshipStatus || 'Độc thân',
+      });
+    }
+  }, [profile.name, profile.gender, profile.job, profile.height, profile.weight, profile.relationshipStatus, editing]);
+
   const handleSave = async () => {
     const uid = profile.uid || auth.currentUser?.uid;
-    if (!uid) return;
+    if (!uid) {
+      alert('Không tìm thấy thông tin đăng nhập, vui lòng đăng nhập lại.');
+      return;
+    }
     setSaving(true);
     try {
-      await apiUpdateProfile({ uid, fields: formData });
+      // 1. Cập nhật Redux store ngay lập tức để UI phản hồi mượt mà
       dispatch(updateProfile(formData as any));
+
+      // 2. Lưu trực tiếp vào Firestore từ client
       try {
         await setDoc(doc(db, 'users', uid), formData, { merge: true });
-      } catch (e) {
-        console.warn('Lưu form vào Firestore trực tiếp:', e);
+      } catch (errFirestore) {
+        console.warn('Lưu Firestore trực tiếp từ client:', errFirestore);
       }
+
+      // 3. Đồng bộ với Backend API
+      try {
+        await apiUpdateProfile({ uid, fields: formData });
+      } catch (errApi) {
+        console.warn('Đồng bộ profile với backend API:', errApi);
+      }
+
       setEditing(false);
-    } catch (e) { console.error(e); }
-    finally { setSaving(false); }
+    } catch (e) {
+      console.error('Lỗi khi lưu hồ sơ:', e);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -244,9 +280,44 @@ export default function ProfilePage() {
               ))}
             </div>
           </div>
-          <button onClick={() => setEditing(false)} className="text-purple-400 text-sm hover:text-white">
-            Huỷ
-          </button>
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-cosmic px-5 py-2 text-sm flex items-center gap-1.5 cursor-pointer"
+            >
+              {saving ? (
+                <>
+                  <UiIcon name="hourglass" label="Đang lưu" className="mr-1 inline" />
+                  <span>Đang lưu...</span>
+                </>
+              ) : (
+                <>
+                  <UiIcon name="check" label="Lưu thay đổi" className="mr-1 inline" />
+                  <span>Lưu thay đổi</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormData({
+                  name: profile.name || '',
+                  gender: profile.gender || '',
+                  job: profile.job || '',
+                  height: profile.height || '',
+                  weight: profile.weight || '',
+                  relationshipStatus: profile.relationshipStatus || 'Độc thân',
+                });
+                setEditing(false);
+              }}
+              disabled={saving}
+              className="px-4 py-2 text-sm text-purple-300 hover:text-white glass rounded-xl transition-all cursor-pointer border-0"
+            >
+              Huỷ
+            </button>
+          </div>
         </motion.div>
       ) : (
         <div className="grid grid-cols-2 gap-4">

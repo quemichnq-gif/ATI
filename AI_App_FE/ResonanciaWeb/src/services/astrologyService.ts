@@ -12,15 +12,32 @@ async function getCoordinates(address: string) {
   return { latitude: 21.0285, longitude: 105.8542 }; // Hanoi default
 }
 
+export function parseDateParts(dateStr: string): { year: number; month: number; day: number } {
+  if (!dateStr) return { year: 2000, month: 1, day: 1 };
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/').map(Number);
+    return { day: parts[0] || 1, month: parts[1] || 1, year: parts[2] || 2000 };
+  }
+  if (dateStr.includes('-')) {
+    const parts = dateStr.split('-').map(Number);
+    if (parts[0] > 1000) {
+      return { year: parts[0] || 2000, month: parts[1] || 1, day: parts[2] || 1 };
+    }
+    return { day: parts[0] || 1, month: parts[1] || 1, year: parts[2] || 2000 };
+  }
+  return { year: 2000, month: 1, day: 1 };
+}
+
 function parseDateTime(birthDate: string, birthTime: string) {
-  const [year, month, date] = birthDate.split('-').map(Number);
-  const [hours, minutes] = birthTime.split(':').map(Number);
-  return { year, month, date, hours, minutes, seconds: 0 };
+  const { year, month, day: date } = parseDateParts(birthDate);
+  const [hours, minutes] = (birthTime || '06:00').split(':').map(Number);
+  return { year, month, date, hours: hours || 0, minutes: minutes || 0, seconds: 0 };
 }
 
 function createRequestBody(birthDate: string, birthTime: string, lat: number, lon: number) {
   const dt = parseDateTime(birthDate, birthTime);
-  const d = new Date(birthDate + 'T' + birthTime);
+  const isoDate = `${String(dt.year).padStart(4, '0')}-${String(dt.month).padStart(2, '0')}-${String(dt.date).padStart(2, '0')}`;
+  const d = new Date(isoDate + 'T' + (birthTime || '06:00'));
   const timezone = -d.getTimezoneOffset() / 60;
   return {
     ...dt, latitude: lat, longitude: lon, timezone,
@@ -119,7 +136,7 @@ function calcElementalRatio(planets: Record<string, string>) {
 }
 
 function calcAge(birthDate: string) {
-  const [year, month, day] = birthDate.split('-').map(Number);
+  const { year, month, day } = parseDateParts(birthDate);
   const today = new Date();
   let age = today.getFullYear() - year;
   const hasBd = today.getMonth() + 1 > month || (today.getMonth() + 1 === month && today.getDate() >= day);
@@ -148,8 +165,8 @@ function getSunSign(month: number, day: number): string {
   return 'Song Ngư';
 }
 
-function calculateAstrologyFallback(birthDate: string, birthTime: string) {
-  const [year, month, day] = birthDate.split('-').map(Number);
+export function calculateAstrologyFallback(birthDate: string, birthTime: string) {
+  const { year, month, day } = parseDateParts(birthDate);
   const [hours, minutes] = birthTime.split(':').map(Number);
   const sunSign = getSunSign(month, day);
   const sunIndex = ZODIAC_LIST.indexOf(sunSign);
@@ -200,28 +217,37 @@ function calculateAstrologyFallback(birthDate: string, birthTime: string) {
 }
 
 export async function fetchAstrologyData(birthDate: string, birthTime: string, birthPlace: string) {
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Astrology API timeout (4.5s)')), 4500)
+  );
+
   try {
-    const { latitude, longitude } = await getCoordinates(birthPlace);
-    const body = createRequestBody(birthDate, birthTime, latitude, longitude);
-    const [planets, houses, aspects, natalChartImage] = await Promise.all([
-      getPlanets(body),
-      getHouses(body),
-      getAspects(body),
-      getNatalChart(body),
-    ]);
-    const elementalRatio = calcElementalRatio(planets);
-    return {
-      age: calcAge(birthDate),
-      ...planets,
-      ...houses,
-      conjunctionAspect: aspects.conjunction.join(', '),
-      oppositionAspect: aspects.opposition.join(', '),
-      trineAspect: aspects.trine.join(', '),
-      squareAspect: aspects.square.join(', '),
-      sextileAspect: aspects.sextile.join(', '),
-      natalChartImage,
-      ...elementalRatio,
-    };
+    const fetchPromise = (async () => {
+      const { latitude, longitude } = await getCoordinates(birthPlace);
+      const body = createRequestBody(birthDate, birthTime, latitude, longitude);
+      const [planets, houses, aspects, natalChartImage] = await Promise.all([
+        getPlanets(body),
+        getHouses(body),
+        getAspects(body),
+        getNatalChart(body),
+      ]);
+      const elementalRatio = calcElementalRatio(planets);
+      return {
+        age: calcAge(birthDate),
+        ...planets,
+        ...houses,
+        conjunctionAspect: aspects.conjunction?.join(', ') || '',
+        oppositionAspect: aspects.opposition?.join(', ') || '',
+        trineAspect: aspects.trine?.join(', ') || '',
+        squareAspect: aspects.square?.join(', ') || '',
+        sextileAspect: aspects.sextile?.join(', ') || '',
+        natalChartImage,
+        ...elementalRatio,
+      };
+    })();
+
+    const result = await Promise.race([fetchPromise, timeoutPromise]);
+    return result as any;
   } catch (err) {
     console.warn('Astrology API unavailable, using fallback astrology engine:', err);
     return calculateAstrologyFallback(birthDate, birthTime);
