@@ -264,7 +264,7 @@ export default function RegisterStep2Page() {
                         <button key={g} type="button"
                             aria-pressed={gender === g}
                           onClick={() => setGender(g)}
-                          className={`py-2 rounded-xl text-sm font-medium transition-all ${
+                          className={`min-h-11 py-2 rounded-xl text-sm font-medium transition-all ${
                             gender === g ? 'text-white' : 'text-purple-300 bg-white/5'
                           }`}
                           style={gender === g ? { background: 'linear-gradient(135deg, #9d4edd, #ff6eb4)' } : {}}>

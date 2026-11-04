@@ -403,7 +403,7 @@ export default function TarotPage() {
           {/* Danh sách lá bài được rút */}
           <div
             className={`grid gap-6 justify-center ${
-              spreadMode === 'draw1' ? 'grid-cols-1 justify-items-center' : 'grid-cols-1 sm:grid-cols-3'
+              spreadMode === 'draw1' ? 'grid-cols-1 justify-items-center' : 'grid-cols-1 lg:grid-cols-3'
             }`}
           >
             {drawnCards.map((item, idx) => (
