@@ -28,7 +28,6 @@ if not api_key:
 # Cấu hình Gemini
 genai.configure(api_key=api_key)
 
-import google.auth.transport.requests
 
 # Firebase Admin (chỉ Firestore)
 FIREBASE_AVAILABLE = False
@@ -37,17 +36,14 @@ try:
     key_path = os.path.join(base_dir, "firebase-key.json")
     if os.path.exists(key_path):
         cred = credentials.Certificate(key_path)
-        google_cred = cred.get_credential()
-        req = google.auth.transport.requests.Request()
-        google_cred.refresh(req)
         firebase_admin.initialize_app(cred)
         db = firestore.client()
         FIREBASE_AVAILABLE = True
-        print("✅ Firebase Admin kết nối thành công!")
+        print("Firebase Admin initialized.")
     else:
-        print("⚠️ Không tìm thấy firebase-key.json, hoạt động ở chế độ fallback.")
+        print("Firebase key not found; using fallback mode.")
 except Exception as fe:
-    print(f"⚠️ Xác thực Firebase Admin thất bại ({fe}), backend sẽ hoạt động ở chế độ fallback an toàn không làm treo ứng dụng.")
+    print(f"Firebase Admin initialization failed; using fallback mode: {fe}")
     FIREBASE_AVAILABLE = False
     db = None
 
@@ -2150,5 +2146,5 @@ def get_matching_history(uid, match_type):
 #  Run Flask App
 # -------------------------------------------------
 if __name__ == "__main__":
-    print("Flask nhận request /generate, /upload-image, /update-profile, /verify-password")
+    print("Starting Flask server on port 5001.")
     app.run(debug=True, host="0.0.0.0", port=5001)
