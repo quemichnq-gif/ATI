@@ -126,7 +126,7 @@ export default function HomePage() {
     <div className="space-y-7 max-w-4xl mx-auto pb-12">
       {/* Editorial Header */}
       <motion.div initial={{ opacity: 0, y: -15 }} animate={{ opacity: 1, y: 0 }} className="text-center pt-2">
-        <p className="text-xs uppercase tracking-widest text-purple-300/70 font-mono mb-2">
+        <p className="text-xs uppercase tracking-wider text-purple-300/70 font-medium mb-2">
           {currentDate}
         </p>
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
@@ -219,7 +219,7 @@ export default function HomePage() {
                   <div className="grid grid-cols-2 gap-6 sm:gap-10 mb-8 relative z-10">
                     <div className="p-3.5 rounded-2xl border text-center"
                       style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(168, 85, 247, 0.12)' }}>
-                      <p className="text-[11px] text-purple-300/60 uppercase tracking-widest font-mono mb-1.5">
+                      <p className="text-[11px] text-purple-300/70 uppercase tracking-wider font-medium mb-1.5">
                         Mặt Trời · Sun Sign
                       </p>
                       <div className="flex items-center justify-center gap-2">
@@ -230,7 +230,7 @@ export default function HomePage() {
 
                     <div className="p-3.5 rounded-2xl border text-center"
                       style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(168, 85, 247, 0.12)' }}>
-                      <p className="text-[11px] text-purple-300/60 uppercase tracking-widest font-mono mb-1.5">
+                      <p className="text-[11px] text-purple-300/70 uppercase tracking-wider font-medium mb-1.5">
                         Mặt Trăng · Moon Sign
                       </p>
                       <div className="flex items-center justify-center gap-2">
@@ -262,7 +262,7 @@ export default function HomePage() {
                   <div className="grid grid-cols-2 gap-6 sm:gap-10 mb-8 relative z-10">
                     <div className="p-3.5 rounded-2xl border text-center"
                       style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(168, 85, 247, 0.12)' }}>
-                      <p className="text-[11px] text-purple-300/60 uppercase tracking-widest font-mono mb-1.5">
+                      <p className="text-[11px] text-purple-300/70 uppercase tracking-wider font-medium mb-1.5">
                         Điểm Mọc · Ascendant
                       </p>
                       <div className="flex items-center justify-center gap-2">
@@ -273,7 +273,7 @@ export default function HomePage() {
 
                     <div className="p-3.5 rounded-2xl border text-center"
                       style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(168, 85, 247, 0.12)' }}>
-                      <p className="text-[11px] text-purple-300/60 uppercase tracking-widest font-mono mb-1.5">
+                      <p className="text-[11px] text-purple-300/70 uppercase tracking-wider font-medium mb-1.5">
                         Nguyên Tố · Element
                       </p>
                       <div className="flex items-center justify-center gap-2">
