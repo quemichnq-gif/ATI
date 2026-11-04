@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { updateProfile } from '../store/profileSlice';
+import { fetchAstrologyData, calculateAstrologyFallback } from '../services/astrologyService';
+import { apiUpdateProfile } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RootState } from '../store';
@@ -48,7 +53,11 @@ function getDefaultLoveMetrics(sun?: string) {
 
 export default function HomePage() {
   const profile = useSelector((s: RootState) => s.profile);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalculateSuccess, setRecalculateSuccess] = useState('');
+  const isStale = Boolean(profile.is_stale || profile.needs_recalculation);
   const [tab, setTab] = useState<'astro' | 'love'>('astro');
   const [loveMetrics, setLoveMetrics] = useState<any>(() => getDefaultLoveMetrics(profile.sun));
   const [loadingPred, setLoadingPred] = useState(false);
@@ -101,6 +110,99 @@ export default function HomePage() {
       .finally(() => setLoadingMetrics(false));
   }, [profile.uid, hasAstro, profile.sun, profile.moon, profile.birthDate, profile.name]);
 
+  const handleRecalculateNatal = async () => {
+    if (!profile.uid) return;
+    setRecalculating(true);
+    setRecalculateSuccess('');
+    try {
+      const bDate = profile.birthDate || '';
+      const bTime = profile.birthTime || '06:00';
+      const bPlace = profile.birthPlace || 'Hà Nội, Việt Nam';
+
+      let astro: Record<string, any> = {};
+      try {
+        astro = await fetchAstrologyData(bDate, bTime, bPlace);
+      } catch (err) {
+        console.warn('Astrology fetch error on home regeneration, using fallback:', err);
+      }
+
+      if (!astro || !astro.sun || !astro.ascendant) {
+        const fallbackAstro = calculateAstrologyFallback(bDate, bTime);
+        astro = { ...fallbackAstro, ...(astro || {}) };
+      }
+
+      const updatedNatalFields: Record<string, any> = {
+        sun: astro.sun || '',
+        moon: astro.moon || '',
+        mercury: astro.mercury || '',
+        venus: astro.venus || '',
+        mars: astro.mars || '',
+        jupiter: astro.jupiter || '',
+        saturn: astro.saturn || '',
+        uranus: astro.uranus || '',
+        neptune: astro.neptune || '',
+        pluto: astro.pluto || '',
+        ascendant: astro.ascendant || '',
+        descendant: astro.descendant || '',
+        mc: astro.mc || '',
+        ic: astro.ic || '',
+        house1: astro.house1 || '',
+        house2: astro.house2 || '',
+        house3: astro.house3 || '',
+        house4: astro.house4 || '',
+        house5: astro.house5 || '',
+        house6: astro.house6 || '',
+        house7: astro.house7 || '',
+        house8: astro.house8 || '',
+        house9: astro.house9 || '',
+        house10: astro.house10 || '',
+        house11: astro.house11 || '',
+        house12: astro.house12 || '',
+        conjunctionAspect: astro.conjunctionAspect || '',
+        oppositionAspect: astro.oppositionAspect || '',
+        trineAspect: astro.trineAspect || '',
+        squareAspect: astro.squareAspect || '',
+        sextileAspect: astro.sextileAspect || '',
+        natalChartImage: astro.natalChartImage || '',
+        fireRatio: astro.fireRatio || 0,
+        earthRatio: astro.earthRatio || 0,
+        airRatio: astro.airRatio || 0,
+        waterRatio: astro.waterRatio || 0,
+        age: astro.age || profile.age || 0,
+        is_stale: false,
+        needs_recalculation: false,
+      };
+
+      // 1. Cập nhật Redux ngay lập tức
+      dispatch(updateProfile(updatedNatalFields));
+
+      // 2. Lưu vào Firestore
+      try {
+        await setDoc(doc(db, 'users', profile.uid), {
+          ...updatedNatalFields,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (fErr) {
+        console.warn('Lưu Firestore khi tái tạo bản đồ sao:', fErr);
+      }
+
+      // 3. Đồng bộ Backend API
+      try {
+        await apiUpdateProfile({ uid: profile.uid, fields: updatedNatalFields });
+      } catch (bErr) {
+        console.warn('Đồng bộ backend khi tái tạo bản đồ sao:', bErr);
+      }
+
+      setRecalculateSuccess('Đã tái tạo Bản đồ sao thành công theo dữ liệu ngày giờ sinh mới!');
+      setTimeout(() => setRecalculateSuccess(''), 6000);
+    } catch (e: any) {
+      console.error('Lỗi khi tái tạo bản đồ sao:', e);
+      alert('Không thể tính toán lại bản đồ sao: ' + (e.message || 'Lỗi mạng'));
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   const handlePredict = async () => {
     if (!profile.uid) return;
     if (!hasAstro) {
@@ -136,6 +238,68 @@ export default function HomePage() {
           Năng lượng chiêm tinh hôm nay mở ra những cơ hội sâu sắc cho sự đồng điệu và thấu hiểu.
         </p>
       </motion.div>
+
+      {/* Banner Tái Tạo Bản Đồ Sao khi dữ liệu sinh bị thay đổi (is_stale) */}
+      <AnimatePresence>
+        {isStale && (
+          <motion.div
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            className="p-5 sm:p-6 rounded-2xl glass border border-amber-500/40 relative overflow-hidden shadow-2xl"
+            style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(147, 51, 234, 0.15) 50%, rgba(219, 39, 119, 0.1) 100%)',
+            }}
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border border-amber-400/50 bg-amber-500/20 text-amber-300 shadow-md">
+                  <UiIcon name="sparkles" label="Cần tái tạo" className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-white font-bold text-base sm:text-lg">
+                      Dữ liệu sinh đã thay đổi
+                    </h3>
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-400/40 font-semibold tracking-wider">
+                      Cần cập nhật
+                    </span>
+                  </div>
+                  <p className="text-purple-200/90 text-xs sm:text-sm mt-1 leading-relaxed max-w-2xl">
+                    Ngày, giờ hoặc nơi sinh của bạn vừa được cập nhật tại trang Hồ Sơ. Bản đồ sao cá nhân gốc và các luận giải chiêm tinh hiện tại cần được tính toán lại để đảm bảo độ chính xác.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleRecalculateNatal}
+                disabled={recalculating}
+                className="btn-cosmic px-6 py-3 text-xs sm:text-sm font-semibold tracking-wide shrink-0 inline-flex items-center gap-2 cursor-pointer shadow-lg"
+                style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #db2777 100%)' }}
+              >
+                {recalculating ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Đang tái tạo...</span>
+                  </>
+                ) : (
+                  <>
+                    <UiIcon name="chart" label="Tạo lại Bản đồ sao" />
+                    <span>Tạo lại Bản đồ sao</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {recalculateSuccess && (
+              <p className="text-emerald-300 text-xs sm:text-sm mt-3 pt-3 border-t border-amber-500/20 flex items-center gap-1.5 font-medium">
+                <UiIcon name="check" label="Thành công" />
+                <span>{recalculateSuccess}</span>
+              </p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Segmented Control Tabs */}
       <div className="flex justify-center">
@@ -332,8 +496,8 @@ export default function HomePage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-white text-sm font-semibold mb-0.5">Bản Đồ Chi Tiết (Natal Chart)</h3>
-                  <p className="text-purple-300/60 text-xs">Khám phá biểu đồ SVG tròn 10 hành tinh và 12 cung</p>
+                  <h3 className="text-white text-sm font-semibold mb-1.5">Bản Đồ Chi Tiết (Natal Chart)</h3>
+                  <p className="text-purple-300/70 text-xs leading-relaxed">Khám phá biểu đồ SVG tròn 10 hành tinh và 12 cung</p>
                 </div>
               </motion.div>
 
@@ -355,8 +519,8 @@ export default function HomePage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-white text-sm font-semibold mb-0.5">Tìm Kiếm Tri Kỷ (Matchmaking)</h3>
-                  <p className="text-purple-300/60 text-xs">Kết nối dựa trên độ hòa hợp cung hoàng đạo</p>
+                  <h3 className="text-white text-sm font-semibold mb-1.5">Tìm Kiếm Tri Kỷ (Matchmaking)</h3>
+                  <p className="text-purple-300/70 text-xs leading-relaxed">Kết nối dựa trên độ hòa hợp cung hoàng đạo</p>
                 </div>
               </motion.div>
             </div>
@@ -385,8 +549,8 @@ export default function HomePage() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                    <h4 className="text-white text-xs font-semibold sm:w-48 flex-shrink-0">Bản Đồ Đôi (Synastry)</h4>
-                    <p className="text-purple-300/60 text-[11px] leading-relaxed flex-1">So khớp góc chiếu & độ tương hợp sâu giữa 2 người</p>
+                    <h4 className="text-white text-sm font-semibold sm:w-52 shrink-0">Bản Đồ Đôi (Synastry)</h4>
+                    <p className="text-purple-300/70 text-xs leading-relaxed flex-1">So khớp góc chiếu & độ tương hợp sâu giữa 2 người</p>
                   </div>
                 </motion.div>
 
@@ -407,8 +571,8 @@ export default function HomePage() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                    <h4 className="text-white text-xs font-semibold sm:w-48 flex-shrink-0">Vận Hạn (Transit)</h4>
-                    <p className="text-purple-300/60 text-[11px] leading-relaxed flex-1">Dự báo năng lượng vũ trụ hiện tại tác động lên bạn</p>
+                    <h4 className="text-white text-sm font-semibold sm:w-52 shrink-0">Vận Hạn (Transit)</h4>
+                    <p className="text-purple-300/70 text-xs leading-relaxed flex-1">Dự báo năng lượng vũ trụ hiện tại tác động lên bạn</p>
                   </div>
                 </motion.div>
 
@@ -429,8 +593,8 @@ export default function HomePage() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                    <h4 className="text-white text-xs font-semibold sm:w-48 flex-shrink-0">Trải Bài Tarot</h4>
-                    <p className="text-purple-300/60 text-[11px] leading-relaxed flex-1">Rút 1 lá bài trực quan & nhận thông điệp ngày mới</p>
+                    <h4 className="text-white text-sm font-semibold sm:w-52 shrink-0">Trải Bài Tarot</h4>
+                    <p className="text-purple-300/70 text-xs leading-relaxed flex-1">Rút 1 lá bài trực quan & nhận thông điệp ngày mới</p>
                   </div>
                 </motion.div>
 
@@ -451,8 +615,8 @@ export default function HomePage() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                    <h4 className="text-white text-xs font-semibold sm:w-48 flex-shrink-0">Nhật Ký Vũ Trụ</h4>
-                    <p className="text-purple-300/60 text-[11px] leading-relaxed flex-1">Lưu giữ cảm xúc đồng hành cùng các chu kỳ trăng</p>
+                    <h4 className="text-white text-sm font-semibold sm:w-52 shrink-0">Nhật Ký Vũ Trụ</h4>
+                    <p className="text-purple-300/70 text-xs leading-relaxed flex-1">Lưu giữ cảm xúc đồng hành cùng các chu kỳ trăng</p>
                   </div>
                 </motion.div>
 
@@ -473,8 +637,8 @@ export default function HomePage() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                    <h4 className="text-white text-xs font-semibold sm:w-48 flex-shrink-0">Từ Điển Chiêm Tinh Học</h4>
-                    <p className="text-purple-300/60 text-[11px] leading-relaxed flex-1">Tra cứu ý nghĩa 12 cung hoàng đạo, 12 nhà (houses) và các góc chiếu chi tiết</p>
+                    <h4 className="text-white text-sm font-semibold sm:w-52 shrink-0">Từ Điển Chiêm Tinh Học</h4>
+                    <p className="text-purple-300/70 text-xs leading-relaxed flex-1">Tra cứu ý nghĩa 12 cung hoàng đạo, 12 nhà (houses) và các góc chiếu chi tiết</p>
                   </div>
                 </motion.div>
               </div>

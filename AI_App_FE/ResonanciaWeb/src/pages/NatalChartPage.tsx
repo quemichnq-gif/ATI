@@ -32,33 +32,59 @@ const PAGE_TABS = [
 
 function cleanSectionText(text: string) {
   if (!text) return '';
+  const lines = text.trim().split('\n');
+  if (lines.length > 1) {
+    const firstLine = lines[0].trim();
+    // Bỏ dòng tiêu đề mục nếu có (ví dụ: ## 1. Tính Cách, 1. Tính Cách, **1. Tính Cách**)
+    if (
+      /^(?:#{1,4}\s*)?(?:\*\*)?(?:[1-8][.:)/-]|mục\s*[1-8]|phần\s*[1-8])/i.test(firstLine) ||
+      /^(?:#{1,4}\s+)/.test(firstLine)
+    ) {
+      return lines.slice(1).join('\n').trim();
+    }
+  }
   return text
-    .replace(/^([#]{1,4}|\*\*|\d+\.|#)+\s*[\d.\s\w\p{L}–\-:]+(\n|\*\*)+/u, '')
+    .replace(/^([#]{1,4}|\*\*|\d+[.:)/-]|#)+\s*[\d.\s\w\p{L}–\-:]+(\n|\*\*)+/u, '')
     .trim();
 }
 
 function parseAnalysisSections(text: string) {
   const sections: Record<string, string> = {};
   if (!text) return sections;
-  const parts = text.split(/\n(?=\d+\.|#{1,3}\s*\d*|\*\*[0-9A-ZÁÀẢ])/);
+
+  // Tách theo tiêu đề mục (## 1., 1., **1., ###)
+  const parts = text.split(/\n(?=(?:#{1,4}\s*)?(?:\d+[.:)/-]|\*\*\d+[.:)/-]))/);
   const keys = ['personality', 'emotions', 'career', 'love', 'strengths', 'elements', 'advice', 'idealPartner'];
-  
+
   parts.forEach((part, i) => {
     const trimmed = part.trim();
     if (!trimmed) return;
-    const lower = trimmed.toLowerCase();
-    if (lower.includes('tính cách')) sections['personality'] = trimmed;
-    else if (lower.includes('cảm xúc')) sections['emotions'] = trimmed;
-    else if (lower.includes('sự nghiệp')) sections['career'] = trimmed;
-    else if (lower.includes('tình yêu')) sections['love'] = trimmed;
-    else if (lower.includes('điểm mạnh')) sections['strengths'] = trimmed;
-    else if (lower.includes('nguyên tố')) sections['elements'] = trimmed;
-    else if (lower.includes('lời khuyên')) sections['advice'] = trimmed;
-    else if (lower.includes('người lý tưởng')) sections['idealPartner'] = trimmed;
-    else if (keys[i]) {
+    const firstLine = trimmed.split('\n')[0].toLowerCase();
+
+    // 1. Kiểm tra số thứ tự 1-8 ở đầu dòng
+    const numMatch = firstLine.match(/^\s*(?:#{1,4}\s*)?(?:\*\*)?([1-8])[.:)/-]/);
+    if (numMatch) {
+      const idx = parseInt(numMatch[1], 10) - 1;
+      if (idx >= 0 && idx < keys.length) {
+        sections[keys[idx]] = trimmed;
+        return;
+      }
+    }
+
+    // 2. Kiểm tra từ khóa CHỈ TRÊN DÒNG ĐẦU TIÊN (firstLine) để tránh nhầm lẫn từ ngữ trong thân bài
+    if (firstLine.includes('người lý tưởng') || firstLine.includes('lý tưởng')) sections['idealPartner'] = trimmed;
+    else if (firstLine.includes('lời khuyên') || firstLine.includes('khuyên')) sections['advice'] = trimmed;
+    else if (firstLine.includes('nguyên tố')) sections['elements'] = trimmed;
+    else if (firstLine.includes('điểm mạnh')) sections['strengths'] = trimmed;
+    else if (firstLine.includes('tình yêu')) sections['love'] = trimmed;
+    else if (firstLine.includes('sự nghiệp')) sections['career'] = trimmed;
+    else if (firstLine.includes('cảm xúc')) sections['emotions'] = trimmed;
+    else if (firstLine.includes('tính cách')) sections['personality'] = trimmed;
+    else if (keys[i] && !sections[keys[i]]) {
       sections[keys[i]] = trimmed;
     }
   });
+
   if (Object.keys(sections).length === 0) sections['personality'] = text;
   return sections;
 }
@@ -534,7 +560,7 @@ export default function NatalChartPage() {
                               Tab riêng ↗
                             </button>
                           </div>
-                          <FormattedMarkdown content={cleaned || content || analysis || ''} />
+                          <FormattedMarkdown content={cleaned || content || 'Đang cập nhật phân tích...'} />
                         </div>
                       );
                     })}
@@ -566,7 +592,7 @@ export default function NatalChartPage() {
                   </button>
                 </div>
 
-                <FormattedMarkdown content={cleanSectionText(sections[activeSection]) || sections[activeSection] || analysis || ''} />
+                <FormattedMarkdown content={cleanSectionText(sections[activeSection]) || sections[activeSection] || 'Đang cập nhật phân tích...'} />
               </motion.div>
             )}
           </AnimatePresence>

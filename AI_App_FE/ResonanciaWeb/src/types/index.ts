@@ -14,6 +14,8 @@ export interface UserProfile {
   job?: string;
   relationshipStatus?: string;
   profileComplete?: boolean;
+  is_stale?: boolean;
+  needs_recalculation?: boolean;
   // Planets
   sun?: string;
   moon?: string;
