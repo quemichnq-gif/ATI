@@ -314,6 +314,18 @@ body {
   animation: fillBar 1.5s ease forwards;
 }
 
+/* Keep mobile controls comfortably tappable without changing desktop sizing. */
+@media (max-width: 767px) {
+  button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  aside nav a {
+    min-height: 44px;
+  }
+}
+
 @keyframes twinkle {
   0%, 100% { opacity: 0.2; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.2); }

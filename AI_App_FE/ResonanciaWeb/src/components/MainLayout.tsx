@@ -13,7 +13,7 @@ export default function MainLayout() {
       <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Mobile top bar — hidden on md+ (sidebar always visible) */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center gap-3 px-4 py-3"
+      <header className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center gap-3 px-4 py-2.5"
         style={{
           background: 'rgba(9, 7, 18, 0.92)',
           borderBottom: '1px solid rgba(168, 85, 247, 0.12)',
