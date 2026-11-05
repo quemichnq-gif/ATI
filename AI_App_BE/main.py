@@ -270,6 +270,7 @@ def generate_prediction():
     name = user_data.get("name", "Bạn")
     sun = user_data.get("sun") or user_data.get("zodiac", "Ma Kết")
     moon = user_data.get("moon") or "Kim Ngưu"
+    ascendant = user_data.get("ascendant") or data.get("extra", {}).get("ascendant", "")
 
     # Kiểm tra cache
     cached_doc = get_cached_prediction(uid, name, sun, moon, category, day)
