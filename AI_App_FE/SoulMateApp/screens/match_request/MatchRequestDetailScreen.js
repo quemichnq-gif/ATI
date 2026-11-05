@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { auth } from '../../config/firebaseConfig';
 import { BASE_URL } from '../../config/api';
+import { apiFetch } from '../../services/apiClient';
 
 const API_BASE_URL = BASE_URL;
 
@@ -61,7 +62,7 @@ const MatchRequestDetailScreen = ({ route, navigation }) => {
       setLoading(true);
       
       //FIX: Đổi URL thành /check-match-request/
-      const response = await fetch(`${API_BASE_URL}/check-match-request/${requestId}`);
+      const response = await apiFetch(`${API_BASE_URL}/check-match-request/${requestId}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -112,7 +113,7 @@ const MatchRequestDetailScreen = ({ route, navigation }) => {
     try {
       console.log('📤 Accepting match request:', { requestId, receiverId: currentUserId });
       
-      const response = await fetch(`${API_BASE_URL}/accept-match-request`, {
+      const response = await apiFetch(`${API_BASE_URL}/accept-match-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -184,7 +185,7 @@ const MatchRequestDetailScreen = ({ route, navigation }) => {
             try {
               console.log('📤 Rejecting match request:', { requestId, receiverId: currentUserId });
               
-              const response = await fetch(`${API_BASE_URL}/reject-match-request`, {
+              const response = await apiFetch(`${API_BASE_URL}/reject-match-request`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 

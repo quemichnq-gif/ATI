@@ -8,6 +8,11 @@ AI_App_BE/__pycache__/
 .env
 .env.*
 *.env
+!AI_App_BE/.env.example
+firebase-key*.json
+serviceAccount*.json
+*.pem
+*.key
 AI_App_BE/.env
 AI_App_FE/ResonanciaWeb/.env
 AI_App_FE/ResonanciaWeb/.env.local

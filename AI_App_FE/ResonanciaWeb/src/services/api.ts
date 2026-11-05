@@ -3,9 +3,6 @@ import { auth } from './firebase';
 
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 
-export const ASTROLOGY_API_KEY = 'ByNqfA4kvD1EBGyi6ZlUC8aekqCi7FgF8VuJ8SF1';
-export const ASTROLOGY_BASE_URL = 'https://json.freeastrologyapi.com/western';
-
 // Axios instance với auto auth token và timeout 15s an toàn
 const api = axios.create({ baseURL: BASE_URL, timeout: 15000 });
 
@@ -39,3 +36,4 @@ export const apiMarkNotificationRead = (data: object) => api.post('/mark-notific
 export const apiDeleteNotification = (data: object) => api.post('/delete-notification', data);
 export const apiGetMatchRequests = (uid: string, type?: string) =>
   api.get(`/get-match-requests?uid=${uid}${type ? `&type=${type}` : ''}`);
+export const apiAstrology = (endpoint: string, data: object) => api.post(`/astrology/${endpoint}`, data);

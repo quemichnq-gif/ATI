@@ -12,7 +12,7 @@ import {
   Dimensions
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import axios from "axios";
+import { apiClient, apiFetch } from "../../services/apiClient";
 import { useSelector } from "react-redux";
 import LoveMatchResultScreen from "../match/LoveMatchResultScreen";
 import { BASE_URL } from "../../config/api";
@@ -48,7 +48,7 @@ export default function LoveMatchSelectScreen() {
       setSingleMatchData(null);
   
       // 1️⃣ CHECK FIRESTORE TRƯỚC
-      const cached = await fetch(
+      const cached = await apiFetch(
         `${BASE_URL}/love-matching/history/${user.uid}/${type}`
       ).then(res => res.json());
   
@@ -63,7 +63,7 @@ export default function LoveMatchSelectScreen() {
   
       // KHÔNG CÓ CACHE → GỌI AI
       console.log("🤖 CALL AI:", type);
-      const res = await axios.post(`${BASE_URL}/love-matching/${type}`, {
+      const res = await apiClient.post(`${BASE_URL}/love-matching/${type}`, {
         uid: user.uid,
       });
   

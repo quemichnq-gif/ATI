@@ -17,6 +17,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebaseConfig';
 import { updateProfileField } from '../my_profile/profileSlice';
 import { BASE_URL } from '../../config/api';
+import { apiFetch } from '../../services/apiClient';
 
 export default function UpdateAvatar({ route, navigation }) {
   const { imageType } = route.params; // "avatar" hoặc "coverImage"
@@ -85,7 +86,7 @@ export default function UpdateAvatar({ route, navigation }) {
 
     try {
       // Gửi base64 lên Flask server
-      const response = await fetch(`${BASE_URL}/upload-image`, {
+      const response = await apiFetch(`${BASE_URL}/upload-image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +135,7 @@ export default function UpdateAvatar({ route, navigation }) {
               setUploading(true);
 
               // Xóa trên server
-              await fetch(`${BASE_URL}/delete-image`, {
+              await apiFetch(`${BASE_URL}/delete-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

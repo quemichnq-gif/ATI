@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Alert } from "react-native";
-import axios from "axios";
+import { apiClient } from "../services/apiClient";
 import { API } from "../config/api";
 
 
@@ -14,7 +14,7 @@ export default function useAstroAPI() {
     try {
       setLoading(true);
       console.log(`🚀 Gọi Flask API (${category}, ${day})...`);
-      const response = await axios.post(API.generate, { userData, category, day }, { timeout: 60000 });
+      const response = await apiClient.post(API.generate, { userData, category, day }, { timeout: 60000 });
 
       if (response.data.error) throw new Error(response.data.error);
       setPrediction(response.data.prediction);
@@ -32,7 +32,7 @@ export default function useAstroAPI() {
   const generatePrediction = async (userData, navigation) => {
     try {
       console.log("Gọi dự đoán daily...");
-      const res = await axios.post(API.generate, {
+      const res = await apiClient.post(API.generate, {
         userData,
         category: "daily",
         day: "today",
@@ -51,7 +51,7 @@ export default function useAstroAPI() {
   const generateLoveMetrics = async (userData) => {
     try {
     
-      const res = await axios.post(API.generate, {
+      const res = await apiClient.post(API.generate, {
         userData,
         category: "love_metrics",
         day: "today",

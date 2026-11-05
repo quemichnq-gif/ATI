@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
 import google.generativeai as genai
+import requests
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
@@ -25,6 +26,7 @@ load_dotenv(os.path.join(base_dir, ".env"))
 
 api_key = os.getenv("GEMINI_API_KEY")
 firebase_api_key = os.getenv("FIREBASE_API_KEY")
+astrology_api_key = os.getenv("ASTROLOGY_API_KEY")
 
 if not api_key:
     raise ValueError("⚠️ Chưa load được GEMINI_API_KEY!")
@@ -37,15 +39,12 @@ genai.configure(api_key=api_key)
 FIREBASE_AVAILABLE = False
 db = None
 try:
-    key_path = os.path.join(base_dir, "firebase-key.json")
-    if os.path.exists(key_path):
-        cred = credentials.Certificate(key_path)
-        firebase_admin.initialize_app(cred)
-        db = firestore.client()
-        FIREBASE_AVAILABLE = True
-        print("Firebase Admin initialized.")
-    else:
-        print("Firebase key not found; using fallback mode.")
+    key_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
+    cred = credentials.Certificate(key_path) if key_path else credentials.ApplicationDefault()
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    FIREBASE_AVAILABLE = True
+    print("Firebase Admin initialized.")
 except Exception as fe:
     print(f"Firebase Admin initialization failed; using fallback mode: {fe}")
     FIREBASE_AVAILABLE = False
@@ -63,7 +62,45 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 CORS(app)
 
+
+@app.before_request
+def authenticate_api_request():
+    """Require a valid Firebase ID token on every application API route."""
+    if request.method == "OPTIONS" or request.endpoint == "home":
+        return None
+
+    if not FIREBASE_AVAILABLE:
+        return jsonify({"error": "Authentication service unavailable"}), 503
+
+    auth_header = request.headers.get("Authorization", "")
+    scheme, _, token = auth_header.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return jsonify({"error": "Authentication required"}), 401
+
+    try:
+        g.firebase_user = auth.verify_id_token(token.strip())
+    except Exception:
+        return jsonify({"error": "Invalid or expired authentication token"}), 401
+
+    user_uid = g.firebase_user.get("uid")
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        body = {}
+    view_args = request.view_args or {}
+    requested_uids = (
+        body.get("uid"),
+        request.args.get("uid"),
+        view_args.get("uid"),
+        body.get("userId"),
+        request.args.get("userId"),
+    )
+    if any(uid and uid != user_uid for uid in requested_uids):
+        return jsonify({"error": "User does not have access to this resource"}), 403
+
+    return None
+
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+ASTROLOGY_ENDPOINTS = {"planets", "houses", "aspects", "natal-wheel-chart"}
 
 def safe_print(*args, **kwargs):
     try:
@@ -140,20 +177,42 @@ def is_valid_user(u):
 # -------------------------------------------------
 #  Route Verify Password
 # -------------------------------------------------
+@app.route("/astrology/<endpoint>", methods=["POST"])
+def astrology_proxy(endpoint):
+    if endpoint not in ASTROLOGY_ENDPOINTS:
+        return jsonify({"error": "Unsupported astrology endpoint"}), 404
+    if not astrology_api_key:
+        return jsonify({"error": "Astrology provider is not configured"}), 503
+
+    try:
+        upstream = requests.post(
+            f"https://json.freeastrologyapi.com/western/{endpoint}",
+            json=request.get_json(silent=True) or {},
+            headers={"x-api-key": astrology_api_key, "Content-Type": "application/json"},
+            timeout=15,
+        )
+        if not upstream.ok:
+            return jsonify({"error": "Astrology provider request failed"}), 502
+        return jsonify(upstream.json()), 200
+    except (requests.RequestException, ValueError):
+        return jsonify({"error": "Astrology provider is temporarily unavailable"}), 502
+
+
 @app.route("/verify-password", methods=["POST"])
 def verify_password():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         email = data.get("email")
         password = data.get("password")
 
-        print(f"=== VERIFY PASSWORD DEBUG ===")
-        print(f"Email nhận được: {email}")
-        print(f"Password length: {len(password) if password else 0}")
-        print(f"Firebase API Key có tồn tại: {bool(firebase_api_key)}")
-
         if not email or not password:
             return jsonify({"success": False, "error": "Thiếu email hoặc password"}), 400
+
+        if email.strip().casefold() != str(g.firebase_user.get("email", "")).casefold():
+            return jsonify({"success": False, "error": "Tài khoản không khớp phiên đăng nhập"}), 403
+
+        if not firebase_api_key:
+            return jsonify({"success": False, "error": "Dịch vụ xác thực chưa được cấu hình"}), 503
 
         url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={firebase_api_key}"
 
@@ -163,26 +222,18 @@ def verify_password():
             "returnSecureToken": True
         }
 
-        print(f"Gửi request đến Firebase Auth...")
-        response = requests.post(url, json=payload)
+        response = requests.post(url, json=payload, timeout=10)
         result = response.json()
 
-        print(f"Response status: {response.status_code}")
-        print(f"Response body: {result}")
-
         if response.status_code == 200 and result.get("idToken"):
-            print(f"Xác thực thành công cho {email}")
             return jsonify({"success": True}), 200
         else:
-            error_msg = result.get("error", {}).get("message", "Invalid password")
-            print(f"Xác thực thất bại: {error_msg}")
             return jsonify({"success": False, "error": "Mật khẩu không đúng"}), 401
 
-    except Exception as e:
-        print(f"❌ Verify error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "error": str(e)}), 500
+    except requests.RequestException:
+        return jsonify({"success": False, "error": "Dịch vụ xác thực tạm thời không khả dụng"}), 502
+    except Exception:
+        return jsonify({"success": False, "error": "Không thể xác thực yêu cầu"}), 500
 
 
 # -------------------------------------------------
@@ -986,7 +1037,7 @@ def accept_match_request():
     try:
         data = request.get_json() or {}
         request_id = data.get("requestId")
-        receiver_id = data.get("receiverId") or data.get("uid")
+        receiver_id = g.firebase_user.get("uid")
         sender_id = data.get("senderId") or data.get("targetUid")
         response_message = data.get("responseMessage", "")
 
@@ -999,11 +1050,14 @@ def accept_match_request():
                     match_req = r
                     break
 
+        request_found = bool(match_req)
         if match_req:
-            if not sender_id:
-                sender_id = match_req.get("senderId")
-            if not receiver_id:
-                receiver_id = match_req.get("receiverId")
+            if match_req.get("receiverId") != receiver_id:
+                return jsonify({"error": "Only the recipient can accept this request"}), 403
+            if match_req.get("status") != "pending":
+                return jsonify({"error": "This request is no longer pending"}), 409
+            sender_id = match_req.get("senderId")
+            receiver_id = match_req.get("receiverId")
             match_req["status"] = "accepted"
 
         # Đồng bộ Firestore nếu có
@@ -1011,7 +1065,13 @@ def accept_match_request():
             try:
                 r_doc = db.collection("match_requests").document(request_id).get(timeout=1.5)
                 if r_doc.exists:
-                    sender_id = r_doc.to_dict().get("senderId")
+                    request_data = r_doc.to_dict()
+                    if request_data.get("receiverId") != receiver_id:
+                        return jsonify({"error": "Only the recipient can accept this request"}), 403
+                    if request_data.get("status") != "pending":
+                        return jsonify({"error": "This request is no longer pending"}), 409
+                    request_found = True
+                    sender_id = request_data.get("senderId")
                     db.collection("match_requests").document(request_id).update({
                         "status": "accepted",
                         "responseMessage": response_message,
@@ -1019,6 +1079,9 @@ def accept_match_request():
                     })
             except Exception:
                 pass
+
+        if not request_found:
+            return jsonify({"error": "Match request not found"}), 404
 
         if not sender_id:
             sender_id = "user_sender"
@@ -1056,7 +1119,7 @@ def reject_match_request():
     try:
         data = request.get_json() or {}
         request_id = data.get("requestId")
-        receiver_id = data.get("receiverId") or data.get("uid")
+        receiver_id = g.firebase_user.get("uid")
         sender_id = data.get("senderId") or data.get("targetUid")
 
         match_req = IN_MEMORY_MATCH_REQUESTS.get(request_id) if request_id else None
@@ -1068,17 +1131,32 @@ def reject_match_request():
                     match_req = r
                     break
 
+        request_found = bool(match_req)
         if match_req:
+            if match_req.get("receiverId") != receiver_id:
+                return jsonify({"error": "Only the recipient can reject this request"}), 403
+            if match_req.get("status") != "pending":
+                return jsonify({"error": "This request is no longer pending"}), 409
             match_req["status"] = "rejected"
 
         if FIREBASE_AVAILABLE and db is not None and request_id:
             try:
-                db.collection("match_requests").document(request_id).update({
+                request_ref = db.collection("match_requests").document(request_id)
+                request_doc = request_ref.get(timeout=1.5)
+                if not request_doc.exists or request_doc.to_dict().get("receiverId") != receiver_id:
+                    return jsonify({"error": "Only the recipient can reject this request"}), 403
+                if request_doc.to_dict().get("status") != "pending":
+                    return jsonify({"error": "This request is no longer pending"}), 409
+                request_found = True
+                request_ref.update({
                     "status": "rejected",
                     "rejectedAt": firestore.SERVER_TIMESTAMP
                 })
             except Exception:
                 pass
+
+        if not request_found:
+            return jsonify({"error": "Match request not found"}), 404
 
         return jsonify({"success": True, "message": "Đã từ chối lời mời"}), 200
     except Exception as e:
@@ -1096,6 +1174,8 @@ def breakup():
     try:
         data = request.get_json() or {}
         user_id = data.get("userId")
+        if user_id != g.firebase_user.get("uid"):
+            return jsonify({"error": "User does not have access to this resource"}), 403
         target_partner_id = data.get("partnerId")
 
         if not user_id:
@@ -1161,6 +1241,12 @@ def check_match_status():
     try:
         user_id = request.args.get("userId") or request.args.get("uid1") or request.args.get("uid")
         target_id = request.args.get("targetId") or request.args.get("uid2") or request.args.get("partnerUid") or request.args.get("targetUid")
+
+        authenticated_uid = g.firebase_user.get("uid")
+        if authenticated_uid not in (user_id, target_id):
+            return jsonify({"error": "User does not have access to this resource"}), 403
+        if user_id != authenticated_uid:
+            user_id, target_id = target_id, user_id
 
         if not user_id or not target_id:
             return jsonify({"error": "Thiếu userId hoặc targetId"}), 400
@@ -1240,6 +1326,9 @@ def get_notifications():
     try:
         user_id = request.args.get("userId") or request.args.get("uid")
 
+        if user_id != g.firebase_user.get("uid"):
+            return jsonify({"error": "User does not have access to this resource"}), 403
+
         if not user_id:
             return jsonify({"error": "Thiếu userId"}), 400
 
@@ -1306,6 +1395,13 @@ def mark_notification_read():
         if not notification_ids:
             return jsonify({"error": "Thiếu notificationIds"}), 400
 
+        user_id = g.firebase_user.get("uid")
+        if FIREBASE_AVAILABLE and db is not None:
+            for notif_id in notification_ids:
+                notif_doc = db.collection("notifications").document(notif_id).get(timeout=2)
+                if not notif_doc.exists or notif_doc.to_dict().get("userId") != user_id:
+                    return jsonify({"error": "Notification does not belong to this user"}), 403
+
         if FIREBASE_AVAILABLE and db is not None:
             for notif_id in notification_ids:
                 try:
@@ -1317,10 +1413,9 @@ def mark_notification_read():
                     pass
 
         # Update in-memory notifications
-        for uid, notifs in IN_MEMORY_NOTIFICATIONS.items():
-            for n in notifs:
-                if n.get("id") in notification_ids:
-                    n["read"] = True
+        for n in IN_MEMORY_NOTIFICATIONS.get(user_id, []):
+            if n.get("id") in notification_ids:
+                n["read"] = True
 
         return jsonify({
             "success": True,
@@ -1347,14 +1442,22 @@ def delete_notification():
         if not notification_id:
             return jsonify({"error": "Thiếu notificationId"}), 400
 
+        user_id = g.firebase_user.get("uid")
+
         if FIREBASE_AVAILABLE and db is not None:
             try:
-                db.collection("notifications").document(notification_id).delete()
+                notif_ref = db.collection("notifications").document(notification_id)
+                notif_doc = notif_ref.get(timeout=2)
+                if not notif_doc.exists or notif_doc.to_dict().get("userId") != user_id:
+                    return jsonify({"error": "Notification does not belong to this user"}), 403
+                notif_ref.delete()
             except Exception:
                 pass
 
-        for uid in list(IN_MEMORY_NOTIFICATIONS.keys()):
-            IN_MEMORY_NOTIFICATIONS[uid] = [n for n in IN_MEMORY_NOTIFICATIONS[uid] if n.get("id") != notification_id]
+        IN_MEMORY_NOTIFICATIONS[user_id] = [
+            n for n in IN_MEMORY_NOTIFICATIONS.get(user_id, [])
+            if n.get("id") != notification_id
+        ]
 
         return jsonify({
             "success": True,
@@ -1377,6 +1480,9 @@ def get_match_requests():
     try:
         user_id = request.args.get("userId") or request.args.get("uid")
         request_type = request.args.get("type", "received")  # received, sent, all
+
+        if user_id != g.firebase_user.get("uid"):
+            return jsonify({"error": "User does not have access to this resource"}), 403
 
         if not user_id:
             return jsonify({"error": "Thiếu userId"}), 400
@@ -2180,4 +2286,4 @@ def get_matching_history(uid, match_type):
 # -------------------------------------------------
 if __name__ == "__main__":
     print("Starting Flask server on port 5001.")
-    app.run(debug=True, host="0.0.0.0", port=5001)
+    app.run(debug=False, host="0.0.0.0", port=5001)
