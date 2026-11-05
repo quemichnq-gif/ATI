@@ -91,14 +91,6 @@ export default function OnboardingPage() {
           </motion.button>
         </motion.div>
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="text-purple-400 opacity-50 text-xs mt-8"
-        >
-          ✦ Được xây dựng bởi Nhóm 32 – HUST Faculty of IT ✦
-        </motion.p>
       </div>
     </div>
   );
