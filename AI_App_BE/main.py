@@ -69,18 +69,36 @@ def authenticate_api_request():
     if request.method == "OPTIONS" or request.endpoint == "home":
         return None
 
-    if not FIREBASE_AVAILABLE:
-        return jsonify({"error": "Authentication service unavailable"}), 503
-
     auth_header = request.headers.get("Authorization", "")
     scheme, _, token = auth_header.partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
         return jsonify({"error": "Authentication required"}), 401
 
-    try:
-        g.firebase_user = auth.verify_id_token(token.strip())
-    except Exception:
-        return jsonify({"error": "Invalid or expired authentication token"}), 401
+    if FIREBASE_AVAILABLE:
+        try:
+            g.firebase_user = auth.verify_id_token(token.strip())
+        except Exception:
+            return jsonify({"error": "Invalid or expired authentication token"}), 401
+    elif firebase_api_key:
+        # Firebase Admin may be unavailable in local or hosted environments
+        # without service-account credentials. Identity Toolkit still verifies
+        # the Firebase ID token and returns the authenticated UID.
+        try:
+            response = requests.post(
+                f"https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={firebase_api_key}",
+                json={"idToken": token.strip()},
+                timeout=8,
+            )
+            if response.status_code != 200:
+                return jsonify({"error": "Invalid or expired authentication token"}), 401
+            firebase_users = response.json().get("users", [])
+            if not firebase_users or not firebase_users[0].get("localId"):
+                return jsonify({"error": "Invalid or expired authentication token"}), 401
+            g.firebase_user = {"uid": firebase_users[0]["localId"]}
+        except requests.RequestException:
+            return jsonify({"error": "Authentication service temporarily unavailable"}), 503
+    else:
+        return jsonify({"error": "Authentication is not configured on the server"}), 503
 
     user_uid = g.firebase_user.get("uid")
     body = request.get_json(silent=True)
@@ -99,7 +117,7 @@ def authenticate_api_request():
 
     return None
 
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 ASTROLOGY_ENDPOINTS = {"planets", "houses", "aspects", "natal-wheel-chart"}
 
 def safe_print(*args, **kwargs):
@@ -631,6 +649,61 @@ def generate_prediction():
         safe_print("Backend generate error:", e)
         fallback_msg = f"Năng lượng chiêm tinh hôm nay của {sun} rất tích cực và hài hòa. Hãy lắng nghe trực giác và tự tin vào các kế hoạch của mình."
         return jsonify({"prediction": fallback_msg, "cached": False}), 200
+
+
+@app.route("/astrology-chat", methods=["POST"])
+def astrology_chat():
+    data = request.get_json(silent=True) or {}
+    messages = data.get("messages")
+    user_data = data.get("userData") or {}
+    if not isinstance(messages, list) or not messages:
+        return jsonify({"error": "Hãy nhập câu hỏi trước khi gửi."}), 400
+
+    # Keep a short, bounded conversation and accept only plain text turns.
+    turns = []
+    for item in messages[-12:]:
+        if not isinstance(item, dict) or item.get("role") not in ("user", "assistant"):
+            continue
+        content = item.get("content")
+        if isinstance(content, str) and content.strip():
+            turns.append(f"{ 'Người dùng' if item['role'] == 'user' else 'Resonancia' }: {content.strip()[:2000]}")
+    last_message = messages[-1]
+    if not turns or not isinstance(last_message, dict) or last_message.get("role") != "user":
+        return jsonify({"error": "Tin nhắn cuối cần là câu hỏi của bạn."}), 400
+
+    name = str(user_data.get("name") or "Bạn")[:80]
+    sun = str(user_data.get("sun") or "chưa cung cấp")[:40]
+    moon = str(user_data.get("moon") or "chưa cung cấp")[:40]
+    ascendant = str(user_data.get("ascendant") or "chưa cung cấp")[:40]
+    prompt = f"""Bạn là trợ lý AI Resonancia, trò chuyện bằng tiếng Việt, tự nhiên và rõ ràng.
+Trả lời trực tiếp đúng câu hỏi mới nhất của người dùng, không chuyển sang chủ đề khác, không thêm lời khuyên chung chung hoặc nội dung không được hỏi. Ưu tiên câu trả lời ngắn gọn từ 1 đến 4 câu; chỉ viết dài hơn khi người dùng yêu cầu giải thích chi tiết.
+Dùng lịch sử bên dưới để hiểu ngữ cảnh và trả lời tiếp mạch hội thoại. Chỉ dùng thông tin hồ sơ nếu liên quan; không bịa dữ liệu, sự kiện hiện tại hoặc vị trí hành tinh. Chiêm tinh chỉ là góc nhìn tham khảo, không khẳng định định mệnh.
+Thông tin người dùng: tên {name}; Mặt Trời {sun}; Mặt Trăng {moon}; Cung Mọc {ascendant}.
+Lịch sử hội thoại:
+{chr(10).join(turns)}
+Hãy trả lời tin nhắn cuối như một cuộc trò chuyện trực tiếp."""
+    try:
+        response = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent",
+            params={"key": api_key},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.7},
+            },
+            timeout=32,
+        )
+        if not response.ok:
+            safe_print("Gemini chat API error:", response.status_code, response.text[:1000])
+            response.raise_for_status()
+        candidates = response.json().get("candidates", [])
+        parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
+        answer = "\n".join(part.get("text", "") for part in parts if part.get("text")).strip()
+        if not answer:
+            raise ValueError("Gemini returned no text candidate")
+        return jsonify({"answer": answer}), 200
+    except Exception as e:
+        safe_print("Astrology chat AI error:", e)
+        return jsonify({"error": "AI hiện chưa thể trả lời. Vui lòng thử lại sau."}), 502
 
 
 # -------------------------------------------------
