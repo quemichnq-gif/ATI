@@ -697,6 +697,7 @@ def natal_chart_analysis():
     try:
         data = request.get_json() or {}
         uid = data.get("uid", "")
+        birth_date = data.get("birthDate", "")
 
         # Lấy thông tin từ request
         user_info = {
@@ -837,7 +838,7 @@ def natal_chart_analysis():
             analysis_text = re.sub(r"(```|'''|\"\"\")", "", analysis_text).strip()
         except BaseException as gemini_err:
             safe_print(f"⚠️ Gemini API tạm thời giới hạn ({gemini_err}), sử dụng luận giải chiêm tinh chuyên sâu dự phòng...")
-            analysis_text = generate_natal_depth_analysis(user_info, houses, aspects, elemental_ratios)
+            analysis_text = generate_natal_depth_analysis(user_info, houses, aspects, elemental_ratios, birth_date)
 
         # Lưu vào Firestore an toàn
         if FIREBASE_AVAILABLE and db is not None and uid:

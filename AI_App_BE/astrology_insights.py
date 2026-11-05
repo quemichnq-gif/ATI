@@ -348,20 +348,44 @@ ANGLES_INSIGHTS = {
         "Bảo Bình": """Điểm Lặn tại Bảo Bình nhấn mạnh sự cần thiết của một mối quan hệ độc đáo, trí tuệ và mang tính đột phá. Người bạn đời lý tưởng của bạn là người sáng tạo, cởi mở và luôn tìm cách khám phá những ý tưởng mới. Họ không chỉ là người yêu mà còn là người bạn đồng hành, giúp bạn mở rộng tư duy và nhìn nhận thế giới theo một góc nhìn mới mẻ. Mối quan hệ này cần sự tôn trọng không gian riêng, tự do và sự kết nối về lý tưởng sống.""",
         "Sư Tử": """Cung Lặn Sư Tử chỉ ra rằng bạn bị thu hút bởi những người tự tin, ấm áp, hào phóng và có sức hút tự nhiên. Bạn tìm kiếm một người bạn đời biết truyền cảm hứng, làm bạn cảm thấy tự hào và mang lại nguồn năng lượng lãng mạn rực rỡ vào cuộc sống.""",
         "Kim Ngưu": """Cung Lặn Kim Ngưu hướng bạn đến người bạn đời điềm tĩnh, vững chãi, trung thủy và mang lại sự an tâm tuyệt đối về vật chất cũng như tinh thần. Bạn trân trọng sự bình yên và những giá trị bền vững lâu dài.""",
-        "Bọ Cạp": """Cung Lặn Bọ Cạp cho thấy bạn tìm kiếm sự gắn kết tâm hồn sâu sắc, mãnh liệt và không tì vết. Đối tác lý tưởng của bạn là người chân thật, bản lĩnh và sẵn sàng cùng bạn đi qua mọi thăng trầm cuộc đời."""
+        "Bọ Cạp": """Cung Lặn Bọ Cạp cho thấy bạn tìm kiếm sự gắn kết tâm hồn sâu sắc, mãnh liệt và không tì vết. Đối tác lý tưởng của bạn là người chân thật, bản lĩnh và sẵn sàng cùng bạn đi qua mọi thăng trầm cuộc đời.""",
+        "Bạch Dương": """Cung Lặn Bạch Dương thu hút bạn đến những người bạn đời tràn đầy nhiệt huyết, dũng cảm và quyết đoán. Bạn cần một đối tác có khả năng thúc đẩy bạn hành động, thẳng thắn và luôn đồng hành cùng bạn chinh phục những mục tiêu mới.""",
+        "Song Tử": """Cung Lặn Song Tử hướng bạn đến một người bạn đời thông minh, linh hoạt, khiếu hài hước và giao tiếp lôi cuốn. Sự gắn kết về mặt trí tuệ và những cuộc đối thoại mở là chìa khóa nuôi dưỡng tình yêu lâu bền.""",
+        "Cự Giải": """Cung Lặn Cự Giải cho thấy bạn tìm kiếm sự ấm áp, chu đáo, thấu cảm và an toàn cảm xúc trong mối quan hệ. Đối tác lý tưởng là người biết chăm sóc, gắn bó với tổ ấm gia đình và chân thành từ tận đáy lòng.""",
+        "Xử Nữ": """Cung Lặn Xử Nữ hướng bạn đến người bạn đời có tổ chức, khiêm tốn, đáng tin cậy và có trách nhiệm cao. Họ thể hiện tình cảm qua những hành động thiết thực, sự quan tâm tỉ mỉ đến từng chi tiết trong cuộc sống hằng ngày.""",
+        "Thiên Bình": """Cung Lặn Thiên Bình thu hút bạn đến người bạn đời tinh tế, yêu chuộng hòa bình, duyên dáng và có gu thẩm mỹ cao. Mối quan hệ dựa trên sự bình đẳng, tôn trọng và sẻ chia ngọt bùi.""",
+        "Nhân Mã": """Cung Lặn Nhân Mã hướng bạn đến một đối tác cởi mở, yêu thích phiêu lưu khám phá và có lý tưởng sống phóng khoáng. Bạn cần một người bạn đồng hành trên con đường học hỏi, mở rộng thế giới quan và cùng nhau trải nghiệm.""",
+        "Ma Kết": """Cung Lặn Ma Kết cho thấy bạn trân trọng người bạn đời chín chắn, kiên định, có ý chí tiến thủ và đáng tin cậy. Họ mang lại nền tảng vững vàng, sự bảo bọc và đồng lòng xây dựng sự nghiệp chung.""",
+        "Song Ngư": """Cung Lặn Song Ngư hướng bạn đến tâm hồn lãng mạn, giàu lòng trắc ẩn, nhạy bén và thấu suốt cảm xúc. Bạn cần một tình yêu thuần khiết, nơi hai tâm hồn có thể đồng điệu và chữa lành cho nhau."""
     },
     "mc": {
         "Kim Ngưu": """Thiên Đỉnh tại Kim Ngưu cho bạn ý thức sâu sắc về giá trị của sự kiên trì, ổn định và xây dựng nền tảng vững chắc trong sự nghiệp. Bạn hiểu rằng thành công bền vững là kết quả của chiến lược dài hạn và sự kiên định không ngừng nghỉ. Bạn có tinh thần trách nhiệm cao, uy tín vững chắc và phong cách làm việc bài bản.
 Công việc thích hợp: Tài chính, ngân hàng, bất động sản, kiến trúc, thiết kế nghệ thuật, quản trị tài sản, đầu tư giá trị, kinh doanh bền vững.""",
         "Bạch Dương": """Thiên Đỉnh Bạch Dương định vị bạn là người tiên phong, dũng cảm mở lối và làm chủ vận mệnh nghề nghiệp. Bạn thành công rực rỡ khi được trao quyền tự quyết và dẫn dắt các dự án đột phá.""",
         "Ma Kết": """Thiên Đỉnh Ma Kết cho thấy đỉnh cao sự nghiệp của bạn gắn liền với quyền lực quản trị, sự kỷ luật thượng tầng và năng lực kiến tạo đế chế bền vững được xã hội kính trọng.""",
-        "Bảo Bình": """Thiên Đỉnh Bảo Bình hướng sự nghiệp của bạn vào các lĩnh vực đổi mới sáng tạo, công nghệ tương lai, cải cách xã hội và các dự án vì tiến bộ nhân loại."""
+        "Bảo Bình": """Thiên Đỉnh Bảo Bình hướng sự nghiệp của bạn vào các lĩnh vực đổi mới sáng tạo, công nghệ tương lai, cải cách xã hội và các dự án vì tiến bộ nhân loại.""",
+        "Song Tử": """Thiên Đỉnh Song Tử trao cho bạn tài năng kết nối truyền thông, ngôn ngữ sắc bén và khả năng xử lý đa nhiệm xuất sắc. Bạn dễ dàng tỏa sáng trong truyền thông, marketing, giáo dục và công nghệ thông tin.""",
+        "Cự Giải": """Thiên Đỉnh Cự Giải định hướng bạn đến những vị trí lãnh đạo giàu tính nhân văn, chăm sóc cộng đồng, giáo dục, bất động sản hoặc xây dựng văn hóa doanh nghiệp gắn kết.""",
+        "Sư Tử": """Thiên Đỉnh Sư Tử nâng bước bạn lên sân khấu trung tâm, truyền cảm hứng và khẳng định uy tín vượt trội. Bạn phù hợp với vai trò giám đốc sáng tạo, quản lý cấp cao, giải trí hoặc đại sứ thương hiệu.""",
+        "Xử Nữ": """Thiên Đỉnh Xử Nữ khẳng định danh tiếng qua tính chuyên nghiệp, tỉ mỉ, quản trị chất lượng và dịch vụ hoàn hảo. Bạn thành công lớn trong y tế, nghiên cứu, kiểm toán và công nghệ kỹ thuật.""",
+        "Thiên Bình": """Thiên Đỉnh Thiên Bình hướng bạn vào lĩnh vực ngoại giao, pháp lý, quan hệ đối tác chiến lược và nghệ thuật thẩm mỹ. Phong thái lịch thiệp và năng lực hòa giải giúp bạn xây dựng uy tín lâu bền.""",
+        "Bọ Cạp": """Thiên Đỉnh Bọ Cạp cho thấy sự nghiệp của bạn gắn liền với khả năng chuyển hóa, nghiên cứu chuyên sâu, tài chính mạo hiểm, quản trị khủng hoảng và năng lực thấu suốt thị trường.""",
+        "Nhân Mã": """Thiên Đỉnh Nhân Mã đưa bạn vươn tầm quốc tế, giáo dục bậc cao, xuất bản, du lịch hoặc chiến lược phát triển tầm nhìn toàn cầu. Bạn được kính trọng nhờ triết lý sâu rộng.""",
+        "Song Ngư": """Thiên Đỉnh Song Ngư tỏa sáng trong nghệ thuật, âm nhạc, sáng tạo thị giác, tâm lý học trị liệu và các sứ mệnh thiện nguyện nhân ái chạm tới trái tim xã hội."""
     },
     "ic": {
         "Bọ Cạp": """Thiên Đế thuộc Bọ Cạp chỉ ra rằng gia đình là nơi bạn tìm kiếm sự riêng tư, tái tạo năng lượng và đào sâu vào thế giới nội tâm của mình. Ngôi nhà giống như một 'chốn ẩn náu' an toàn nơi bạn có thể cởi bỏ mọi áp lực bên ngoài. Mối quan hệ gia đình của bạn rất sâu sắc và đầy gắn kết. Gia đình chính là cái nôi rèn luyện bản lĩnh kiên cường và giúp bạn khám phá những khía cạnh sâu sắc nhất trong tâm hồn.""",
         "Kim Ngưu": """Thiên Đế Kim Ngưu mang lại cho bạn một tổ ấm ấm áp, yên bình và trù phú. Bạn tìm thấy sự phục hồi năng lượng thông qua không gian sống tiện nghi, gần gũi thiên nhiên và sự gắn bó bền vững bên người thân.""",
         "Sư Tử": """Thiên Đế Sư Tử cho thấy cội nguồn gia đình mang lại cho bạn niềm tự hào, lòng tự trọng và sự ấm áp bao la để tự tin bước ra chinh phục thế giới.""",
-        "Bảo Bình": """Thiên Đế Bảo Bình biểu thị một không gian gia đình tự do, tôn trọng sự độc lập cá tính của từng thành viên và luôn cởi mở trước những tư tưởng mới."""
+        "Bảo Bình": """Thiên Đế Bảo Bình biểu thị một không gian gia đình tự do, tôn trọng sự độc lập cá tính của từng thành viên và luôn cởi mở trước những tư tưởng mới.""",
+        "Bạch Dương": """Thiên Đế Bạch Dương mang lại cho bạn nền tảng nội tâm dũng cảm, tự lập từ sớm và luôn sẵn sàng đương đầu thử thách để bảo vệ gia đình.""",
+        "Song Tử": """Thiên Đế Song Tử tạo dựng một mái ấm ngập tràn tri thức, đối thoại sôi nổi, nơi các thành viên luôn chia sẻ thông tin và nuôi dưỡng tư duy cởi mở.""",
+        "Cự Giải": """Thiên Đế Cự Giải đặt gia đình làm gốc rễ thiêng liêng nhất. Nguồn sức mạnh tinh thần lớn nhất của bạn bắt nguồn từ tình cảm gia đình ấm áp và sự chở che vững chãi.""",
+        "Xử Nữ": """Thiên Đế Xử Nữ thể hiện một môi trường sống ngăn nắp, kỷ luật, chăm chút sức khỏe và thói quen sinh hoạt khoa học làm nền tảng nuôi dưỡng tâm hồn.""",
+        "Thiên Bình": """Thiên Đế Thiên Bình mang đến không gian gia đình thanh lịch, chan hòa, nơi cái đẹp và sự thấu hiểu lẫn nhau giữ cho mái ấm luôn êm đềm.""",
+        "Nhân Mã": """Thiên Đế Nhân Mã tạo nên một mái nhà tự do, truyền cảm hứng học hỏi, khuyến khích các chuyến đi và mở rộng tầm nhìn cho mọi thành viên.""",
+        "Ma Kết": """Thiên Đế Ma Kết rèn luyện cho bạn tính kỷ luật, tự giác và trách nhiệm gia đình sâu sắc, tạo nên điểm tựa vững chãi không gì lay chuyển.""",
+        "Song Ngư": """Thiên Đế Song Ngư là chốn nương náu tâm hồn thanh tịnh, nơi bạn tìm về để lắng đọng, hồi phục cảm xúc qua nghệ thuật, tình yêu thương và sự tĩnh tại vô bờ."""
     }
 }
 
@@ -388,17 +412,35 @@ def generate_natal_depth_analysis(user_info: dict, houses: dict, aspects: dict, 
         except Exception:
             pass
 
+    # Tìm nhà thực sự của Mặt Trời và Mặt Trăng từ dữ liệu houses
+    def find_house_for_planet(planet_sign: str, house_dict: dict, default_house: int) -> int:
+        if not house_dict:
+            return default_house
+        for i in range(1, 13):
+            val = house_dict.get(f"house{i}") or house_dict.get(str(i)) or house_dict.get(i)
+            if val and (planet_sign.lower() in str(val).lower() or str(val).lower() in planet_sign.lower()):
+                return i
+        return default_house
+
+    # Tìm nhà hoặc fallback hợp lý
+    sun_house_num = find_house_for_planet(sun, houses, 6 if sun == "Ma Kết" else 1)
+    moon_house_num = find_house_for_planet(moon, houses, 2 if moon == "Xử Nữ" else 4)
+
     decan_data = get_decan_info(sun, day, month)
     lunar_phase = get_lunar_phase_insight(sun, moon)
-    asc_text = ASCENDANT_INSIGHTS.get(asc, ASCENDANT_INSIGHTS["Sư Tử"])
-    sun_text = SUN_SIGN_INSIGHTS.get(sun, SUN_SIGN_INSIGHTS["Ma Kết"])
-    sun_house_text = SUN_HOUSE_INSIGHTS.get(6, SUN_HOUSE_INSIGHTS[6])
-    moon_text = MOON_SIGN_INSIGHTS.get(moon, MOON_SIGN_INSIGHTS["Xử Nữ"])
-    moon_house_text = MOON_HOUSE_INSIGHTS.get(2, MOON_HOUSE_INSIGHTS[2])
+    asc_text = ASCENDANT_INSIGHTS.get(asc, ASCENDANT_INSIGHTS.get("Sư Tử", "Cung Mọc phản ánh cách bạn tương tác với thế giới."))
+    sun_text = SUN_SIGN_INSIGHTS.get(sun, SUN_SIGN_INSIGHTS.get("Ma Kết", "Mặt Trời đại diện cho cốt lõi bản ngã và ý chí."))
+    sun_house_text = SUN_HOUSE_INSIGHTS.get(sun_house_num, SUN_HOUSE_INSIGHTS.get(1))
+    moon_text = MOON_SIGN_INSIGHTS.get(moon, MOON_SIGN_INSIGHTS.get("Xử Nữ", "Mặt Trăng phản ánh nội tâm và nhu cầu cảm xúc."))
+    moon_house_text = MOON_HOUSE_INSIGHTS.get(moon_house_num, MOON_HOUSE_INSIGHTS.get(1))
     big3_text = get_big3_synthesis(asc, sun, moon)
-    dc_text = ANGLES_INSIGHTS["descendant"].get(desc, ANGLES_INSIGHTS["descendant"]["Bảo Bình"])
-    mc_text = ANGLES_INSIGHTS["mc"].get(mc, ANGLES_INSIGHTS["mc"]["Kim Ngưu"])
-    ic_text = ANGLES_INSIGHTS["ic"].get(ic, ANGLES_INSIGHTS["ic"]["Bọ Cạp"])
+    
+    dc_text = (ANGLES_INSIGHTS["descendant"].get(desc) 
+               or f"Cung Lặn {desc} hướng bạn tìm kiếm người bạn đời mang năng lượng bù trừ, cùng bạn sẻ chia và tạo dựng mối quan hệ hài hòa.")
+    mc_text = (ANGLES_INSIGHTS["mc"].get(mc) 
+               or f"Thiên Đỉnh {mc} định hướng sự nghiệp của bạn phát huy năng lực bản lĩnh, khẳng định giá trị bền vững và uy tín trong công việc.")
+    ic_text = (ANGLES_INSIGHTS["ic"].get(ic) 
+               or f"Thiên Đế {ic} cho thấy gia đình và chốn riêng tư là điểm tựa phục hồi năng lượng thiết yếu nhất của bạn.")
 
     return f"""## Cung Mọc {asc}
 {asc_text}
@@ -408,7 +450,7 @@ def generate_natal_depth_analysis(user_info: dict, houses: dict, aspects: dict, 
 ## Mặt Trời {sun}
 {sun_text}
 
-### Mặt Trời Nhà 6
+### Mặt Trời Nhà {sun_house_num}
 {sun_house_text}
 
 ### Phân đoạn {decan_data['decan']} {sun} ({decan_data['range']})
@@ -419,7 +461,7 @@ def generate_natal_depth_analysis(user_info: dict, houses: dict, aspects: dict, 
 ## Mặt Trăng {moon}
 {moon_text}
 
-### Mặt Trăng Nhà 2
+### Mặt Trăng Nhà {moon_house_num}
 {moon_house_text}
 
 ### Góc từ Mặt Trời tới Mặt Trăng ({lunar_phase['angle']}) · {lunar_phase['phase']}
