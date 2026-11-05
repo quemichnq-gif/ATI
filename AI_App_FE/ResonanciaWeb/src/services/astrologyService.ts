@@ -1,4 +1,4 @@
-import { ASTROLOGY_API_KEY, ASTROLOGY_BASE_URL } from './api';
+import { apiAstrology } from './api';
 import { TRANSLATIONS, PLANET_TRANSLATIONS, ELEMENT_MAP } from '../constants/astrologyMap';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -53,13 +53,8 @@ function createRequestBody(birthDate: string, birthTime: string, lat: number, lo
 async function callAPI(endpoint: string, body: object, retry = 3): Promise<any> {
   for (let i = 0; i < retry; i++) {
     try {
-      const res = await fetch(`${ASTROLOGY_BASE_URL}/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': ASTROLOGY_API_KEY },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error(`API Error: ${res.status}`);
-      return await res.json();
+      const res = await apiAstrology(endpoint, body);
+      return res.data;
     } catch (e) {
       if (i === retry - 1) throw e;
       await delay(2000);

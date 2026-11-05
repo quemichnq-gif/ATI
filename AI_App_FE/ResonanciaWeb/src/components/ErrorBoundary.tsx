@@ -25,7 +25,10 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    // Firestore's async queue can become permanently failed after an internal
+    // assertion. Remounting this boundary keeps the same Firestore instance;
+    // a full reload is needed to create a healthy client again.
+    window.location.reload();
   };
 
   private handleGoHome = () => {

@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../config/firebaseConfig';
 import { BASE_URL } from '../../../config/api';
+import { apiFetch } from '../../../services/apiClient';
 
 export default function UserPersonalInfo({ 
   userData, 
@@ -101,7 +102,7 @@ export default function UserPersonalInfo({
       targetUserId
     });
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${apiUrl}/check-match-status?userId=${currentUserId}&targetId=${targetUserId}`
       );
       const data = await response.json();
@@ -144,7 +145,7 @@ export default function UserPersonalInfo({
 
     setLoading(true);
     try {
-      const response = await fetch(`${apiUrl}/send-match-request`, {
+      const response = await apiFetch(`${apiUrl}/send-match-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -178,7 +179,7 @@ export default function UserPersonalInfo({
   const handleBreakup = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${apiUrl}/breakup`, {
+      const response = await apiFetch(`${apiUrl}/breakup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

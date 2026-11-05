@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { useSelector } from 'react-redux';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import axios from 'axios';
+import { apiClient } from '../../services/apiClient';
 import { API } from "../../config/api";
 
 
@@ -62,7 +62,7 @@ export default function NatalChartAnalysis({ navigation }) {
         waterRatio: profile.waterRatio,
       };
 
-      const response = await axios.post(API.natalAnalysis, requestData);
+      const response = await apiClient.post(API.natalAnalysis, requestData);
 
       if (response.data) {
         setAnalysis(response.data.analysis);

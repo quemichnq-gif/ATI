@@ -12,7 +12,7 @@ import {
 import { useSelector } from 'react-redux';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import axios from 'axios';
+import { apiClient } from '../../services/apiClient';
 import { API } from '../../config/api';
 
 const { width } = Dimensions.get('window');
@@ -55,7 +55,7 @@ export default function DetailedCompatibilityScreen({ navigation, route }) {
       console.log('📤 API Request:', API.compatibilityAnalysis);
       console.log('📦 Request Data:', requestData);
 
-      const response = await axios.post(API.compatibilityAnalysis, requestData);
+      const response = await apiClient.post(API.compatibilityAnalysis, requestData);
 
       console.log('📥 API Response:', response.data);
 

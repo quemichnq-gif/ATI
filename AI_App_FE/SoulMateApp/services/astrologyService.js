@@ -1,6 +1,7 @@
 import { ZODIAC_TRANSLATIONS, PLANET_TRANSLATIONS } from "../constants/translations";
 import { ELEMENT_MAP } from "../constants/astrologyMap";
-import { ASTROLOGY_API_KEY, ASTROLOGY_BASE_URL } from "../config/api";
+import { API } from "../config/api";
+import { apiFetch } from "./apiClient";
 
 // Helper: delay để tránh vượt quá 1 request/second
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -71,11 +72,10 @@ function createRequestBody(birthDate, birthTime, latitude, longitude) {
 async function callAPI(endpoint, requestBody, retryCount = 3) {
   for (let i = 0; i < retryCount; i++) {
     try {
-      const response = await fetch(`${ASTROLOGY_BASE_URL}/${endpoint}`, {
+      const response = await apiFetch(API.astrology(endpoint), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': ASTROLOGY_API_KEY,
         },
         body: JSON.stringify(requestBody),
       });

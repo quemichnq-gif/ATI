@@ -20,6 +20,7 @@ import { auth } from "../../config/firebaseConfig";
 import { loadUserProfile } from "../../services/profileLoader";
 import { openDirectChat } from "../../services/chatService";
 import { BASE_URL } from '../../config/api';
+import { apiFetch } from '../../services/apiClient';
 
 const { width } = Dimensions.get('window');
 
@@ -114,7 +115,7 @@ export default function HomeScreen({ navigation }) {
         setLoadingMatches(true);
 
         // CHECK DB
-        const cachedRes = await fetch(
+        const cachedRes = await apiFetch(
           `${BASE_URL}/love-matching/history/${profile.uid}/greenflag`
         );
         const cached = await cachedRes.json();
@@ -132,7 +133,7 @@ export default function HomeScreen({ navigation }) {
         // KHÔNG CÓ DB → GỌI AI
         console.log("🤖 Không có DB → Gọi AI để tạo GreenFlag");
 
-        const aiRes = await fetch(
+        const aiRes = await apiFetch(
           `${BASE_URL}/love-matching/greenflag`,
           {
             method: "POST",
