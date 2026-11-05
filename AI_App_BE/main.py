@@ -444,21 +444,29 @@ def generate_prediction():
         2. Đưa ra 1-2 câu hướng dẫn ứng xử hành động cụ thể, thực tế cho {name} hôm nay, nêu rõ việc nên làm hoặc thái độ tâm lý cần chuyển hóa, thay vì các câu template chung chung lặp lại.
         - Lời văn thi vị, tinh tế nhưng sắc bén và hữu ích. Không dùng emoji, không tiêu đề thừa.
         """
-    elif category.endswith("_week") or category.endswith("_month"):
-        period_str = "tuần này" if category.endswith("_week") else "tháng này"
-        base_cat = category.replace("_week", "").replace("_month", "")
-        cat_map2 = {"astro": "tổng quan chiêm tinh", "love": "tình duyên", "work": "công việc"}
+    elif category.endswith("_week") or category.endswith("_month") or category.endswith("_future"):
+        if category.endswith("_future"):
+            period_str = "trong tương lai dài hạn (6 - 12 tháng tới)"
+            base_cat = category.replace("_future", "")
+        elif category.endswith("_month"):
+            period_str = "tháng này"
+            base_cat = category.replace("_month", "")
+        else:
+            period_str = "tuần này"
+            base_cat = category.replace("_week", "")
+
+        cat_map2 = {"astro": "tổng quan chiêm tinh", "daily": "tổng quan chiêm tinh", "love": "tình duyên", "work": "công việc"}
         base_label = cat_map2.get(base_cat, "chiêm tinh")
         prompt = f"""
         Bạn là bậc thầy Chiêm Tinh Học Tâm Lý Chiều Sâu. Hãy viết bản dự báo chi tiết, toàn diện về {base_label} {period_str} cho {name}:
         - Bản đồ sao: Mặt Trời {sun}, Mặt Trăng {moon}{f', Cung Mọc {ascendant}' if ascendant else ''}.
 
         YÊU CẦU ĐỘ DÀI & ĐỘ SÂU:
-        - Viết khoảng 350 - 500 từ thật chi tiết, phân tích rõ ràng và sâu sắc.
-        - Chia thành từng giai đoạn cụ thể:
-          + Giai đoạn 1 (Đầu kỳ): Xu hướng năng lượng, cơ hội tiềm ẩn và điểm khởi sắc.
-          + Giai đoạn 2 (Giữa kỳ): Điểm rơi cảm xúc, biến động cần lưu tâm, cạm bẫy tâm lý cần phòng tránh.
-          + Giai đoạn 3 (Cuối kỳ): Kết quả đạt được, sự hòa hợp và bước đệm chuyển tiếp.
+        - Viết một bài luận giải phong phú, sâu sắc dài khoảng 400 - 600 từ.
+        - Chia thành từng giai đoạn rõ ràng:
+          + Giai đoạn 1 (Khởi đầu): Xu hướng năng lượng, cơ hội tiềm ẩn và điểm khởi sắc.
+          + Giai đoạn 2 (Phát triển & Biến động): Điểm rơi cảm xúc, thách thức cần lưu tâm, cạm bẫy tâm lý cần phòng tránh.
+          + Giai đoạn 3 (Thu hoạch & Định hình): Kết quả đạt được, sự hòa hợp và bước đệm chuyển tiếp.
           + Lời khuyên vàng: Chỉ dẫn hành động thực tế, sắc bén, mang tính ứng dụng cao.
         - Lời văn truyền cảm hứng, tinh tế, hiện đại, không dùng emoji, không mở/kết bài sáo rỗng.
         """
@@ -522,8 +530,8 @@ def generate_prediction():
                 mercury = extra.get("mercury") or user_data.get("mercury", "Sao Thủy")
                 asc = extra.get("ascendant") or user_data.get("ascendant", "Nhân Mã")
                 text = generate_career_insight_text(name, sun, moon, asc, mc, house10, saturn, jupiter, mercury)
-            elif category.startswith("love") or category.startswith("work") or category.startswith("astro"):
-                pred_period = "month" if category.endswith("_month") else ("week" if category.endswith("_week") else "today")
+            elif category.startswith("love") or category.startswith("work") or category.startswith("astro") or category.startswith("daily"):
+                pred_period = "future" if category.endswith("_future") else ("month" if category.endswith("_month") else ("week" if category.endswith("_week") else "today"))
                 text = generate_time_based_prediction(category, pred_period, {"name": name, "sun": sun, "moon": moon}, day_label)
             elif category == "love_metrics":
                 love_fallbacks = {

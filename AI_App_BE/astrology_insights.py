@@ -566,17 +566,33 @@ Vận trình công danh của {name} bước vào giai đoạn gặt hái thành
     # 3. TỔNG QUAN CHIÊM TINH (ASTRO)
     else:
         if period == "today":
-            return f"""Tổng Quan Chiêm Tinh Hôm Nay ({day_str or 'Hôm nay'}):
-Năng lượng vũ trụ hôm nay mang lại cho {name} (Mặt Trời {sun}, Mặt Trăng {moon}) sự điềm tĩnh nội tại và nguồn sinh khí cân bằng. Bạn cảm nhận rõ sự kết nối giữa ý chí hành động và trực giác cảm xúc. Đây là ngày thuận lợi để giải quyết các vấn đề quan trọng trong sự tĩnh tại, chăm sóc sức khỏe và tận hưởng những khoảnh khắc bình dị đáng quý."""
+            return f"""Dự Báo Tổng Quan Chiêm Tinh Hôm Nay ({day_str or 'Hôm nay'}):
+Năng lượng vũ trụ hôm nay tạo nên sự giao thoa hài hòa giữa Mặt Trời {sun} và Mặt Trăng {moon}, mang lại cho {name} nguồn sinh khí dồi dào cùng trạng thái tinh thần cân bằng, sáng suốt:
+- Năng lượng tổng quan: Bạn cảm nhận rõ sự kết nối nhịp nhàng giữa ý chí hành động và trực giác cảm xúc vi mô. Sự điềm tĩnh tự nhiên giúp bạn không bị xao động trước những áp lực ngoại cảnh bất ngờ.
+- Cơ hội & Tương tác: Đây là thời điểm tuyệt vời để bạn mở rộng giao tiếp, kết nối với những người cùng tần số tư tưởng, đồng thời đưa ra những quyết định sáng suốt trong các mối quan hệ xã hội lẫn cá nhân.
+- Thách thức nội tâm: Hãy lưu ý tránh để những suy nghĩ vụn vặt gây tiêu hao năng lượng tinh thần; giữ vững sự thư thái và nhịp thở tĩnh tại.
+- Lời khuyên hành động: Dành ít nhất 15-30 phút cuối ngày để nhìn nhận lại những điều tích cực đã trải qua; trân trọng từng khoảnh khắc hiện tại và tự tin bước tiếp trên hành trình của mình."""
 
         elif period == "week":
-            return f"""Tổng Quan Chiêm Tinh Tuần Tới cho {name}:
-Bản đồ sao tuần này cho thấy sự hòa hợp giữa các góc chiếu nguyên tố, giúp bạn cân bằng xuất sắc giữa công việc và đời sống tinh thần. Đầu tuần thuận lợi cho khởi đầu mới; giữa tuần đón nhận những thông điệp vũ trụ quý giá; cuối tuần là lúc phục hồi năng lượng và kết nối yêu thương."""
+            return f"""Dự Báo Vận Trình Chiêm Tinh Tuần Này cho {name}:
+Bản đồ sao tuần này cho thấy sự vận hành mạnh mẽ của các góc chiếu nguyên tố, mang lại nhịp điệu chuyển biến đa chiều cho người mang năng lượng {sun}:
+- Đầu tuần (Thứ 2 - Thứ 4 - Khởi sắc & Kích hoạt): Năng lượng khởi đầu thuận hòa. Bạn dễ dàng thiết lập mục tiêu tuần mới, khơi gợi cảm hứng sáng tạo và tìm thấy sự đồng thuận từ bạn bè, đồng nghiệp. Mọi dự định bắt đầu trong giai đoạn này đều có bước đà thuận lợi.
+- Giữa tuần (Thứ 5 - Thứ 6 - Điểm rơi thử thách & Chuyển hóa): Góc chiếu thử thách nhẹ đòi hỏi bạn phải cân đối giữa cảm xúc cá nhân và trách nhiệm thực tế. Hãy tỉnh táo trước những phản ứng bộc phát và kiên nhẫn lắng nghe đa chiều trước khi đưa ra kết luận.
+- Cuối tuần (Thứ 7 - Chủ Nhật - Hòa hợp & Tái tạo): Khoảng thời gian lắng đọng tuyệt vời để phục hồi sinh lực, kết nối sâu sắc với người thân yêu và tận hưởng không gian tĩnh lặng nuôi dưỡng tâm hồn.
+- Kim chỉ nam của tuần: Giữ tâm an giữa vạn biến; sự mềm mỏng và kiên định chính là chìa khóa mở ra bình an trọn vẹn."""
 
         elif period == "month":
-            return f"""Tổng Quan Chiêm Tinh Tháng Tới cho {name}:
-Tháng tới là một chu kỳ thanh lọc và tái sinh mạnh mẽ. Năng lượng các hành tinh thúc đẩy bạn buông bỏ những áp lực cũ kỹ, đón nhận những cơ hội mới mẻ trong cả tình duyên lẫn sự nghiệp, kiến tạo một phiên bản tự tin và an yên hơn bao giờ hết."""
+            return f"""Dự Báo Vận Trình Chiêm Tinh Tháng Này cho {name}:
+Tháng này đánh dấu một chu kỳ thanh lọc, chuyển tiếp và tái định vị năng lượng đầy sâu sắc dưới tác động của các dịch chuyển thiên văn lên cung {sun}:
+- Tuần 1 (Tái định vị mục tiêu): Giai đoạn ủ mầm và nhìn nhận lại nội tâm. Bạn tự động soi chiếu các khía cạnh cuộc sống, loại bỏ những kỳ vọng không còn phù hợp để giải phóng không gian tinh thần cho những khởi đầu mới.
+- Tuần 2 (Khai mở cơ hội & Vận hội): Năng lượng giao lưu và đón nhận may mắn tăng cao. Các cơ hội hợp tác mới, sự hỗ trợ từ quý nhân và những kết nối nhân duyên đáng giá sẽ liên tục xuất hiện nếu bạn chủ động bước ra khỏi vùng an toàn.
+- Tuần 3 (Đỉnh điểm cảm xúc & Bài học thức tỉnh): Trăng tròn kích hoạt chiều sâu trực giác của Mặt Trăng {moon}. Đây là lúc bạn nhận thức rõ đâu là giá trị cốt lõi cần trân quý và đâu là ranh giới cảm xúc cần được thiết lập kiên quyết.
+- Tuần 4 (Thu hoạch & Khẳng định bản sắc): Bạn hoàn tất chu kỳ tháng trong trạng thái mãn nguyện, nắm giữ sự tự chủ vững vàng và chuẩn bị tâm thế vững chãi cho những bước tiến lớn tiếp theo."""
 
         else: # future
-            return f"""Tổng Quan Vận Trình Tương Lai Dài Hạn cho {name}:
-Hành trình tương lai mở ra một chương sách rực rỡ của sự trưởng thành tâm hồn và hiện thực hóa những ước mơ lớn. Bạn sẽ từng bước đạt được sự tự do tài chính, viên mãn trong tình cảm và bình an sâu sắc trong thế giới nội tâm của chính mình."""
+            return f"""Dự Báo Vận Trình Tương Lai Dài Hạn (Tầm Nhìn 6 - 12 Tháng Tới cho {name}):
+Hành trình tương lai mở ra một chương sách rực rỡ của sự thức tỉnh tâm thức, trưởng thành bản lĩnh và hiện thực hóa những khát vọng lớn:
+- Xu hướng vận mệnh chủ đạo: Sự tương tác giữa các đại tinh mang lại cho bạn bước nhảy vọt về nhận thức. Bạn không còn bị chi phối bởi những nỗi lo sợ vô hình của quá khứ mà chủ động kiến tạo vận mệnh theo cách riêng đầy tự do và kiêu hãnh.
+- Cột mốc chuyển hóa lớn: Trong vòng nửa năm tới, bạn sẽ trải qua một bước ngoặt quan trọng liên quan đến môi trường sống, sự nghiệp hoặc một cam kết bền vững trong mối quan hệ. Đây là phần thưởng xứng đáng cho sự kiên trì và chân thành của bạn.
+- Bài học tiến hóa tâm hồn: Học cách đón nhận sự biến chuyển của cuộc đời với tâm thế điềm nhiên; biến nghịch cảnh thành chất liệu rèn luyện nội lực và lan tỏa nguồn năng lượng tích cực đến xung quanh.
+- Thông điệp vũ trụ: Bạn đang đứng trước ngưỡng cửa của phiên bản rạng rỡ và vững chãi nhất của chính mình; hãy tin tưởng tuyệt đối vào lộ trình thiêng liêng mà vũ trụ đang dẫn lối."""
