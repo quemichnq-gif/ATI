@@ -1,3 +1,17 @@
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+AI_App_BE/__pycache__/
+
+# Local environment variables
+.env
+.env.*
+*.env
+AI_App_BE/.env
+AI_App_FE/ResonanciaWeb/.env
+AI_App_FE/ResonanciaWeb/.env.local
+
 # Virtual environment
 AI_App_BE/venv/
 AI_App_BE/.venv/

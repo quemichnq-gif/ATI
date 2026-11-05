@@ -52,7 +52,7 @@ function parseAnalysisSections(text: string) {
   const sections: Record<string, string> = {};
   if (!text) return sections;
 
-  // Tách theo tiêu đề mục (## 1., 1., **1., ###)
+  // 1. Trường hợp bài phân tích theo chuẩn 8 mục (1. Tính Cách ... 8. Người Lý Tưởng)
   const parts = text.split(/\n(?=(?:#{1,4}\s*)?(?:\d+[.:)/-]|\*\*\d+[.:)/-]))/);
   const keys = ['personality', 'emotions', 'career', 'love', 'strengths', 'elements', 'advice', 'idealPartner'];
 
@@ -61,7 +61,7 @@ function parseAnalysisSections(text: string) {
     if (!trimmed) return;
     const firstLine = trimmed.split('\n')[0].toLowerCase();
 
-    // 1. Kiểm tra số thứ tự 1-8 ở đầu dòng
+    // Kiểm tra số thứ tự 1-8 ở đầu dòng
     const numMatch = firstLine.match(/^\s*(?:#{1,4}\s*)?(?:\*\*)?([1-8])[.:)/-]/);
     if (numMatch) {
       const idx = parseInt(numMatch[1], 10) - 1;
@@ -71,7 +71,7 @@ function parseAnalysisSections(text: string) {
       }
     }
 
-    // 2. Kiểm tra từ khóa CHỈ TRÊN DÒNG ĐẦU TIÊN (firstLine) để tránh nhầm lẫn từ ngữ trong thân bài
+    // Kiểm tra từ khóa trên dòng đầu tiên
     if (firstLine.includes('người lý tưởng') || firstLine.includes('lý tưởng')) sections['idealPartner'] = trimmed;
     else if (firstLine.includes('lời khuyên') || firstLine.includes('khuyên')) sections['advice'] = trimmed;
     else if (firstLine.includes('nguyên tố')) sections['elements'] = trimmed;
@@ -80,10 +80,24 @@ function parseAnalysisSections(text: string) {
     else if (firstLine.includes('sự nghiệp')) sections['career'] = trimmed;
     else if (firstLine.includes('cảm xúc')) sections['emotions'] = trimmed;
     else if (firstLine.includes('tính cách')) sections['personality'] = trimmed;
-    else if (keys[i] && !sections[keys[i]]) {
-      sections[keys[i]] = trimmed;
-    }
   });
+
+  // 2. Nếu định dạng phân tích sâu theo Cấu trúc Thiên văn (Cung Mọc, Mặt Trời, Mặt Trăng, 3 Đỉnh)
+  if (Object.keys(sections).length < 2) {
+    const astroParts = text.split(/\n(?=##\s+)/);
+    astroParts.forEach(p => {
+      const trimmed = p.trim();
+      const firstLine = trimmed.split('\n')[0].toLowerCase();
+      if (firstLine.includes('cung mọc')) sections['personality'] = (sections['personality'] ? sections['personality'] + '\n\n' : '') + trimmed;
+      else if (firstLine.includes('mặt trời')) sections['personality'] = (sections['personality'] ? sections['personality'] + '\n\n' : '') + trimmed;
+      else if (firstLine.includes('mặt trăng')) sections['emotions'] = trimmed;
+      else if (firstLine.includes('kết hợp cung mọc') || firstLine.includes('big 3')) sections['strengths'] = trimmed;
+      else if (firstLine.includes('3 đỉnh') || firstLine.includes('cung lặn') || firstLine.includes('thiên đỉnh')) {
+        sections['career'] = trimmed;
+        sections['idealPartner'] = trimmed;
+      }
+    });
+  }
 
   if (Object.keys(sections).length === 0) sections['personality'] = text;
   return sections;
@@ -137,6 +151,7 @@ export default function NatalChartPage() {
         earthRatio: profile.earthRatio,
         airRatio: profile.airRatio,
         waterRatio: profile.waterRatio,
+        birthDate: profile.birthDate || '',
       });
       const text = res.data?.analysis || '';
       if (!text) throw new Error('Empty analysis from backend');

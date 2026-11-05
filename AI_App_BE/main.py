@@ -13,7 +13,11 @@ import cloudinary
 import cloudinary.uploader
 from datetime import datetime, timedelta
 import uuid
-from astrology_insights import generate_career_insight_text, generate_natal_depth_analysis
+from astrology_insights import (
+    generate_career_insight_text,
+    generate_natal_depth_analysis,
+    generate_time_based_prediction
+)
 
 # Load biến môi trường
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -266,6 +270,7 @@ def generate_prediction():
     name = user_data.get("name", "Bạn")
     sun = user_data.get("sun") or user_data.get("zodiac", "Ma Kết")
     moon = user_data.get("moon") or "Kim Ngưu"
+    ascendant = user_data.get("ascendant") or data.get("extra", {}).get("ascendant", "")
 
     # Kiểm tra cache
     cached_doc = get_cached_prediction(uid, name, sun, moon, category, day)
@@ -439,24 +444,46 @@ def generate_prediction():
         2. Đưa ra 1-2 câu hướng dẫn ứng xử hành động cụ thể, thực tế cho {name} hôm nay, nêu rõ việc nên làm hoặc thái độ tâm lý cần chuyển hóa, thay vì các câu template chung chung lặp lại.
         - Lời văn thi vị, tinh tế nhưng sắc bén và hữu ích. Không dùng emoji, không tiêu đề thừa.
         """
-    elif category.endswith("_week") or category.endswith("_month"):
-        period_str = "tuần này" if category.endswith("_week") else "tháng này"
-        base_cat = category.replace("_week", "").replace("_month", "")
-        cat_map2 = {"astro": "tổng quan chiêm tinh", "love": "tình duyên", "work": "công việc"}
+    elif category.endswith("_week") or category.endswith("_month") or category.endswith("_future"):
+        if category.endswith("_future"):
+            period_str = "trong tương lai dài hạn (6 - 12 tháng tới)"
+            base_cat = category.replace("_future", "")
+        elif category.endswith("_month"):
+            period_str = "tháng này"
+            base_cat = category.replace("_month", "")
+        else:
+            period_str = "tuần này"
+            base_cat = category.replace("_week", "")
+
+        cat_map2 = {"astro": "tổng quan chiêm tinh", "daily": "tổng quan chiêm tinh", "love": "tình duyên", "work": "công việc"}
         base_label = cat_map2.get(base_cat, "chiêm tinh")
         prompt = f"""
-        Dự đoán {base_label} {period_str} cho {name} (Mặt Trời {sun}, Mặt Trăng {moon}).
-        Viết 150-200 từ, chia theo các giai đoạn (đầu/giữa/cuối {period_str}), lời khuyên cụ thể. Không dùng emoji.
+        Bạn là bậc thầy Chiêm Tinh Học Tâm Lý Chiều Sâu. Hãy viết bản dự báo chi tiết, toàn diện về {base_label} {period_str} cho {name}:
+        - Bản đồ sao: Mặt Trời {sun}, Mặt Trăng {moon}{f', Cung Mọc {ascendant}' if ascendant else ''}.
+
+        YÊU CẦU ĐỘ DÀI & ĐỘ SÂU:
+        - Viết một bài luận giải phong phú, sâu sắc dài khoảng 400 - 600 từ.
+        - Chia thành từng giai đoạn rõ ràng:
+          + Giai đoạn 1 (Khởi đầu): Xu hướng năng lượng, cơ hội tiềm ẩn và điểm khởi sắc.
+          + Giai đoạn 2 (Phát triển & Biến động): Điểm rơi cảm xúc, thách thức cần lưu tâm, cạm bẫy tâm lý cần phòng tránh.
+          + Giai đoạn 3 (Thu hoạch & Định hình): Kết quả đạt được, sự hòa hợp và bước đệm chuyển tiếp.
+          + Lời khuyên vàng: Chỉ dẫn hành động thực tế, sắc bén, mang tính ứng dụng cao.
+        - Lời văn truyền cảm hứng, tinh tế, hiện đại, không dùng emoji, không mở/kết bài sáo rỗng.
         """
     else:
         prompt = f"""
-    {cat_label} cho {day_label}:
-    - Tên: {name}
-    - Mặt Trời: {sun}, Mặt Trăng: {moon}
+        Bạn là bậc thầy Chiêm Tinh Học Tâm Lý Chiều Sâu. Hãy phân tích chuyên sâu vận trình {cat_label} cho {day_label} của {name}:
+        - Bản đồ sao: Mặt Trời {sun}, Mặt Trăng {moon}{f', Cung Mọc {ascendant}' if ascendant else ''}.
 
-    Mô tả cụ thể năng lượng, cảm xúc, xu hướng và lời khuyên thiết thực.
-    Không dùng emoji, không ký tự đặc biệt, không mở đầu hay kết thúc dư thừa.
-    """
+        YÊU CẦU ĐỘ DÀI & NỘI DUNG CHI TIẾT:
+        - Viết một bài luận giải sâu sắc dài khoảng 300 - 400 từ, giàu hàm lượng tri thức chiêm tinh học.
+        - Phân tích rõ nét:
+          1. Năng lượng vũ trụ chi phối và diễn biến tâm lý nội tâm trong ngày.
+          2. Cơ hội cụ thể cần nắm bắt (trong các mối quan hệ xã hội, giao tiếp hoặc công việc).
+          3. Cạm bẫy cảm xúc hoặc áp lực tiềm thức cần chú ý kiểm soát.
+          4. Chỉ dẫn hành động vàng (Actionable advice): điều nên ưu tiên làm và điều cần tránh để đạt được sự thuận hòa cao nhất.
+        - Tuyệt đối không dùng emoji, không viết câu ngắn cụt ngủn hoặc chung chung sáo rỗng.
+        """
 
     try:
         text = ""
@@ -503,10 +530,9 @@ def generate_prediction():
                 mercury = extra.get("mercury") or user_data.get("mercury", "Sao Thủy")
                 asc = extra.get("ascendant") or user_data.get("ascendant", "Nhân Mã")
                 text = generate_career_insight_text(name, sun, moon, asc, mc, house10, saturn, jupiter, mercury)
-            elif category == "love":
-                text = f"Năng lượng sao Kim và Mặt Trăng mang đến luồng gió mới cho chuyện tình cảm của {sun}. Hôm nay bạn cảm nhận rõ nét sự ấm áp, dễ mở lòng chia sẻ và thấu cảm với đối phương. Đối với người độc thân, một cuộc gặp gỡ tình cờ có thể nhóm lên tia lửa đồng điệu; với người đã có đôi, sự lắng nghe chân thành sẽ giúp hai bạn thêm gắn kết bền chặt."
-            elif category == "work":
-                text = f"Vận trình sự nghiệp của {sun} hôm nay có nhiều tín hiệu khởi sắc nhờ sự hỗ trợ đắc lực từ sao Thủy. Bạn có khả năng tập trung cao độ, xử lý thông suốt các nhiệm vụ phức tạp và đưa ra quyết định chuẩn xác. Hãy tự tin đề xuất ý tưởng mới, năng lực của bạn đang được đồng nghiệp và cấp trên đánh giá rất cao."
+            elif category.startswith("love") or category.startswith("work") or category.startswith("astro") or category.startswith("daily"):
+                pred_period = "future" if category.endswith("_future") else ("month" if category.endswith("_month") else ("week" if category.endswith("_week") else "today"))
+                text = generate_time_based_prediction(category, pred_period, {"name": name, "sun": sun, "moon": moon}, day_label)
             elif category == "love_metrics":
                 love_fallbacks = {
                     "Bạch Dương": {"match": "Thiên Bình", "luck": 89, "comp": 94, "quote": "Ngọn lửa chân thành từ trái tim bạn sẽ sưởi ấm và thu hút người tri kỷ đích thực."},
@@ -679,6 +705,7 @@ def natal_chart_analysis():
     try:
         data = request.get_json() or {}
         uid = data.get("uid", "")
+        birth_date = data.get("birthDate", "")
 
         # Lấy thông tin từ request
         user_info = {
@@ -749,71 +776,77 @@ def natal_chart_analysis():
 
         # Tạo prompt phân tích chi tiết
         prompt = f"""
-        Phân tích bản đồ sao chi tiết cho người có thông tin sau:
+        Bạn là bậc thầy Chiêm Tinh Học Tâm Lý Chiều Sâu (Depth Psychological Astrologer). Hãy phân tích bản đồ sao cá nhân cực kỳ chi tiết, sâu sắc và toàn diện cho đương số sau:
 
-        **Thông tin cơ bản:**
+        **Thông tin bản đồ sao:**
         - Tên: {user_info['name']}
-        - Mặt Trời: {user_info['sun']}
-        - Mặt Trăng: {user_info['moon']}
-        - Thủy tinh: {user_info['mercury']}
-        - Kim tinh: {user_info['venus']}
-        - Hỏa tinh: {user_info['mars']}
-        - Mộc tinh: {user_info['jupiter']}
-        - Thổ tinh: {user_info['saturn']}
-        - Thiên Vương tinh: {user_info['uranus']}
-        - Hải Vương tinh: {user_info['neptune']}
-        - Diêm Vương tinh: {user_info['pluto']}
-
-        **Điểm đặc biệt:**
-        - Ascendant (Cung Thăng): {user_info['ascendant']}
-        - Descendant: {user_info['descendant']}
-        - MC (Midheaven): {user_info['mc']}
-        - IC: {user_info['ic']}
+        - Cung Mặt Trời (Bản ngã & Ý chí): {user_info['sun']}
+        - Cung Mặt Trăng (Nội tâm & Nhu cầu an toàn): {user_info['moon']}
+        - Cung Mọc / Ascendant (Khí chất, diện mạo & lăng kính tiếp cận): {user_info['ascendant']}
+        - Cung Lặn / Descendant (Hình mẫu đối tác & người bạn đời lý tưởng): {user_info['descendant']}
+        - Thiên Đỉnh / MC (Đỉnh cao công danh & định vị sự nghiệp): {user_info['mc']}
+        - Thiên Đế / IC (Cội nguồn gia đình & chốn ẩn náu tâm hồn): {user_info['ic']}
+        - Thủy tinh (Tư duy & giao tiếp): {user_info['mercury']}
+        - Kim tinh (Giá trị & ngôn ngữ tình yêu): {user_info['venus']}
+        - Hỏa tinh (Động lực hành động & tham vọng): {user_info['mars']}
+        - Mộc tinh (Vận may & sự mở rộng): {user_info['jupiter']}
+        - Thổ tinh (Kỷ luật, thử thách & nghiệp lực): {user_info['saturn']}
+        - Thiên Vương tinh: {user_info['uranus']}, Hải Vương tinh: {user_info['neptune']}, Diêm Vương tinh: {user_info['pluto']}
 
         **Các nhà (Houses):**
         {chr(10).join([f"- Nhà {i}: {houses[f'house{i}']}" for i in range(1, 13) if houses[f'house{i}']])}
 
-        **Các góc tương tác (Aspects):**
-        - Conjunction: {aspects['conjunction']}
-        - Opposition: {aspects['opposition']}
-        - Trine: {aspects['trine']}
-        - Square: {aspects['square']}
-        - Sextile: {aspects['sextile']}
+        **Các góc tương tác nổi bật (Aspects):**
+        - Trùng tụ (Conjunction): {aspects['conjunction']}
+        - Đối đỉnh (Opposition): {aspects['opposition']}
+        - Tam hợp (Trine): {aspects['trine']}
+        - Vuông góc (Square): {aspects['square']}
+        - Lục hợp (Sextile): {aspects['sextile']}
 
-        **Tỷ lệ nguyên tố:**
-        - Lửa: {elemental_ratios['fire']}%
-        - Đất: {elemental_ratios['earth']}%
-        - Khí: {elemental_ratios['air']}%
-        - Nước: {elemental_ratios['water']}%
+        **Tỷ lệ 4 nguyên tố:** Lửa {elemental_ratios['fire']}%, Đất {elemental_ratios['earth']}%, Khí {elemental_ratios['air']}%, Nước {elemental_ratios['water']}%
 
-        Hãy phân tích chi tiết bản đồ sao này theo đúng 8 mục sau (mỗi mục dùng tiêu đề số):
+        BẮT BUỘC PHÂN TÍCH ĐỦ VÀ ĐÚNG THEO 8 MỤC SAU (mỗi mục dùng tiêu đề số 1 đến 8):
 
         1. Tính Cách
-        2. Cảm Xúc
-        3. Sự Nghiệp
-        4. Tình Yêu
-        5. Điểm Mạnh
-        6. Nguyên Tố
-        7. Lời Khuyên
-        8. Người Lý Tưởng
+        Phân tích chuyên sâu sự hòa hợp giữa Cung Mọc ({user_info['ascendant']}) và Mặt Trời ({user_info['sun']}). Cách đương số bước vào một không gian, phong thái tiếp cận, cơ chế tự vệ, sự tự tôn và cách khẳng định giá trị bản thân.
 
-        Yêu cầu:
-        - Viết bằng tiếng Việt, văn phong chiêm tinh học tâm lý chiều sâu (Depth Psychological Astrology).
-        - Đưa ra những insight sâu sắc, chạm đến tiềm thức: mâu thuẫn giữa bản ngã và cảm xúc, cơ chế phòng vệ tâm lý, ngôn ngữ tình cảm đích thực và kim chỉ nam khai phóng sự nghiệp.
-        - Mỗi mục khoảng 1-2 đoạn văn súc tích, giàu hàm lượng tri thức.
-        - Không dùng emoji, không dùng ký tự đặc biệt, không chào hỏi dư thừa.
+        2. Cảm Xúc
+        Mặt Trăng ({user_info['moon']}) và nhà của Mặt Trăng. Nhu cầu an toàn cốt lõi, cơ chế xoa dịu bản thân, cách kiểm soát hay che giấu cảm xúc, mâu thuẫn giữa lý trí và thế giới nội tâm sâu kín.
+
+        3. Sự Nghiệp
+        Thiên Đỉnh ({user_info['mc']}), sao Thổ ({user_info['saturn']}) và Mặt Trời. Động lực thành công dài hạn, các lĩnh vực phát huy tối đa tiềm năng, phong cách quản lý/lãnh đạo và định vị sự nghiệp bền vững.
+
+        4. Tình Yêu
+        Kim tinh ({user_info['venus']}), Cung Lặn ({user_info['descendant']}) và Mặt Trăng. Ngôn ngữ tình cảm, cách trao đi và đón nhận yêu thương, xu hướng gắn kết và điều kiện để cảm thấy an tâm trong một mối quan hệ.
+
+        5. Điểm Mạnh
+        Tổng hợp năng khiếu thiên bẩm từ Big 3 (Mọc - Trời - Trăng) và các góc chiếu thuận lợi. Sức bền, trực giác, năng lực tổ chức hoặc sức hút cá nhân nổi trội.
+
+        6. Nguyên Tố
+        Phân tích sự phân bổ 4 nguyên tố. Ưu thế từ nguyên tố trội và cách bù đắp năng lượng cho nguyên tố còn thiếu để đạt trạng thái cân bằng nội tại.
+
+        7. Lời Khuyên
+        Chỉ dẫn chuyển hóa tâm lý thực tế: bài học buông bỏ cầu toàn, chấp nhận sự không hoàn hảo, quản trị năng lượng và khai phóng tiềm năng cao nhất của bản mệnh.
+
+        8. Người Lý Tưởng
+        Chân dung người bạn đời và tri kỷ đồng điệu (dựa trên Cung Lặn {user_info['descendant']}, Kim tinh và Mặt Trăng): tính cách, phong thái, giá trị sống và cách họ bù trừ cho đương số.
+
+        QUY TẮC BẮT BUỘC VỀ ĐỘ DÀI VÀ VĂN PHONG:
+        - Bài phân tích phải thật DÀI, CHI TIẾT và CHUYÊN MÔN CAO (khoảng 1500 - 2000 từ toàn bài, mỗi mục từ 180 - 250 từ).
+        - Văn phong tâm lý học sâu sắc, chạm đến tiềm thức, thấu đáo và chữa lành.
+        - Tuyệt đối không dùng emoji, không chào hỏi, không kết bài thừa.
         """
 
         analysis_text = ""
         try:
-            # Gọi Gemini API với timeout 10.0s
+            # Gọi Gemini API với timeout 25.0s để AI có đủ thời gian sinh bài viết dài và chi tiết
             model = genai.GenerativeModel(MODEL_NAME)
-            response = model.generate_content(prompt, request_options={"timeout": 10.0})
+            response = model.generate_content(prompt, request_options={"timeout": 25.0})
             analysis_text = response.text if hasattr(response, "text") else str(response)
             analysis_text = re.sub(r"(```|'''|\"\"\")", "", analysis_text).strip()
         except BaseException as gemini_err:
             safe_print(f"⚠️ Gemini API tạm thời giới hạn ({gemini_err}), sử dụng luận giải chiêm tinh chuyên sâu dự phòng...")
-            analysis_text = generate_natal_depth_analysis(user_info, houses, aspects, elemental_ratios)
+            analysis_text = generate_natal_depth_analysis(user_info, houses, aspects, elemental_ratios, birth_date)
 
         # Lưu vào Firestore an toàn
         if FIREBASE_AVAILABLE and db is not None and uid:

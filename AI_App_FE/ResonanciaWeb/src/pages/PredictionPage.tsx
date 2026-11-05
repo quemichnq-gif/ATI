@@ -25,9 +25,10 @@ export default function PredictionPage() {
     { id: 'today', label: 'Hôm Nay' },
     { id: 'week', label: 'Tuần Nay' },
     { id: 'month', label: 'Tháng Nay' },
+    { id: 'future', label: 'Tương Lai' },
   ];
 
-  const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today');
+  const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'future'>('today');
 
   const CATEGORIES = [
     { id: 'astro', label: 'Chiêm Tinh', icon: 'chart', desc: 'Dự đoán tổng quan hôm nay' },
@@ -40,7 +41,9 @@ export default function PredictionPage() {
       ? new Date().toISOString().split('T')[0]
       : p === 'week'
       ? `week_${getWeekNumber()}`
-      : `month_${new Date().toISOString().slice(0, 7)}`;
+      : p === 'month'
+      ? `month_${new Date().toISOString().slice(0, 7)}`
+      : 'future_outlook';
     return `pred_${profile.uid || 'guest'}_${cat}_${p}_${dateKey}`;
   };
 
