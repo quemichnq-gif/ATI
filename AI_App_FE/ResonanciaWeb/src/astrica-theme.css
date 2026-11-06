@@ -89,7 +89,7 @@ body,
   z-index: 1;
   width: 100vw;
   margin-left: calc(50% - 50vw);
-  margin-bottom: 64px;
+  margin-bottom: 0;
 }
 
 .reference-home-sections::before {
@@ -137,7 +137,7 @@ body,
 }
 
 .astrica-app-shell > header.astrica-navbar {
-  position: fixed;
+  position: absolute;
   top: 0;
   right: 0;
   left: 0;
@@ -737,16 +737,253 @@ body,
   text-transform: none;
 }
 
-.astrica-app-shell > footer {
-  background-color: rgba(4, 3, 42, 0.92);
-  background-image: url('/astrica/images/6879dbaa5249136c7d02b462_footer-bg.png');
-  background-position: center top;
-  background-size: cover;
-  border-color: var(--color--border-color-light, rgba(255, 255, 255, 0.3));
+/* ==========================================================================
+   ASTRICA AUTHENTIC FOOTER (Crisp, High-Contrast, Exact Astrica Match)
+   ========================================================================== */
+.astrica-footer {
+  position: relative !important;
+  z-index: 20 !important;
+  width: 100% !important;
+  background-color: #040316 !important;
+  background-image: url('/astrica/images/6879dbaa5249136c7d02b462_footer-bg.png') !important;
+  background-position: 50% top !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  padding-top: 80px !important;
+  padding-bottom: 0 !important;
+  overflow: hidden !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 -20px 60px rgba(4, 3, 22, 0.95) !important;
 }
 
-.astrica-app-shell > footer .container {
-  max-width: 1330px;
+.astrica-footer .container {
+  max-width: 1330px !important;
+  width: 100% !important;
+}
+
+.astrica-footer .first-footer {
+  display: grid !important;
+  grid-template-columns: 5fr 4fr 3fr !important;
+  grid-column-gap: 50px !important;
+  grid-row-gap: 50px !important;
+  align-items: flex-start !important;
+}
+
+.astrica-footer .footer-widget {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+}
+
+.astrica-footer .widget-title {
+  color: #ffffff !important;
+  font-family: Merriweather, Georgia, serif !important;
+  font-size: 18px !important;
+  line-height: 28px !important;
+  font-weight: 700 !important;
+  margin-bottom: 24px !important;
+  letter-spacing: 0.5px !important;
+}
+
+.astrica-footer .footer-nav-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  grid-column-gap: 30px !important;
+  grid-row-gap: 12px !important;
+  width: 100% !important;
+}
+
+.astrica-footer .footer-nav-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+
+.astrica-footer .footer-nav-link {
+  color: #ffffff !important;
+  font-family: Manrope, sans-serif !important;
+  font-size: 15px !important;
+  line-height: 24px !important;
+  text-decoration: none !important;
+  transition: all 0.3s ease !important;
+  display: inline-block !important;
+  opacity: 0.9 !important;
+}
+
+.astrica-footer .footer-nav-link:hover {
+  color: #fff1b3 !important;
+  opacity: 1 !important;
+  transform: translateX(3px);
+}
+
+.astrica-footer .footer-social-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+
+.astrica-footer .footer-social-link {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  width: 150px !important;
+  height: 42px !important;
+  padding: 8px 18px 8px 45px !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 15px !important;
+  color: #ffffff !important;
+  font-size: 15px !important;
+  line-height: 25px !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  transition: all 0.4s ease !important;
+}
+
+.astrica-footer .footer-social-link:hover {
+  border-radius: 50px !important;
+  box-shadow: 0 0 16px rgba(155, 28, 255, 0.7) !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  color: #ffffff !important;
+  padding-left: 10px !important;
+  transform: translateY(-2px);
+}
+
+.astrica-footer .footer-social-icon-block {
+  position: absolute !important;
+  top: 50% !important;
+  left: 12px !important;
+  transform: translateY(-50%) !important;
+  width: 22px !important;
+  height: 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+}
+
+.astrica-footer .footer-social-icon-block img {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+}
+
+.astrica-footer .footer-social-text-block {
+  width: 100% !important;
+  text-align: right !important;
+}
+
+.astrica-footer .footer-social-text {
+  color: #ffffff !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+}
+
+.astrica-footer .copyright-block {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-top: 70px !important;
+  margin-bottom: 45px !important;
+  font-size: 14px !important;
+  color: #ffffff !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding-top: 24px !important;
+}
+
+.astrica-footer .copyright-text {
+  color: #ffffff !important;
+  font-size: 14px !important;
+  opacity: 0.9 !important;
+}
+
+.astrica-footer .copyright-text-link {
+  color: #ffffff !important;
+  text-decoration: underline !important;
+  transition: all 0.3s ease !important;
+}
+
+.astrica-footer .copyright-text-link:hover {
+  color: #fff1b3 !important;
+}
+
+.astrica-footer .bottom-footer {
+  margin-bottom: -40px !important;
+  margin-left: -50px !important;
+  margin-right: -50px !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  user-select: none !important;
+}
+
+.astrica-footer .bottom-footer-text {
+  font-family: Merriweather, Georgia, serif !important;
+  color: #ffffff !important;
+  text-align: center !important;
+  letter-spacing: clamp(6px, 1.2vw, 16px) !important;
+  text-transform: uppercase !important;
+  font-size: clamp(60px, 12vw, 180px) !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: baseline !important;
+  width: 100% !important;
+}
+
+.astrica-footer .footer-text-span {
+  transition: transform 0.3s ease, color 0.3s ease !important;
+  display: inline-block !important;
+  cursor: default !important;
+}
+
+.astrica-footer .footer-text-span:hover {
+  transform: translateY(-30px) !important;
+  color: #fff1b3 !important;
+  text-shadow: 0 0 25px rgba(255, 241, 179, 0.7) !important;
+}
+
+@media (max-width: 991px) {
+  .astrica-footer .first-footer {
+    grid-template-columns: 8fr 4fr !important;
+    grid-column-gap: 30px !important;
+    grid-row-gap: 30px !important;
+  }
+  .astrica-footer .bottom-footer {
+    margin-bottom: -15px !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .astrica-footer {
+    padding-top: 50px !important;
+  }
+  .astrica-footer .first-footer {
+    grid-template-columns: 1fr !important;
+    grid-column-gap: 25px !important;
+    grid-row-gap: 25px !important;
+  }
+  .astrica-footer .footer-social-list {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+  }
+  .astrica-footer .copyright-block {
+    flex-direction: column !important;
+    text-align: center !important;
+    gap: 12px !important;
+    margin-top: 40px !important;
+    margin-bottom: 25px !important;
+  }
+  .astrica-footer .bottom-footer {
+    margin-bottom: 0 !important;
+  }
 }
 
 .astrica-app-shell [class*='bg-zinc-950'],
@@ -886,7 +1123,7 @@ body,
   }
 
   .astrica-menu-panel {
-    position: fixed;
+    position: absolute;
     top: 104px;
     left: 50%;
     transform: translateX(-50%);
@@ -1018,4 +1255,14 @@ body,
   .astrica-menu-capsule {
     width: 164px;
   }
+}
+
+
+/* An badge Webflow */
+.w-webflow-badge,
+a.w-webflow-badge {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

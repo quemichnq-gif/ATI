@@ -22,6 +22,7 @@ from astrology_insights import (
 
 # Load biến môi trường
 base_dir = os.path.abspath(os.path.dirname(__file__))
+load_dotenv(os.path.join(base_dir, ".env.local"))
 load_dotenv(os.path.join(base_dir, ".env"))
 
 api_key = os.getenv("GEMINI_API_KEY")

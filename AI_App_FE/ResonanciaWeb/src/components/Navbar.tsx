@@ -58,7 +58,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className="header-content-wrapper navbar w-nav astrica-navbar fixed top-0 left-0 right-0 z-40">
+    <header className="header-content-wrapper navbar w-nav astrica-navbar absolute top-0 left-0 right-0 z-40">
       <div className="container w-container site-navigation astrica-navbar-inner">
         <Link to="/home" className="astrica-brand" aria-label="Resonancia - Trang chủ">
           RESONANCIA

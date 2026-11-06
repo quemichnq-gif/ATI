@@ -3,13 +3,6 @@ import { motion } from 'framer-motion';
 import StarField from '../components/StarField';
 import UiIcon from '../components/UiIcon';
 
-const FEATURES = [
-  { icon: 'chart', title: 'Natal Chart AI', desc: 'Phân tích biểu đồ chiêm tinh cá nhân sâu với Gemini AI' },
-  { icon: 'heart', title: 'AI Matchmaking', desc: '5 loại kết nối: Green Flag, Red Flag, Karmic, Destiny, Twin Flame' },
-  { icon: 'message', title: 'Real-time Chat', desc: 'Kết nối và trò chuyện với người tương hợp trong thời gian thực' },
-  { icon: 'star', title: 'Dự Đoán Hàng Ngày', desc: 'Horoscope cá nhân hoá dựa trên biểu đồ sinh của bạn' },
-];
-
 export default function OnboardingPage() {
   const navigate = useNavigate();
 
@@ -34,35 +27,10 @@ export default function OnboardingPage() {
           transition={{ duration: 0.8, ease: 'easeOut' }}
           className="mb-8"
         >
-          <motion.div
-            animate={{ rotate: [0, 5, -5, 0], y: [0, -10, 0] }}
-            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-            className="text-8xl mb-6 inline-block"
-          ><UiIcon name="chart" label="Biểu đồ chiêm tinh" className="text-8xl" /></motion.div>
           <h1 className="text-6xl font-bold font-display gradient-text mb-4">Resonancia</h1>
           <p className="text-xl text-purple-300 opacity-80 max-w-xl mx-auto leading-relaxed">
             Nền tảng kết đôi chiêm tinh học thông minh đầu tiên được hỗ trợ bởi <span className="text-pink-400 font-semibold">Gemini AI</span>
           </p>
-        </motion.div>
-
-        {/* Features grid */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10"
-        >
-          {FEATURES.map((f, i) => (
-            <motion.div key={i}
-              whileHover={{ y: -8, scale: 1.02 }}
-              className="glass-card p-5 text-center card-hover"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            >
-              <div className="text-4xl mb-3"><UiIcon name={f.icon as 'chart'} label={f.title} /></div>
-              <h3 className="text-white font-semibold text-sm mb-1">{f.title}</h3>
-              <p className="text-purple-300 text-xs opacity-70 leading-relaxed">{f.desc}</p>
-            </motion.div>
-          ))}
         </motion.div>
 
         {/* CTA */}

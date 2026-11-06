@@ -1,75 +1,144 @@
 import { Link } from 'react-router-dom';
-// @ts-ignore
-import logoImg from '../assets/astrogpt/Logo.png';
+
+// Danh sách trang lấy chuẩn xác từ Menu Điều hướng (Navbar.tsx)
+const astrologyMenuCol1 = [
+  { name: 'Trang Chủ', path: '/home' },
+  { name: 'Bản Đồ Sao', path: '/natal' },
+  { name: 'Ghép Đôi', path: '/match' },
+  { name: 'Bản Đồ Đôi', path: '/synastry' },
+];
+
+const astrologyMenuCol2 = [
+  { name: 'Vận Hạn', path: '/transit' },
+  { name: 'Dự Đoán', path: '/prediction' },
+  { name: 'Tarot', path: '/tarot' },
+  { name: 'Nhật Ký Vũ Trụ', path: '/journal' },
+];
+
+const featuresMenu = [
+  { name: 'Từ Điển Chiêm Tinh', path: '/glossary' },
+  { name: 'Trò Chuyện', path: '/chat' },
+  { name: 'Resonancia AI', path: '/assistant' },
+  { name: 'Thông Báo', path: '/notifications' },
+  { name: 'Hồ Sơ Cá Nhân', path: '/profile' },
+];
+
+const socialLinks = [
+  {
+    name: 'Facebook',
+    url: 'https://www.facebook.com/',
+    icon: '/astrica/images/687a0a9f772f56954abcb15e_facebook.svg',
+  },
+  {
+    name: 'Twitter',
+    url: 'https://twitter.com/',
+    icon: '/astrica/images/687a0a9f8abd083fa17554c6_d7a3fc95e38cfecee0dc7af9c395c0de_twitter.svg',
+  },
+  {
+    name: 'LinkedIn',
+    url: 'https://in.linkedin.com/',
+    icon: '/astrica/images/687a0a9d928404cbfe0edbfd_linkedin.svg',
+  },
+  {
+    name: 'Instagram',
+    url: 'https://www.instagram.com/',
+    icon: '/astrica/images/687a0a9f311190c0fc07c241_145d82f565fd3d3f691ebf9963b896c6_instagram%201.svg',
+  },
+];
+
+const watermarkChars = ['A', 's', 't', 'r', 'o', 'l', 'o', 'g', 'y'];
 
 export default function Footer() {
   return (
-    <footer className="footer-section mt-24 border-t border-purple-900/40 bg-zinc-950/80 backdrop-blur-md">
-      <div className="container w-container mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
-          {/* Logo & About */}
-          <div className="md:col-span-1 space-y-4">
-            <div className="flex items-center gap-3">
-              <img src={logoImg} alt="Resonancia" className="w-12 h-12" />
-              <div>
-                <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-200 to-pink-300 font-serif tracking-widest">
-                  RESONANCIA
-                </span>
-                <p className="text-[10px] text-purple-400/80 uppercase font-mono">Astrology Matchmaking</p>
-              </div>
+    <footer className="astrica-footer relative z-20 w-full overflow-hidden">
+      <div className="container w-container mx-auto max-w-[1330px] px-4 sm:px-6 lg:px-8">
+        {/* Top 3-column Widget Grid */}
+        <div className="first-footer">
+          {/* Column 1: Chiêm Tinh Học (Chia 2 cột con cân đối, 100% link chuẩn từ Menu) */}
+          <div className="footer-widget">
+            <h3 className="widget-title">Chiêm Tinh Học</h3>
+            <div className="footer-nav-grid">
+              <ul className="footer-nav-list">
+                {astrologyMenuCol1.map((item) => (
+                  <li key={item.name}>
+                    <Link to={item.path} className="footer-nav-link">
+                      {item.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <ul className="footer-nav-list">
+                {astrologyMenuCol2.map((item) => (
+                  <li key={item.name}>
+                    <Link to={item.path} className="footer-nav-link">
+                      {item.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <p className="text-xs text-purple-300/70 leading-relaxed">
-              Nền tảng chiêm tinh học thông minh kết hợp trí tuệ nhân tạo Gemini. Phân tích lá số tử vi cá nhân, giải mã tương hợp tình duyên và dự đoán vận mệnh chuẩn xác.
-            </p>
           </div>
 
-          {/* Quick links */}
-          <div>
-            <h4 className="text-sm font-bold uppercase tracking-wider text-purple-200 mb-4 font-mono">
-              Chiêm Tinh Học
-            </h4>
-            <ul className="space-y-2 text-xs text-purple-300/80">
-              <li><Link to="/natal" className="hover:text-purple-100 transition-colors">Bản Đồ Sao Cá Nhân (Natal Chart)</Link></li>
-              <li><Link to="/synastry" className="hover:text-purple-100 transition-colors">Bản Đồ Cặp Đôi (Synastry)</Link></li>
-              <li><Link to="/transit" className="hover:text-purple-100 transition-colors">Vận Hạn Hành Tinh (Transits)</Link></li>
-              <li><Link to="/glossary" className="hover:text-purple-100 transition-colors">Từ Điển 12 Cung Hoàng Đạo</Link></li>
-            </ul>
-          </div>
-
-          {/* Match & Tarot */}
-          <div>
-            <h4 className="text-sm font-bold uppercase tracking-wider text-purple-200 mb-4 font-mono">
-              Tính Năng Độc Quyền
-            </h4>
-            <ul className="space-y-2 text-xs text-purple-300/80">
-              <li><Link to="/match" className="hover:text-purple-100 transition-colors">Ghép Đôi Tình Duyên AI</Link></li>
-              <li><Link to="/tarot" className="hover:text-purple-100 transition-colors">Trải Bài Tarot Hàng Ngày</Link></li>
-              <li><Link to="/journal" className="hover:text-purple-100 transition-colors">Nhật Ký Cảm Xúc Vũ Trụ</Link></li>
-              <li><Link to="/chat" className="hover:text-purple-100 transition-colors">Phòng Trò Chuyện Tri Kỷ</Link></li>
-            </ul>
-          </div>
-
-          {/* Contact & Community */}
-          <div>
-            <h4 className="text-sm font-bold uppercase tracking-wider text-purple-200 mb-4 font-mono">
-              Trợ Lý Vũ Trụ
-            </h4>
-            <p className="text-xs text-purple-300/70 mb-3">
-              Luôn sẵn sàng giải đáp mọi thắc mắc về tình cảm, sự nghiệp và vận mệnh 24/7 bằng công nghệ AI tiên tiến nhất.
-            </p>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-900/40 border border-purple-700/50 text-[11px] text-purple-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              Resonancia AI Online
+          {/* Column 2: Tính Năng & Tiện Ích (100% link chuẩn từ Menu) */}
+          <div className="footer-widget">
+            <h3 className="widget-title">Tính Năng &amp; Tiện Ích</h3>
+            <div className="footer-nav-grid">
+              <ul className="footer-nav-list">
+                {featuresMenu.map((item) => (
+                  <li key={item.name}>
+                    <Link to={item.path} className="footer-nav-link">
+                      {item.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
+          </div>
+
+          {/* Column 3: Social (4 nút viên nhộng với SVG chính thức) */}
+          <div className="footer-widget">
+            <h3 className="widget-title">Social</h3>
+            <ul className="footer-social-list">
+              {socialLinks.map((item) => (
+                <li key={item.name}>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="footer-social-link"
+                  >
+                    <div className="footer-social-icon-block">
+                      <img src={item.icon} alt={item.name} loading="lazy" />
+                    </div>
+                    <div className="footer-social-text-block">
+                      <div className="footer-social-text">{item.name}</div>
+                    </div>
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-purple-900/30 flex flex-col sm:flex-row justify-between items-center text-xs text-purple-400/60 gap-4">
-          <p>© 2026 Resonancia Platform. All rights reserved.</p>
-          <p className="font-mono">Empowered by Google Gemini AI & Swiss Ephemeris</p>
+        {/* Copyright Block */}
+        <div className="copyright-block">
+          <div className="copyright-text">© 2026 Resonancia Platform. All Rights Reserved.</div>
+          <div className="copyright-text">
+            Empowered by Google Gemini AI &amp; Swiss Ephemeris
+          </div>
+        </div>
+
+        {/* Bottom Giant ASTROLOGY Watermark with Hover Jump */}
+        <div className="bottom-footer">
+          <div className="bottom-footer-text">
+            {watermarkChars.map((char, index) => (
+              <span key={index} className="footer-text-span">
+                {char}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </footer>
   );
 }
-
