@@ -83,23 +83,34 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       className={`fixed left-0 top-0 h-full w-64 z-50 flex flex-col transition-transform duration-300 ease-in-out
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       style={{
-        background: 'rgba(9, 7, 18, 0.94)',
-        borderRight: '1px solid rgba(168, 85, 247, 0.15)',
-        backdropFilter: 'blur(24px)'
+        background: 'rgba(11, 6, 22, 0.97)',
+        borderRight: '1px solid rgba(168, 85, 247, 0.22)',
+        backdropFilter: 'blur(28px)',
+        boxShadow: '4px 0 32px rgba(88,28,135,0.2)',
       }}
       aria-label="Điều hướng chính"
     >
       {/* Brand Header */}
       <div className="p-6 border-b" style={{ borderColor: 'rgba(168, 85, 247, 0.12)' }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.3), rgba(236,72,153,0.2))', border: '1px solid rgba(168,85,247,0.4)' }}>
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="w-4 h-4 text-purple-300" fill="none" stroke="currentColor" strokeWidth="2">
+          {/* Logo AstroGPT style với hiệu ứng phát sáng */}
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(168,85,247,0.45), rgba(236,72,153,0.3))',
+              border: '1px solid rgba(168,85,247,0.55)',
+              boxShadow: '0 0 14px rgba(168,85,247,0.4)',
+            }}
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="w-5 h-5 text-purple-200" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07 19.07 4.93" strokeLinecap="round"/>
             </svg>
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-wide text-white uppercase" style={{ letterSpacing: '0.08em' }}>
+            <h1
+              className="text-base font-bold text-white uppercase"
+              style={{ letterSpacing: '0.12em', textShadow: '0 0 14px rgba(168,85,247,0.7)' }}
+            >
               Resonancia
             </h1>
             <p className="text-[10px] text-purple-300/60 uppercase tracking-widest font-mono">Astrology Match</p>

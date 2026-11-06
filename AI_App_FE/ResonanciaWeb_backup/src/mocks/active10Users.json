@@ -1,0 +1,102 @@
+[
+  {
+    "fullName": "Phạm Văn Phúc",
+    "email": "phucvanp99@icloud.com",
+    "password": "a123456",
+    "gender": "Nam",
+    "zodiacSign": "Bạch Dương",
+    "birthDate": "1995-03-24",
+    "occupation": "Product Designer",
+    "uid": "8N3pjdi5zIcKnPFRVcCWYOZppnp1"
+  },
+  {
+    "fullName": "Ngô Quốc Trường",
+    "email": "truongquocn358@outlook.com",
+    "password": "a123456",
+    "gender": "Nam",
+    "zodiacSign": "Bảo Bình",
+    "birthDate": "1996-01-25",
+    "occupation": "Graphic Designer",
+    "uid": "iq2l8YEZ7VPgFWTx03ZYMDyiG0n2"
+  },
+  {
+    "fullName": "Trần Hoàng Tuấn",
+    "email": "tuanhoangt916@icloud.com",
+    "password": "a123456",
+    "gender": "Nam",
+    "zodiacSign": "Cự Giải",
+    "birthDate": "1993-07-03",
+    "occupation": "Nhiếp ảnh gia tự do",
+    "uid": "yjPEXT6f9vaJnCSOAsESUD9pwWm1"
+  },
+  {
+    "fullName": "Đỗ Minh Thắng",
+    "email": "thangminhd633@gmail.com",
+    "password": "a123456",
+    "gender": "Nam",
+    "zodiacSign": "Bọ Cạp",
+    "birthDate": "1995-11-09",
+    "occupation": "Huấn luyện viên Yoga / Pilates",
+    "uid": "SeWDQHZijmU99Z8W0Qj4UbyIbjK2"
+  },
+  {
+    "fullName": "Vũ Văn Sơn",
+    "email": "sonvanv227@gmail.com",
+    "password": "a123456",
+    "gender": "Nam",
+    "zodiacSign": "Bảo Bình",
+    "birthDate": "1996-02-07",
+    "occupation": "Bác sĩ đa khoa",
+    "uid": "T1Toywvydmd8Cq2P3KyfjVzKTmH3"
+  },
+  {
+    "fullName": "Huỳnh Yến Ly",
+    "email": "lyyenh393@gmail.com",
+    "password": "a123456",
+    "gender": "Nữ",
+    "zodiacSign": "Cự Giải",
+    "birthDate": "1992-06-26",
+    "occupation": "Copywriter",
+    "uid": "P5nT3rdWCBMASCusoFS9zzFm4xU2"
+  },
+  {
+    "fullName": "Vũ Như Tuyết",
+    "email": "tuyetnhuv692@gmail.com",
+    "password": "a123456",
+    "gender": "Nữ",
+    "zodiacSign": "Sư Tử",
+    "birthDate": "1995-08-21",
+    "occupation": "Giáo viên Tiếng Anh",
+    "uid": "7uzv53fCdJPAg5KyGBt0YfreKIG2"
+  },
+  {
+    "fullName": "Bùi Phương Ngọc",
+    "email": "ngocphuongb312@icloud.com",
+    "password": "a123456",
+    "gender": "Nữ",
+    "zodiacSign": "Bạch Dương",
+    "birthDate": "1993-04-13",
+    "occupation": "Họa sĩ minh họa (Illustrator)",
+    "uid": "qDTpySjKWHWEAVD4sGD8lQaJzO32"
+  },
+  {
+    "fullName": "Phan Bảo Khánh",
+    "email": "khanhbaop817@gmail.com",
+    "password": "a123456",
+    "gender": "Nữ",
+    "zodiacSign": "Song Ngư",
+    "birthDate": "2002-02-21",
+    "occupation": "Data Analyst",
+    "uid": "Smw4tnt2e1fJfCJzOcfhHXamtig1"
+  },
+  {
+    "fullName": "Đặng Ngọc Khánh",
+    "email": "khanhngocd489@gmail.com",
+    "password": "a123456",
+    "gender": "Nữ",
+    "zodiacSign": "Song Tử",
+    "birthDate": "2004-05-24",
+    "occupation": "Bác sĩ đa khoa",
+    "uid": "tqQ5KsZmI9Uvm2sXuTaHiJntFrc2"
+  }
+]

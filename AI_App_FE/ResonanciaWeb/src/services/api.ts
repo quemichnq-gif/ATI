@@ -19,6 +19,7 @@ export default api;
 
 // API functions
 export const apiGenerate = (data: object) => api.post('/generate', data);
+export const apiAstrologyChat = (data: object) => api.post('/astrology-chat', data, { timeout: 40000 });
 export const apiNatalAnalysis = (data: object) => api.post('/natal-analysis', data);
 export const apiCompatibility = (data: object) => api.post('/compatibility-analysis', data);
 export const apiLoveMatching = (type: string, data: object) => api.post(`/love-matching/${type}`, data);

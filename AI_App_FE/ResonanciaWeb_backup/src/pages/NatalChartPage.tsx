@@ -1,0 +1,625 @@
+import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RootState } from '../store';
+import { apiNatalAnalysis, apiGenerate } from '../services/api';
+import { ELEMENT_COLORS, ELEMENT_MAP } from '../constants/astrologyMap';
+import UiIcon from '../components/UiIcon';
+import type { IconName } from '../components/UiIcon';
+import NatalChartSVG from '../components/NatalChartSVG';
+import FormattedMarkdown from '../components/FormattedMarkdown';
+import { generateClientNatalAnalysis, generateClientCareerAnalysis } from '../utils/natalFallback';
+
+const SECTIONS = [
+  { key: 'overview', label: 'Tổng Quan', icon: 'sparkles', desc: 'Toàn cảnh tính cách, cảm xúc & sự nghiệp' },
+  { key: 'personality', label: 'Tính Cách', icon: 'user', desc: 'Bản sắc, cái tôi và cách hành xử' },
+  { key: 'emotions', label: 'Cảm Xúc', icon: 'heart', desc: 'Thế giới nội tâm, tâm lý & nhu cầu an toàn' },
+  { key: 'career', label: 'Sự Nghiệp', icon: 'briefcase', desc: 'Định hướng công danh, sở trường & tài chính' },
+  { key: 'love', label: 'Tình Yêu', icon: 'heart', desc: 'Ngôn ngữ tình cảm & cách xây dựng kết nối' },
+  { key: 'strengths', label: 'Điểm Mạnh', icon: 'star', desc: 'Năng khiếu bẩm sinh & lợi thế vũ trụ' },
+  { key: 'elements', label: 'Nguyên Tố', icon: 'water', desc: 'Tương quan 4 nguyên tố trong bản mệnh' },
+  { key: 'advice', label: 'Lời Khuyên', icon: 'chart', desc: 'Kim chỉ nam phát triển bản thân' },
+  { key: 'idealPartner', label: 'Người Lý Tưởng', icon: 'user', desc: 'Mẫu người đồng điệu về tần số' },
+];
+
+const DETAIL_SECTIONS = SECTIONS.filter(s => s.key !== 'overview');
+
+const PAGE_TABS = [
+  { id: 'chart', label: 'Biểu Đồ Sao' },
+  { id: 'analysis', label: 'Phân Tích AI' },
+  { id: 'career', label: 'Hướng Nghiệp' },
+];
+
+function cleanSectionText(text: string) {
+  if (!text) return '';
+  const lines = text.trim().split('\n');
+  if (lines.length > 1) {
+    const firstLine = lines[0].trim();
+    // Bỏ dòng tiêu đề mục nếu có (ví dụ: ## 1. Tính Cách, 1. Tính Cách, **1. Tính Cách**)
+    if (
+      /^(?:#{1,4}\s*)?(?:\*\*)?(?:[1-8][.:)/-]|mục\s*[1-8]|phần\s*[1-8])/i.test(firstLine) ||
+      /^(?:#{1,4}\s+)/.test(firstLine)
+    ) {
+      return lines.slice(1).join('\n').trim();
+    }
+  }
+  return text
+    .replace(/^([#]{1,4}|\*\*|\d+[.:)/-]|#)+\s*[\d.\s\w\p{L}–\-:]+(\n|\*\*)+/u, '')
+    .trim();
+}
+
+function parseAnalysisSections(text: string) {
+  const sections: Record<string, string> = {};
+  if (!text) return sections;
+
+  // 1. Trường hợp bài phân tích theo chuẩn 8 mục (1. Tính Cách ... 8. Người Lý Tưởng)
+  const parts = text.split(/\n(?=(?:#{1,4}\s*)?(?:\d+[.:)/-]|\*\*\d+[.:)/-]))/);
+  const keys = ['personality', 'emotions', 'career', 'love', 'strengths', 'elements', 'advice', 'idealPartner'];
+
+  parts.forEach((part, i) => {
+    const trimmed = part.trim();
+    if (!trimmed) return;
+    const firstLine = trimmed.split('\n')[0].toLowerCase();
+
+    // Kiểm tra số thứ tự 1-8 ở đầu dòng
+    const numMatch = firstLine.match(/^\s*(?:#{1,4}\s*)?(?:\*\*)?([1-8])[.:)/-]/);
+    if (numMatch) {
+      const idx = parseInt(numMatch[1], 10) - 1;
+      if (idx >= 0 && idx < keys.length) {
+        sections[keys[idx]] = trimmed;
+        return;
+      }
+    }
+
+    // Kiểm tra từ khóa trên dòng đầu tiên
+    if (firstLine.includes('người lý tưởng') || firstLine.includes('lý tưởng')) sections['idealPartner'] = trimmed;
+    else if (firstLine.includes('lời khuyên') || firstLine.includes('khuyên')) sections['advice'] = trimmed;
+    else if (firstLine.includes('nguyên tố')) sections['elements'] = trimmed;
+    else if (firstLine.includes('điểm mạnh')) sections['strengths'] = trimmed;
+    else if (firstLine.includes('tình yêu')) sections['love'] = trimmed;
+    else if (firstLine.includes('sự nghiệp')) sections['career'] = trimmed;
+    else if (firstLine.includes('cảm xúc')) sections['emotions'] = trimmed;
+    else if (firstLine.includes('tính cách')) sections['personality'] = trimmed;
+  });
+
+  // 2. Nếu định dạng phân tích sâu theo Cấu trúc Thiên văn (Cung Mọc, Mặt Trời, Mặt Trăng, 3 Đỉnh)
+  if (Object.keys(sections).length < 2) {
+    const astroParts = text.split(/\n(?=##\s+)/);
+    astroParts.forEach(p => {
+      const trimmed = p.trim();
+      const firstLine = trimmed.split('\n')[0].toLowerCase();
+      if (firstLine.includes('cung mọc')) sections['personality'] = (sections['personality'] ? sections['personality'] + '\n\n' : '') + trimmed;
+      else if (firstLine.includes('mặt trời')) sections['personality'] = (sections['personality'] ? sections['personality'] + '\n\n' : '') + trimmed;
+      else if (firstLine.includes('mặt trăng')) sections['emotions'] = trimmed;
+      else if (firstLine.includes('kết hợp cung mọc') || firstLine.includes('big 3')) sections['strengths'] = trimmed;
+      else if (firstLine.includes('3 đỉnh') || firstLine.includes('cung lặn') || firstLine.includes('thiên đỉnh')) {
+        sections['career'] = trimmed;
+        sections['idealPartner'] = trimmed;
+      }
+    });
+  }
+
+  if (Object.keys(sections).length === 0) sections['personality'] = text;
+  return sections;
+}
+
+export default function NatalChartPage() {
+  const profile = useSelector((s: RootState) => s.profile);
+  const [pageTab, setPageTab] = useState('chart');
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [sections, setSections] = useState<Record<string, string>>({});
+  const [activeSection, setActiveSection] = useState('overview');
+  const [overviewMode, setOverviewMode] = useState<'cards' | 'full'>('cards');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [careerAnalysis, setCareerAnalysis] = useState('');
+  const [careerLoading, setCareerLoading] = useState(false);
+
+  const element = ELEMENT_MAP[profile.sun || ''] || 'Không xác định';
+  const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS['Không xác định'];
+
+  const handleAnalyze = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await apiNatalAnalysis({
+        uid: profile.uid || 'guest_user',
+        name: profile.name || 'Người dùng',
+        sun: profile.sun || 'Ma Kết',
+        moon: profile.moon || 'Kim Ngưu',
+        mercury: profile.mercury,
+        venus: profile.venus,
+        mars: profile.mars,
+        jupiter: profile.jupiter,
+        saturn: profile.saturn,
+        uranus: profile.uranus,
+        neptune: profile.neptune,
+        pluto: profile.pluto,
+        ascendant: profile.ascendant || 'Nhân Mã',
+        descendant: profile.descendant,
+        mc: profile.mc || 'Thiên Bình',
+        ic: profile.ic,
+        house1: profile.house1, house2: profile.house2, house3: profile.house3, house4: profile.house4,
+        house5: profile.house5, house6: profile.house6, house7: profile.house7, house8: profile.house8,
+        house9: profile.house9, house10: profile.house10, house11: profile.house11, house12: profile.house12,
+        conjunctionAspect: profile.conjunctionAspect,
+        oppositionAspect: profile.oppositionAspect,
+        trineAspect: profile.trineAspect,
+        squareAspect: profile.squareAspect,
+        sextileAspect: profile.sextileAspect,
+        fireRatio: profile.fireRatio,
+        earthRatio: profile.earthRatio,
+        airRatio: profile.airRatio,
+        waterRatio: profile.waterRatio,
+        birthDate: profile.birthDate || '',
+      });
+      const text = res.data?.analysis || '';
+      if (!text) throw new Error('Empty analysis from backend');
+      setAnalysis(text);
+      setSections(parseAnalysisSections(text));
+      setActiveSection(SECTIONS[0].key);
+    } catch (e: any) {
+      console.warn('Backend call failed, using client-side natal fallback', e);
+      const fallbackText = generateClientNatalAnalysis(profile);
+      setAnalysis(fallbackText);
+      setSections(parseAnalysisSections(fallbackText));
+      setActiveSection(SECTIONS[0].key);
+      setError('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCareerAnalysis = async () => {
+    setCareerLoading(true);
+    try {
+      const res = await apiGenerate({
+        userData: {
+          uid: profile.uid || 'guest_user',
+          name: profile.name || 'Người dùng',
+          sun: profile.sun || 'Ma Kết',
+          moon: profile.moon || 'Kim Ngưu',
+          birthDate: profile.birthDate,
+        },
+        category: 'career_chart',
+        day: new Date().toISOString().split('T')[0],
+        extra: {
+          mc: profile.mc,
+          house10: profile.house10,
+          saturn: profile.saturn,
+          jupiter: profile.jupiter,
+          mercury: profile.mercury,
+          mars: profile.mars,
+          venus: profile.venus,
+          ascendant: profile.ascendant,
+          house2: profile.house2,
+          house6: profile.house6,
+          fireRatio: profile.fireRatio,
+          earthRatio: profile.earthRatio,
+          airRatio: profile.airRatio,
+          waterRatio: profile.waterRatio,
+        },
+      } as any);
+      const pred = res.data?.prediction;
+      if (!pred) throw new Error('Empty career prediction from backend');
+      setCareerAnalysis(pred);
+    } catch (e) {
+      console.warn('Backend career call failed, using client-side career fallback', e);
+      const fallbackCareer = generateClientCareerAnalysis(profile);
+      setCareerAnalysis(fallbackCareer);
+    } finally {
+      setCareerLoading(false);
+    }
+  };
+
+  // Tự động kích hoạt phân tích khi chuyển sang tab Phân Tích AI hoặc Hướng Nghiệp
+  useEffect(() => {
+    if (pageTab === 'analysis' && !analysis && !loading) {
+      handleAnalyze();
+    } else if (pageTab === 'career' && !careerAnalysis && !careerLoading) {
+      handleCareerAnalysis();
+    }
+  }, [pageTab]);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+        <h1 className="text-3xl font-bold gradient-text font-display"><UiIcon name="chart" label="Natal Chart" className="mr-2 inline" />Natal Chart Analysis</h1>
+        <p className="text-purple-300 opacity-70 mt-1">Phân tích chiêm tinh sâu từ biểu đồ sinh của bạn</p>
+      </motion.div>
+
+      {/* Page tabs */}
+      <div className="flex gap-2">
+        {PAGE_TABS.map(tab => (
+          <button key={tab.id} onClick={() => setPageTab(tab.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              pageTab === tab.id ? 'text-white' : 'glass text-purple-300 hover:text-white'
+            }`}
+            style={pageTab === tab.id ? {
+              background: `linear-gradient(135deg, ${colors[0]}50, ${colors[1]}40)`,
+              border: `1px solid ${colors[0]}60`,
+            } : {}}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* TAB: CHART */}
+      {pageTab === 'chart' && (
+        <>
+        {/* SVG Natal Chart */}
+        <div className="glass-card p-6">
+          <h2 className="text-white font-semibold mb-4"><UiIcon name="chart" label="Biểu đồ chiêm tinh" className="mr-2 inline" />Biểu Đồ Natal Chart</h2>
+          <div className="flex justify-center">
+            <NatalChartSVG
+              planets={{
+                sun: profile.sun, moon: profile.moon, mercury: profile.mercury,
+                venus: profile.venus, mars: profile.mars, jupiter: profile.jupiter,
+                saturn: profile.saturn, uranus: profile.uranus, neptune: profile.neptune,
+                pluto: profile.pluto, ascendant: profile.ascendant, mc: profile.mc,
+              }}
+              aspects={{
+                conjunction: profile.conjunctionAspect,
+                trine: profile.trineAspect,
+                opposition: profile.oppositionAspect,
+                square: profile.squareAspect,
+                sextile: profile.sextileAspect,
+              }}
+              size={380}
+            />
+          </div>
+          {/* Legend */}
+          <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs">
+            {[['#fbbf24','Trùng tụ (0°)'],['#4ade80','Tam hợp (120°)'],['#f87171','Xung đối (180°)'],['#fb923c','Vuông góc (90°)'],['#38bdf8','Lục hợp (60°)']].map(([c,l])=>(
+              <span key={l} className="flex items-center gap-1.5 glass px-2.5 py-1 rounded-full"><span className="w-2.5 h-2.5 inline-block rounded-full shadow-sm" style={{background:c}}/><span className="text-purple-200 text-xs">{l}</span></span>
+            ))}
+          </div>
+        </div>
+
+        {/* Planet Overview */}
+        <div className="glass-card p-6">
+          <h2 className="text-white font-semibold mb-4"><UiIcon name="sparkles" label="Hành tinh của bạn" className="mr-2 inline" />Hành Tinh Của Bạn</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[
+              { label: 'Mặt Trời', icon: 'sun', value: profile.sun },
+              { label: 'Mặt Trăng', icon: 'moon', value: profile.moon },
+              { label: 'Sao Thuỷ ☿', value: profile.mercury },
+              { label: 'Sao Kim ♀', value: profile.venus },
+              { label: 'Sao Hoả ♂', value: profile.mars },
+              { label: 'Sao Mộc ♃', value: profile.jupiter },
+              { label: 'Sao Thổ ♄', value: profile.saturn },
+              { label: 'Điểm Mọc ↑', value: profile.ascendant },
+              { label: 'Trung Thiên', icon: 'star', value: profile.mc },
+              { label: 'Nguyên Tố', icon: 'sparkles', value: element },
+            ].map(p => (
+              <div key={p.label} className="glass p-3 rounded-xl text-center">
+                <p className="text-purple-300 text-xs mb-1 opacity-70">{'icon' in p && <UiIcon name={p.icon as IconName} label={p.label} className="mr-1 inline" />}{p.label}</p>
+                <p className="text-white text-sm font-semibold">{p.value || '—'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        </>)}
+
+      {/* TAB: CAREER CHART */}
+      {pageTab === 'career' && (
+        <div className="space-y-4">
+          <div className="glass-card p-6">
+            <h2 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <UiIcon name="briefcase" label="Hướng nghiệp" className="inline text-purple-400" />
+              Bản Đồ Hướng Nghiệp Chiêm Tinh
+            </h2>
+            <p className="text-purple-300 text-sm opacity-70 mb-4">
+              Phân tích chuyên sâu từ Trung Thiên (Midheaven - MC), Nhà 10 và Sao Thổ của {profile.sun || 'bạn'}
+            </p>
+
+            {careerLoading ? (
+              <div className="glass p-8 rounded-2xl text-center space-y-3" style={{ border: '1px solid rgba(168,85,247,0.3)' }}>
+                <div className="w-9 h-9 mx-auto border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin" />
+                <p className="text-white font-medium text-sm">✦ AI đang giải mã Midheaven ({profile.mc || 'MC'}) & Nhà 10...</p>
+                <p className="text-purple-300 text-xs opacity-70">Tổng hợp năng lực bẩm sinh, phong cách làm việc và lộ trình phát triển sự nghiệp</p>
+              </div>
+            ) : !careerAnalysis ? (
+              <button onClick={handleCareerAnalysis}
+                className="btn-cosmic px-8 py-3 w-full"
+                style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
+                <UiIcon name="sparkles" label="Phân tích hướng nghiệp" className="mr-2 inline" />
+                Khai Mở Bản Đồ Hướng Nghiệp
+              </button>
+            ) : (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+                <div className="p-5 md:p-6 rounded-2xl glass bg-purple-950/40 border border-purple-500/25">
+                  <FormattedMarkdown content={careerAnalysis} />
+                </div>
+                <div className="flex justify-end">
+                  <button onClick={handleCareerAnalysis} className="text-purple-300 text-xs hover:text-white underline transition-colors">
+                    ↻ Phân tích lại hướng nghiệp
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </div>
+          <div className="glass-card p-5">
+            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+              <UiIcon name="chart" label="Vị trí liên quan sự nghiệp" className="inline text-purple-400" />
+              Vị Trí Trọng Yếu Trong Lá Số Sự Nghiệp
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { l: 'Trung Thiên (MC)', v: profile.mc || 'Ma Kết' },
+                { l: 'Nhà 10 (Sự nghiệp)', v: profile.house10 || profile.mc || 'Ma Kết' },
+                { l: 'Sao Thổ (Kỷ luật)', v: profile.saturn || 'Bọ Cạp' },
+                { l: 'Sao Mộc (Cơ hội)', v: profile.jupiter || 'Xử Nữ' }
+              ].map(({ l, v }) => (
+                <div key={l} className="glass p-3 rounded-xl text-center">
+                  <p className="text-purple-400 text-xs mb-1">{l}</p>
+                  <p className="text-white font-semibold text-sm">{v || '—'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: ANALYSIS (existing natal analysis) */}
+      {pageTab === 'analysis' && (
+        <>
+      {/* Element Ratios */}
+
+      {/* Element Ratios */}
+      <div className="glass-card p-6">
+        <h2 className="text-white font-semibold mb-4"><UiIcon name="water" label="Tỷ lệ nguyên tố" className="mr-2 inline" />Tỷ Lệ Nguyên Tố</h2>
+        <div className="space-y-3">
+          {[
+            { label: 'Hoả', icon: 'flame', value: profile.fireRatio || 0, color: '#ef4444' },
+            { label: 'Thổ', icon: 'earth', value: profile.earthRatio || 0, color: '#a16207' },
+            { label: 'Khí', icon: 'wind', value: profile.airRatio || 0, color: '#06b6d4' },
+            { label: 'Thuỷ', icon: 'water', value: profile.waterRatio || 0, color: '#3b82f6' },
+          ].map(e => (
+            <div key={e.label}>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-purple-300"><UiIcon name={e.icon as IconName} label={e.label} className="mr-1 inline" />{e.label}</span>
+                <span className="text-white font-semibold">{e.value}%</span>
+              </div>
+              <div className="cosmic-progress">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${e.value}%` }}
+                  transition={{ duration: 1.2, delay: 0.3 }}
+                  style={{ height: '100%', background: `linear-gradient(90deg, ${e.color}88, ${e.color})`, borderRadius: '3px' }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+
+
+      {/* Analyze button / Auto loading */}
+      {!analysis && (
+        <div className="text-center">
+          {loading ? (
+            <div className="glass-card p-8 rounded-2xl max-w-md mx-auto space-y-3" style={{ border: '1px solid rgba(168,85,247,0.3)' }}>
+              <div className="w-10 h-10 mx-auto border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin" />
+              <p className="text-white font-medium text-base">✦ AI đang giải mã toàn diện bản đồ sao của bạn...</p>
+              <p className="text-purple-300 text-xs opacity-75">
+                Đối chiếu 12 Nhà, Big 3 (Mặt Trời {profile.sun || ''}, Mặt Trăng {profile.moon || ''}, Cung Mọc {profile.ascendant || ''}) và phân bổ năng lượng
+              </p>
+            </div>
+          ) : (
+            <button onClick={handleAnalyze} disabled={loading}
+              className="btn-cosmic px-10 py-4 text-lg"
+              style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
+              <UiIcon name="chart" label="Phân tích Natal Chart" className="mr-2 inline" />Phân Tích Natal Chart
+            </button>
+          )}
+          {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+        </div>
+      )}
+
+      {/* Analysis Result */}
+      {analysis && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          {/* Section tabs */}
+          <div className="flex flex-wrap gap-2">
+            {SECTIONS.map(s => (
+              <button key={s.key} aria-pressed={activeSection === s.key} onClick={() => setActiveSection(s.key)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  activeSection === s.key ? 'text-white' : 'text-purple-300 hover:text-white glass'
+                }`}
+                style={activeSection === s.key ? {
+                  background: `linear-gradient(135deg, ${colors[0]}66, ${colors[1]}44)`,
+                  border: `1px solid ${colors[0]}66`,
+                } : {}}>
+                <UiIcon name={s.icon as any} label={s.label} className="mr-1.5 inline" />{s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Section content */}
+          <AnimatePresence mode="wait">
+            {activeSection === 'overview' ? (
+              <motion.div
+                key="overview"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                {/* Header Tổng Quan Năng Lượng */}
+                <div className="glass-card p-6" style={{ background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.15), rgba(219, 39, 119, 0.1))', border: `1px solid ${colors[0]}55` }}>
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h3 className="text-white font-bold text-xl flex items-center gap-2">
+                        <UiIcon name="sparkles" label="Tổng quan" className="text-yellow-400" />
+                        Tổng Quan Vận Mệnh & Năng Lượng Bản Đồ Sao
+                      </h3>
+                      <p className="text-purple-300 text-xs mt-1 opacity-80">
+                        Bức tranh tổng hợp đa chiều về Tính Cách, Cảm Xúc, Sự Nghiệp và Tình Yêu của bạn
+                      </p>
+                    </div>
+
+                    {/* Chế độ xem */}
+                    <div className="flex gap-1.5 p-1 rounded-xl glass bg-purple-950/40 text-xs">
+                      <button
+                        onClick={() => setOverviewMode('cards')}
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                          overviewMode === 'cards' ? 'bg-purple-600/60 text-white shadow' : 'text-purple-300 hover:text-white'
+                        }`}
+                      >
+                        📊 Dạng Thẻ Tổng Hợp
+                      </button>
+                      <button
+                        onClick={() => setOverviewMode('full')}
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                          overviewMode === 'full' ? 'bg-purple-600/60 text-white shadow' : 'text-purple-300 hover:text-white'
+                        }`}
+                      >
+                        📄 Đọc Toàn Văn
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Highlights Tam Trụ Hoàng Đạo (Big 3) & Nguyên tố */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-purple-500/20">
+                    <div className="glass p-3 rounded-xl text-center">
+                      <span className="text-purple-300 text-[11px] block">Mặt Trời (Bản ngã)</span>
+                      <span className="text-white font-bold text-sm mt-0.5 block">{profile.sun || 'Kim Ngưu'}</span>
+                    </div>
+                    <div className="glass p-3 rounded-xl text-center">
+                      <span className="text-purple-300 text-[11px] block">Mặt Trăng (Cảm xúc)</span>
+                      <span className="text-white font-bold text-sm mt-0.5 block">{profile.moon || 'Xử Nữ'}</span>
+                    </div>
+                    <div className="glass p-3 rounded-xl text-center">
+                      <span className="text-purple-300 text-[11px] block">Cung Mọc (Diện mạo)</span>
+                      <span className="text-white font-bold text-sm mt-0.5 block">{profile.ascendant || 'Ma Kết'}</span>
+                    </div>
+                    <div className="glass p-3 rounded-xl text-center">
+                      <span className="text-purple-300 text-[11px] block">Nguyên Tố Trội</span>
+                      <span className="text-white font-bold text-sm mt-0.5 block">
+                        {profile.earthRatio && profile.earthRatio >= 30 ? 'Thổ' : profile.fireRatio && profile.fireRatio >= 30 ? 'Hoả' : profile.waterRatio && profile.waterRatio >= 30 ? 'Thuỷ' : 'Khí'} (Chủ đạo)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chế độ 1: Dạng Thẻ Lưới Tổng Hợp */}
+                {overviewMode === 'cards' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {DETAIL_SECTIONS.map((s, idx) => {
+                      const content = sections[s.key];
+                      const cleaned = cleanSectionText(content);
+                      return (
+                        <motion.div
+                          key={s.key}
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.04 }}
+                          className="glass-card p-5 flex flex-col justify-between hover:border-purple-400/40 transition-all card-hover"
+                          style={{ border: '1px solid rgba(168, 85, 247, 0.2)' }}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+                                  style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.3), rgba(236,72,153,0.2))' }}>
+                                  <UiIcon name={s.icon as any} label={s.label} />
+                                </div>
+                                <h4 className="text-white font-bold text-base">{s.label}</h4>
+                              </div>
+                              <span className="text-[10px] text-purple-300/60 font-mono">0{idx + 1}</span>
+                            </div>
+
+                            <p className="text-[11px] text-purple-300/70 mb-2 italic">{s.desc}</p>
+                            
+                            <p className="text-purple-100 text-xs leading-relaxed opacity-90 line-clamp-4">
+                              {cleaned || 'Đang cập nhật phân tích chiêm tinh học...'}
+                            </p>
+                          </div>
+
+                          <div className="pt-3 mt-3 border-t border-purple-500/15 flex justify-end">
+                            <button
+                              onClick={() => setActiveSection(s.key)}
+                              className="text-xs font-medium text-pink-400 hover:text-pink-300 transition-colors flex items-center gap-1"
+                            >
+                              <span>Xem chi tiết {s.label}</span>
+                              <span>→</span>
+                            </button>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Chế độ 2: Đọc Toàn Văn Báo Cáo Liền Mạch */}
+                {overviewMode === 'full' && (
+                  <div className="glass-card p-6 md:p-8 space-y-8">
+                    {DETAIL_SECTIONS.map((s, idx) => {
+                      const content = sections[s.key];
+                      const cleaned = cleanSectionText(content);
+                      return (
+                        <div key={s.key} className={idx > 0 ? 'pt-6 border-t border-purple-500/20' : ''}>
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-white font-bold text-lg flex items-center gap-2">
+                              <UiIcon name={s.icon as any} label={s.label} className="text-purple-400" />
+                              <span>{idx + 1}. {s.label}</span>
+                            </h4>
+                            <button
+                              onClick={() => setActiveSection(s.key)}
+                              className="text-xs text-purple-400 hover:text-white glass px-2.5 py-1 rounded-lg transition-all"
+                            >
+                              Tab riêng ↗
+                            </button>
+                          </div>
+                          <FormattedMarkdown content={cleaned || content || 'Đang cập nhật phân tích...'} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            ) : (
+              /* Chi Tiết Từng Mục */
+              <motion.div
+                key={activeSection}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="glass-card p-6 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-purple-500/20">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    {(() => {
+                      const section = SECTIONS.find(s => s.key === activeSection);
+                      return section && <><UiIcon name={section.icon as any} label={section.label} className="mr-1 inline text-purple-400" />{section.label}</>;
+                    })()}
+                  </h3>
+                  <button
+                    onClick={() => setActiveSection('overview')}
+                    className="glass px-3 py-1.5 rounded-xl text-xs text-purple-300 hover:text-white transition-all flex items-center gap-1.5"
+                  >
+                    <span>← Về Tổng Quan</span>
+                  </button>
+                </div>
+
+                <FormattedMarkdown content={cleanSectionText(sections[activeSection]) || sections[activeSection] || 'Đang cập nhật phân tích...'} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button onClick={handleAnalyze}
+            className="text-purple-400 text-sm hover:text-purple-300 underline">
+            ↻ Phân tích lại
+          </button>
+        </motion.div>
+      )}
+      </>
+      )}
+    </div>
+  );
+}
