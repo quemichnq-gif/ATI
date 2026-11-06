@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Resonancia - AI-Powered Astrology Matchmaking Platform",
   "scripts": {
+    "dev": "npm run web",
     "start": "npm run web",
     "web": "cd AI_App_FE/ResonanciaWeb && npm run dev",
     "web:build": "cd AI_App_FE/ResonanciaWeb && npm run build",

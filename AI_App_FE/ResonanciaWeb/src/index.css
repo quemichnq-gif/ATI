@@ -85,6 +85,7 @@ body {
 .star {
   position: absolute;
   border-radius: 50%;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.7);
   animation: twinkle var(--duration, 3s) ease-in-out infinite;
   animation-delay: var(--delay, 0s);
 }
@@ -344,8 +345,8 @@ body {
 }
 
 @keyframes twinkle {
-  0%, 100% { opacity: 0.2; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.2); }
+  0%, 100% { opacity: 0.15; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.5); }
 }
 
 /* AstroBot typing dots — AstroGPT style */
@@ -354,9 +355,9 @@ body {
   50% { transform: translateY(-5px); opacity: 1; }
 }
 
-/* Nền vũ trụ body — AstroGPT base color */
+/* Nền vũ trụ body — đồng bộ với màu nền Astrica (#04032a) để không tạo vệt cắt chuyển cảnh */
 body {
-  background: #0b0616;
+  background: #04032a;
 }
 
 /* AstroGPT foot shadow cho sidebar border */
@@ -368,4 +369,135 @@ body {
 .lii {
   transition-duration: 0.4s;
   transition-timing-function: ease-in-out;
+}
+
+/* ============================================================
+   Animated nebula orbs & Cosmic space movement
+   Ky thuat: stripe.com gradient mesh + vercel.com ambient glow
+   ============================================================ */
+@keyframes float-orb-1 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); opacity: 0.48; }
+  25%      { transform: translate(70px, -55px) scale(1.18); opacity: 0.68; }
+  50%      { transform: translate(30px, 40px) scale(0.95); opacity: 0.45; }
+  75%      { transform: translate(-50px, -25px) scale(1.12); opacity: 0.62; }
+}
+@keyframes float-orb-2 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); opacity: 0.42; }
+  33%      { transform: translate(-75px, 55px) scale(1.16); opacity: 0.65; }
+  66%      { transform: translate(45px, -40px) scale(0.92); opacity: 0.40; }
+}
+@keyframes float-orb-3 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); opacity: 0.40; }
+  40%      { transform: translate(60px, 65px) scale(1.22); opacity: 0.60; }
+  80%      { transform: translate(-40px, -30px) scale(0.96); opacity: 0.35; }
+}
+@keyframes float-orb-4 {
+  0%, 100% { transform: translate(0px, 0px) scale(1); opacity: 0.38; }
+  50%      { transform: translate(-65px, -55px) scale(1.20); opacity: 0.60; }
+}
+
+.nebula-orb-1 { animation: float-orb-1 12s ease-in-out infinite; }
+.nebula-orb-2 { animation: float-orb-2 15s ease-in-out infinite; animation-delay: -3s; }
+.nebula-orb-3 { animation: float-orb-3 10s ease-in-out infinite; animation-delay: -6s; }
+.nebula-orb-4 { animation: float-orb-4 13s ease-in-out infinite; animation-delay: -2s; }
+
+/* 1. Levitation cho ban tay chiem tinh */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(1deg);
+  }
+}
+.animate-float-slow {
+  animation: float-slow 5s ease-in-out infinite;
+}
+
+/* 2. Cosmic drift cho nen vu tru toan trang - chuyen dong ro rang hon */
+@keyframes cosmic-drift {
+  0%, 100% {
+    transform: scale(1) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate(-2.5%, 1.8%);
+  }
+}
+.animate-cosmic-drift {
+  animation: cosmic-drift 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* 3. Sao bang vu tru (Meteor effect) - ro rang, duoi dai sang ruc */
+@keyframes meteor {
+  0% {
+    transform: rotate(215deg) translateX(0);
+    opacity: 0;
+  }
+  4% {
+    opacity: 1;
+  }
+  40% {
+    transform: rotate(215deg) translateX(-750px);
+    opacity: 1;
+  }
+  50% {
+    transform: rotate(215deg) translateX(-900px);
+    opacity: 0;
+  }
+  100% {
+    transform: rotate(215deg) translateX(-900px);
+    opacity: 0;
+  }
+}
+
+.meteor-item {
+  position: absolute;
+  height: 3px;
+  width: 3px;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow: 0 0 12px 2px #4cc9f0, 0 0 24px 4px rgba(157, 78, 221, 0.8);
+  transform: rotate(215deg);
+  pointer-events: none;
+  animation: meteor 4.5s linear infinite;
+}
+
+.meteor-item::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 170px;
+  height: 2px;
+  background: linear-gradient(90deg, #ffffff, #4cc9f0 40%, #9d4edd 75%, transparent);
+  box-shadow: 0 0 8px rgba(76, 201, 240, 0.7);
+}
+
+/* 4. Bui sao vu tru troi bong benh (Stardust drift) */
+@keyframes stardust-drift {
+  0% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  85% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-180px) translateX(30px);
+    opacity: 0;
+  }
+}
+
+.stardust-particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: #ffffff;
+  box-shadow: 0 0 6px 1px rgba(157, 78, 221, 0.8), 0 0 12px 2px rgba(255, 255, 255, 0.6);
+  animation: stardust-drift var(--duration, 7s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
 }
