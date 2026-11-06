@@ -1,0 +1,101 @@
+.horoscope-slider {
+  --horoscope-visible: 4;
+  position: relative;
+  overflow: hidden;
+}
+
+.horoscope-slider-mask {
+  display: flex;
+  width: 100% !important;
+  height: auto;
+  overflow: visible;
+  transition: transform 450ms ease;
+  will-change: transform;
+}
+
+.horoscope-slide {
+  display: block;
+  width: calc(100% / var(--horoscope-visible));
+  height: auto;
+  flex: 0 0 calc(100% / var(--horoscope-visible));
+  box-sizing: border-box;
+}
+
+.horoscope-slider .slide-arrow {
+  position: absolute;
+  bottom: 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.horoscope-slider .horoscope-3-left {
+  right: auto;
+  left: calc(50% - 153px);
+}
+
+.horoscope-slider .horoscope-3-right {
+  right: auto;
+  left: calc(50% + 9px);
+}
+
+.horoscope-slider .slide-arrow:focus-visible {
+  outline: 2px solid var(--color--skin-2, #fff1b3);
+  outline-offset: 3px;
+}
+
+.horoscope-slider .slide-arrow:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media screen and (max-width: 991px) {
+  .horoscope-slider {
+    --horoscope-visible: 3;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .horoscope-slider {
+    --horoscope-visible: 2;
+  }
+}
+
+@media screen and (max-width: 479px) {
+  .horoscope-slider {
+    --horoscope-visible: 1;
+  }
+
+  .horoscope-slider .horoscope-3-left {
+    left: calc(50% - 58px);
+  }
+
+  .horoscope-slider .horoscope-3-right {
+    left: calc(50% + 8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .horoscope-slider-mask {
+    transition: none;
+  }
+}
+
+/* Place the reference heading directly after the Resonancia hero. */
+.about-section.section-padding-top {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.about-section .about-cicle-block {
+  display: none !important;
+}
+
+.about-section .about-content-block {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.about-section .about-content-wrap {
+  margin-top: 180px !important;
+  padding-top: 0 !important;
+}

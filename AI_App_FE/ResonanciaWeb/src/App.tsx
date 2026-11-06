@@ -22,6 +22,7 @@ import TransitPage from './pages/TransitPage';
 import TarotPage from './pages/TarotPage';
 import GlossaryPage from './pages/GlossaryPage';
 import CosmicJournalPage from './pages/CosmicJournalPage';
+import AssistantPage from './pages/AssistantPage';
 
 export default function App() {
   useAuth();
@@ -45,6 +46,7 @@ export default function App() {
         }
       >
         <Route path="/home" element={<HomePage />} />
+        <Route path="/assistant" element={<AssistantPage />} />
         <Route path="/natal" element={<NatalChartPage />} />
         <Route path="/match" element={<MatchPage />} />
         <Route path="/chat" element={<ChatListPage />} />

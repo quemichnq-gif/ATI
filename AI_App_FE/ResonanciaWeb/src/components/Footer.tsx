@@ -4,8 +4,8 @@ import logoImg from '../assets/astrogpt/Logo.png';
 
 export default function Footer() {
   return (
-    <footer className="mt-24 border-t border-purple-900/40 bg-zinc-950/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+    <footer className="footer-section mt-24 border-t border-purple-900/40 bg-zinc-950/80 backdrop-blur-md">
+      <div className="container w-container mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
           {/* Logo & About */}
           <div className="md:col-span-1 space-y-4">

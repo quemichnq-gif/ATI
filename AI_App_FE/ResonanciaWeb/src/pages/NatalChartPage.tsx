@@ -8,6 +8,7 @@ import UiIcon from '../components/UiIcon';
 import type { IconName } from '../components/UiIcon';
 import NatalChartSVG from '../components/NatalChartSVG';
 import FormattedMarkdown from '../components/FormattedMarkdown';
+import PersonalNatalSummary from '../components/PersonalNatalSummary';
 import { generateClientNatalAnalysis, generateClientCareerAnalysis } from '../utils/natalFallback';
 
 const SECTIONS = [
@@ -228,6 +229,8 @@ export default function NatalChartPage() {
         <h1 className="text-3xl font-bold gradient-text font-display"><UiIcon name="chart" label="Natal Chart" className="mr-2 inline" />Natal Chart Analysis</h1>
         <p className="text-purple-300 opacity-70 mt-1">Phân tích chiêm tinh sâu từ biểu đồ sinh của bạn</p>
       </motion.div>
+
+      <PersonalNatalSummary onOpenChart={() => setPageTab('chart')} />
 
       {/* Page tabs */}
       <div className="flex gap-2">

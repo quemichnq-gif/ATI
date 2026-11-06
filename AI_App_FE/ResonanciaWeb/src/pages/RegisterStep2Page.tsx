@@ -209,7 +209,7 @@ export default function RegisterStep2Page() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden"
+    <div className="astrica-auth-page min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{ background: 'radial-gradient(ellipse at center, #1a0030 0%, #0a0015 70%, #000 100%)' }}>
       <StarField count={180} />
 

@@ -14,7 +14,7 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden"
+    <div className="astrica-auth-page min-h-screen flex flex-col items-center justify-center relative overflow-hidden"
       style={{ background: 'radial-gradient(ellipse at 50% 0%, #1a0030 0%, #0a0015 50%, #000 100%)' }}>
       <StarField count={200} />
 

@@ -74,7 +74,7 @@ export default function AstroBot({ onClose }: AstroBotProps) {
   return (
     /* Panel nổi — desktop: góc phải dưới; mobile: toàn màn hình */
     <div
-      className="fixed z-50 md:bottom-24 md:right-6 md:w-96 md:h-[520px]
+      className="astrica-ai-panel fixed z-50 md:bottom-24 md:right-6 md:w-96 md:h-[520px]
                  inset-0 md:inset-auto flex flex-col
                  rounded-none md:rounded-2xl overflow-hidden"
       style={{
