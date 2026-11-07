@@ -1,3 +1,4 @@
+import time
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -19,6 +20,8 @@ from astrology_insights import (
     generate_natal_depth_analysis,
     generate_time_based_prediction
 )
+from rag_service import generate_rag_chat_response
+from intent_router import route_intent
 
 # Load biến môi trường
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -654,68 +657,87 @@ def generate_prediction():
 
 @app.route("/astrology-chat", methods=["POST"])
 def astrology_chat():
+    start_time = time.time()
     data = request.get_json(silent=True) or {}
     messages = data.get("messages")
     user_data = data.get("userData") or {}
     if not isinstance(messages, list) or not messages:
         return jsonify({"error": "Hãy nhập câu hỏi trước khi gửi."}), 400
 
-    # Keep a short, bounded conversation and accept only plain text turns.
-    turns = []
-    for item in messages[-12:]:
-        if not isinstance(item, dict) or item.get("role") not in ("user", "assistant"):
-            continue
-        content = item.get("content")
-        if isinstance(content, str) and content.strip():
-            turns.append(f"{ 'Người dùng' if item['role'] == 'user' else 'Resonancia' }: {content.strip()[:2000]}")
     last_message = messages[-1]
-    if not turns or not isinstance(last_message, dict) or last_message.get("role") != "user":
+    if not isinstance(last_message, dict) or last_message.get("role") != "user":
         return jsonify({"error": "Tin nhắn cuối cần là câu hỏi của bạn."}), 400
 
-    name = str(user_data.get("name") or "Bạn")[:80]
-    sun = str(user_data.get("sun") or "chưa cung cấp")[:40]
-    moon = str(user_data.get("moon") or "chưa cung cấp")[:40]
-    ascendant = str(user_data.get("ascendant") or "chưa cung cấp")[:40]
-    prompt = f"""Bạn là trợ lý AI Resonancia, trò chuyện bằng tiếng Việt, tự nhiên và rõ ràng.
-Trả lời trực tiếp đúng câu hỏi mới nhất của người dùng, không chuyển sang chủ đề khác, không thêm lời khuyên chung chung hoặc nội dung không được hỏi. Ưu tiên câu trả lời ngắn gọn từ 1 đến 4 câu; chỉ viết dài hơn khi người dùng yêu cầu giải thích chi tiết.
-Dùng lịch sử bên dưới để hiểu ngữ cảnh và trả lời tiếp mạch hội thoại. Chỉ dùng thông tin hồ sơ nếu liên quan; không bịa dữ liệu, sự kiện hiện tại hoặc vị trí hành tinh. Chiêm tinh chỉ là góc nhìn tham khảo, không khẳng định định mệnh.
-Thông tin người dùng: tên {name}; Mặt Trời {sun}; Mặt Trăng {moon}; Cung Mọc {ascendant}.
-Lịch sử hội thoại:
-{chr(10).join(turns)}
-Hãy trả lời tin nhắn cuối như một cuộc trò chuyện trực tiếp."""
-    try:
-        response = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent",
-            params={"key": api_key},
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.7},
-            },
-            timeout=32,
-        )
-        if not response.ok:
-            safe_print("Gemini chat API error:", response.status_code, response.text[:1000])
-            response.raise_for_status()
-        candidates = response.json().get("candidates", [])
-        parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
-        answer = "\n".join(part.get("text", "") for part in parts if part.get("text")).strip()
-        if not answer:
-            raise ValueError("Gemini returned no text candidate")
-        return jsonify({"answer": answer}), 200
-    except Exception as e:
-        safe_print("Astrology chat AI error:", e)
-        # Fallback luận giải chiêm tinh thông minh dự phòng khi Gemini API bận hoặc cấu hình key
-        user_msg = last_message.get("content", "").lower()
-        if "chào" in user_msg or "hi" in user_msg or "hello" in user_msg:
-            fallback = f"Chào {name}! Tôi là AstroBot của Resonancia ✨. Với Mặt Trời {sun} và Mặt Trăng {moon}, hôm nay bạn đang mang nguồn năng lượng rất đặc biệt. Bạn muốn tìm hiểu về tình duyên, công việc hay dự báo tử vi hôm nay?"
-        elif any(k in user_msg for k in ["yêu", "tình duyên", "người yêu", "hợp", "kết đôi", "crush"]):
-            fallback = f"Về phương diện tình cảm của {sun}: Sự chân thành và trực giác nhạy bén là thỏi nam châm lớn nhất của bạn lúc này. Nếu đang tìm kiếm một nửa đồng điệu, hãy mở lòng với những người mang nguyên tố tương hợp; vũ trụ đang sắp đặt những cuộc gặp gỡ đầy duyên khởi."
-        elif any(k in user_msg for k in ["công việc", "sự nghiệp", "tiền", "tài chính", "học tập"]):
-            fallback = f"Vận trình sự nghiệp của {sun} đang bước vào chu kỳ tích lũy năng lượng và định hình mục tiêu. Hãy tập trung vào những thế mạnh cốt lõi, kiên nhẫn và tự tin vào kế hoạch dài hạn của mình, thành quả sẽ tới đúng lúc."
-        else:
-            fallback = f"Dưới góc nhìn chiêm tinh học dành cho {name} (Mặt Trời {sun}, Cung Mọc {ascendant}): Năng lượng các chòm sao hiện tại khuyến khích bạn lắng nghe trực giác nội tâm và giữ sự cân bằng cảm xúc. Mọi quyết định xuất phát từ sự bình an nội tại đều sẽ dẫn lối đến kết quả tốt lành."
-        return jsonify({"answer": fallback}), 200
+    user_query = str(last_message.get("content", "")).strip()
+    user_name = str(user_data.get("name") or "Bạn")[:80]
+    history = messages[:-1] if len(messages) > 1 else []
 
+    try:
+        # BƯỚC 1: INTENT ROUTING HOÀN TOÀN LOCAL (0 GEMINI CALLS)
+        route_res = route_intent(user_query, history=history, user_name=user_name)
+        intent = route_res.get("intent", "knowledge")
+        actions = route_res.get("actions", [])
+        action = route_res.get("action")
+
+        # Nếu không cần gọi Gemini (navigation, small_talk, unsupported, crisis)
+        if not route_res.get("should_call_gemini", True):
+            duration_ms = int((time.time() - start_time) * 1000)
+            status_tag = "nav_hit" if intent == "navigation" else intent
+            safe_print(f"[ASTROBOT] intent={intent} status={status_tag} emb_calls=0 gen_calls=0 cache=hit duration_ms={duration_ms}")
+            return jsonify({
+                "answer": route_res.get("direct_response", ""),
+                "intent": intent,
+                "action": action,
+                "actions": actions,
+                "fallback": False
+            }), 200
+
+        # BƯỚC 2: RAG KNOWLEDGE RETRIEVAL & GEMINI GENERATION
+        current_api_key = os.getenv("GEMINI_API_KEY", api_key)
+        current_model = os.getenv("GEMINI_MODEL", MODEL_NAME)
+        rewritten_query = route_res.get("rewritten_query")
+        emotional_level = route_res.get("emotional_level", "none")
+
+        rag_result = generate_rag_chat_response(
+            messages=messages,
+            user_data=user_data,
+            api_key=current_api_key,
+            model_name=current_model,
+            rewritten_query=rewritten_query,
+            emotional_level=emotional_level
+        )
+
+        answer = rag_result.get("answer")
+        if not answer:
+            raise ValueError("RAG service returned no answer")
+
+        duration_ms = int((time.time() - start_time) * 1000)
+        emb_calls = rag_result.get("embedding_calls", 1)
+        gen_calls = rag_result.get("generation_calls", 1)
+        q_cache_hit = rag_result.get("query_cache_hit", False)
+        status_tag = "rag_embedding_cache_hit" if q_cache_hit else "rag_gemini"
+        safe_print(f"[ASTROBOT] intent={intent} status={status_tag} emb_calls={emb_calls} gen_calls={gen_calls} query_cache={'hit' if q_cache_hit else 'miss'} duration_ms={duration_ms}")
+
+        return jsonify({
+            "answer": answer,
+            "intent": intent,
+            "retrieved_topics": rag_result.get("retrieved_topics", []),
+            "fallback": rag_result.get("fallback", False),
+            "action": action,
+            "actions": actions
+        }), 200
+
+    except Exception as e:
+        safe_print("[ASTROBOT] Astrology chat AI error:", e)
+        duration_ms = int((time.time() - start_time) * 1000)
+        safe_print(f"[ASTROBOT] intent=error status=error_fallback emb_calls=0 gen_calls=0 duration_ms={duration_ms}")
+        fallback_msg = "Mình đang gặp giới hạn xử lý một chút, bạn thử lại sau nhé."
+        return jsonify({
+            "answer": fallback_msg,
+            "fallback": True,
+            "action": None,
+            "actions": []
+        }), 200
 
 # -------------------------------------------------
 #  Route test server
