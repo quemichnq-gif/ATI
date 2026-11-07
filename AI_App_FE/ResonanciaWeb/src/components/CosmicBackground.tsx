@@ -31,18 +31,18 @@ interface Stardust {
  * 4. Flowing Nebula Orbs — deep violet & pink cosmic dust shifting actively
  * 5. Hypnotic Celestial Background Drift — gentle 18s breathing motion
  */
+// Pre-generated static stardust to eliminate re-computation and garbage collection spikes on navigation
+const STATIC_STARDUST: Stardust[] = Array.from({ length: 32 }, (_, i) => ({
+  id: i,
+  left: (i * 3.1 + 7) % 96 + 2,
+  top: (i * 2.7 + 13) % 85 + 15,
+  size: (i % 5) * 0.3 + 1.2,
+  duration: 5.5 + (i % 4) * 0.9,
+  delay: (i % 7) * 0.8,
+}));
+
 export default function CosmicBackground() {
-  // Generate 32 stardust particles drifting across the viewport
-  const stardust = useMemo<Stardust[]>(() =>
-    Array.from({ length: 32 }, (_, i) => ({
-      id: i,
-      left: Math.random() * 96 + 2,
-      top: Math.random() * 85 + 15,
-      size: Math.random() * 2.2 + 1.2,
-      duration: Math.random() * 4 + 5.5,
-      delay: Math.random() * 6,
-    })), []
-  );
+  const stardust = STATIC_STARDUST;
 
   return (
     <div

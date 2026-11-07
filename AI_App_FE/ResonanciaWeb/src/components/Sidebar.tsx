@@ -75,7 +75,10 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     navigate('/login');
   };
 
-  const displayName = profile.name?.trim() || (profile.email ? profile.email.split('@')[0] : 'Người dùng');
+  const authUser = useSelector((state: RootState) => state.auth);
+  const currentEmail = profile.email || authUser.email || auth.currentUser?.email || '';
+  const currentName = profile.name?.trim() || auth.currentUser?.displayName?.trim() || '';
+  const displayName = currentName || (currentEmail ? currentEmail.split('@')[0] : 'Người dùng');
   const hasAstro = Boolean(profile.sun && profile.moon);
 
   const sidebarContent = (

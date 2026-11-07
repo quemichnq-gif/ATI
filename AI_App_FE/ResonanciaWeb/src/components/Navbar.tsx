@@ -165,7 +165,10 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const profile = useSelector((state: RootState) => state.profile);
-  const displayName = profile.name?.trim() || (profile.email ? profile.email.split('@')[0] : 'Người dùng');
+  const authUser = useSelector((state: RootState) => state.auth);
+  const currentEmail = profile.email || authUser.email || auth.currentUser?.email || '';
+  const currentName = profile.name?.trim() || auth.currentUser?.displayName?.trim() || '';
+  const displayName = currentName || (currentEmail ? currentEmail.split('@')[0] : 'Người dùng');
 
   useEffect(() => {
     const closeMenuOnOutsideClick = (event: MouseEvent) => {

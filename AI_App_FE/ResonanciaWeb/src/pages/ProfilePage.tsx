@@ -7,6 +7,7 @@ import { RootState } from '../store';
 import { updateProfile } from '../store/profileSlice';
 import { apiUpdateProfile, apiUploadImage } from '../services/api';
 import { auth, db } from '../services/firebase';
+import { updateProfile as fbUpdateProfile } from 'firebase/auth';
 import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
 import UiIcon from '../components/UiIcon';
 import type { IconName } from '../components/UiIcon';
@@ -230,6 +231,22 @@ export default function ProfilePage() {
 
       // 1. Cập nhật Redux store ngay lập tức để UI phản hồi mượt mà
       dispatch(updateProfile(saveFields));
+
+      // Lưu vào Persistent LocalStorage
+      try {
+        const mergedData = { ...profile, ...saveFields };
+        localStorage.setItem(`resonancia_profile_${uid}`, JSON.stringify(mergedData));
+        localStorage.setItem('resonancia_last_profile', JSON.stringify(mergedData));
+      } catch (errLocal) {
+        console.warn('Lỗi lưu profile vào LocalStorage:', errLocal);
+      }
+
+      // Cập nhật Firebase Auth displayName
+      if (auth.currentUser && saveFields.name?.trim()) {
+        try {
+          await fbUpdateProfile(auth.currentUser, { displayName: saveFields.name.trim() });
+        } catch {}
+      }
 
       // 2. Lưu trực tiếp vào Firestore từ client
       try {

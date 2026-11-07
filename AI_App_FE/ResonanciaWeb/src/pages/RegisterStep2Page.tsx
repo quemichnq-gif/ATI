@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db, auth } from '../services/firebase';
+import { updateProfile } from 'firebase/auth';
 import { fetchAstrologyData, calculateAstrologyFallback } from '../services/astrologyService';
 import { setProfile } from '../store/profileSlice';
 import { apiUpdateProfile } from '../services/api';
@@ -120,7 +121,7 @@ export default function RegisterStep2Page() {
       }
 
       const targetUid = uid || auth.currentUser?.uid || '';
-      const targetEmail = email || auth.currentUser?.email || '';
+      const targetEmail = (email || auth.currentUser?.email || '').trim().toLowerCase();
 
       const fullProfileData = {
         uid: targetUid,
@@ -181,7 +182,26 @@ export default function RegisterStep2Page() {
       // 1. Cập nhật ngay Redux store để toàn bộ ứng dụng (Bản Đồ Sao, Trang Chủ, ...) nhận ngay lá số
       dispatch(setProfile(fullProfileData as any));
 
-      // 2. Lưu vào Firestore
+      // 2. Lưu vào Persistent LocalStorage để đảm bảo thông tin hồ sơ không bao giờ bị mất
+      if (targetUid) {
+        try {
+          localStorage.setItem(`resonancia_profile_${targetUid}`, JSON.stringify(fullProfileData));
+          localStorage.setItem('resonancia_last_profile', JSON.stringify(fullProfileData));
+        } catch (errLocal) {
+          console.warn('Lưu LocalStorage từ step2:', errLocal);
+        }
+      }
+
+      // 3. Cập nhật Firebase Auth displayName trực tiếp
+      if (auth.currentUser && fullName.trim()) {
+        try {
+          await updateProfile(auth.currentUser, { displayName: fullName.trim() });
+        } catch (errAuth) {
+          console.warn('Cập nhật displayName Firebase Auth:', errAuth);
+        }
+      }
+
+      // 4. Lưu vào Firestore
       if (targetUid) {
         try {
           await setDoc(doc(db, 'users', targetUid), {
@@ -192,7 +212,7 @@ export default function RegisterStep2Page() {
           console.warn('Lưu Firestore trực tiếp từ step2:', errFs);
         }
 
-        // 3. Đồng bộ với Backend API
+        // 5. Đồng bộ với Backend API
         try {
           await apiUpdateProfile({ uid: targetUid, fields: fullProfileData });
         } catch (errBackend) {

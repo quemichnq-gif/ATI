@@ -1,33 +1,8 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { apiAstrologyChat } from '../services/api';
-
-// Nguồn kỹ thuật: motion.dev/docs/react/animate#variants + animations.dev
-// Panel AssistantPage mount: scale + fade + slide lên từ nhẹ; children stagger 70ms mỗi slot
-const panelVariants = {
-  hidden: { opacity: 0, scale: 0.97, y: 18 },
-  show: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: {
-      type: 'spring' as const,
-      stiffness: 280,
-      damping: 28,
-      mass: 0.85,
-      staggerChildren: 0.07,
-    },
-  },
-};
-
-// Mỗi slot con (heading / conversation / composer) trượt vào từ y=12
-const slotVariants = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 25 } },
-};
 
 interface FeatureLink {
   to: string;
@@ -159,29 +134,21 @@ export default function AssistantPage() {
   };
 
   return (
-    // motion.section: panel tổng thể scale + fade + slide lên khi mount
-    <motion.section
-      className="astrica-assistant-page"
-      aria-label="Resonancia AI"
-      variants={panelVariants}
-      initial="hidden"
-      animate="show"
-    >
-      {/* Heading slot — trượt vào đầu tiên */}
-      <motion.header className="astrica-assistant-heading" variants={slotVariants}>
+    <section className="astrica-assistant-page" aria-label="Resonancia AI">
+      {/* Heading slot */}
+      <header className="astrica-assistant-heading">
         <img src="/astrica/images/6870b7473503e2e6d021b012_Nav_icon.svg" alt="" aria-hidden="true" />
         <div>
           <h1>Resonancia AI</h1>
           <p>Hỏi về chiêm tinh hoặc mở nhanh một tính năng</p>
         </div>
-      </motion.header>
+      </header>
 
-      {/* Conversation slot — trượt vào thứ hai */}
-      <motion.div
+      {/* Conversation slot */}
+      <div
         ref={conversationRef}
         className="astrica-assistant-conversation"
         aria-live="polite"
-        variants={slotVariants}
       >
         {messages.length === 0 ? (
           <div className="astrica-assistant-welcome">
@@ -235,10 +202,10 @@ export default function AssistantPage() {
             )}
           </div>
         )}
-      </motion.div>
+      </div>
 
-      {/* Composer slot — trượt vào cuối */}
-      <motion.div className="astrica-assistant-composer-wrap" variants={slotVariants}>
+      {/* Composer slot */}
+      <div className="astrica-assistant-composer-wrap">
         {error && <p className="astrica-assistant-error" role="status">{error}</p>}
         <form className="astrica-assistant-composer" onSubmit={(event) => void sendMessage(event)}>
           <textarea
@@ -256,7 +223,7 @@ export default function AssistantPage() {
           </button>
         </form>
         <p className="astrica-assistant-hint">Enter để gửi · Shift + Enter để xuống dòng</p>
-      </motion.div>
-    </motion.section>
+      </div>
+    </section>
   );
 }
