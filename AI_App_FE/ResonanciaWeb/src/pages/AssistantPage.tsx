@@ -95,7 +95,17 @@ export default function AssistantPage() {
         },
       });
       const answer = response.data?.answer || response.data?.prediction || 'Mình chưa có câu trả lời cho câu hỏi này.';
-      const answerFeatures = relatedFeatures.length ? relatedFeatures : findRelatedFeatures(answer);
+      const backendActions = response.data?.actions || (response.data?.action ? [response.data.action] : []);
+      const mappedBackendFeatures = backendActions
+        .filter((a: any) => a && a.route && a.label)
+        .map((a: any) => ({
+          to: a.route,
+          label: a.label,
+          keywords: [],
+        }));
+      const answerFeatures = mappedBackendFeatures.length
+        ? mappedBackendFeatures
+        : (relatedFeatures.length ? relatedFeatures : findRelatedFeatures(answer));
       setMessages([
         ...conversation,
         { id: Date.now() + 1, role: 'assistant', content: answer, relatedFeatures: answerFeatures },

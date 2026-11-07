@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { auth } from '../services/firebase';
 
@@ -8,6 +9,7 @@ import logoImg from '../assets/astrogpt/Logo.png';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  actions?: Array<{ type: string; route: string; label: string }>;
 }
 
 interface AstroBotProps {
@@ -17,6 +19,7 @@ interface AstroBotProps {
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 
 export default function AstroBot({ onClose }: AstroBotProps) {
+  const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
@@ -61,7 +64,8 @@ export default function AstroBot({ onClose }: AstroBotProps) {
       );
 
       const answer: string = res.data?.answer || res.data?.prediction || 'Rất tiếc, không nhận được phản hồi từ AI.';
-      setHistory(h => [...h, { role: 'assistant', content: answer }]);
+      const backendActions = res.data?.actions || (res.data?.action ? [res.data.action] : []);
+      setHistory(h => [...h, { role: 'assistant', content: answer, actions: backendActions }]);
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Không thể kết nối backend. Hãy kiểm tra server Python đã chạy chưa.';
       setHistory(h => [...h, { role: 'assistant', content: `⚠️ ${msg}` }]);
@@ -131,6 +135,24 @@ export default function AstroBot({ onClose }: AstroBotProps) {
               }}
             >
               {msg.content}
+              {Boolean(msg.actions?.length) && (
+                <div className="mt-2 pt-2 border-t border-purple-500/20 flex flex-wrap gap-1.5">
+                  {msg.actions?.map((act, actIdx) => (
+                    <button
+                      key={actIdx}
+                      type="button"
+                      onClick={() => {
+                        navigate(act.route);
+                        onClose();
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-400/30 transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>{act.label}</span>
+                      <span>&rarr;</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
