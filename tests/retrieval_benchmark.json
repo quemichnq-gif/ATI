@@ -1,0 +1,151 @@
+{
+  "tune": [
+    {
+      "id": "tune_01",
+      "query": "Bạch Dương có tính cách như thế nào?",
+      "expected_chunk_ids": ["zodiac_aries"]
+    },
+    {
+      "id": "tune_02",
+      "query": "Kim Ngưu hợp với cung nào nhất trong tình yêu?",
+      "expected_chunk_ids": ["zodiac_taurus"]
+    },
+    {
+      "id": "tune_03",
+      "query": "Song Tử có ưu điểm và nhược điểm gì?",
+      "expected_chunk_ids": ["zodiac_gemini"]
+    },
+    {
+      "id": "tune_04",
+      "query": "Mặt Trời Cự Giải mang nguồn năng lượng gì?",
+      "expected_chunk_ids": ["zodiac_cancer"]
+    },
+    {
+      "id": "tune_05",
+      "query": "Sư Tử thuộc nguyên tố nào và có phẩm chất gì?",
+      "expected_chunk_ids": ["zodiac_leo"]
+    },
+    {
+      "id": "tune_06",
+      "query": "Sao Kim có ý nghĩa gì trong chiêm tinh học?",
+      "expected_chunk_ids": ["planets_personal"]
+    },
+    {
+      "id": "tune_07",
+      "query": "Mặt Trăng đại diện cho điều gì trong nội tâm?",
+      "expected_chunk_ids": ["planets_big3"]
+    },
+    {
+      "id": "tune_08",
+      "query": "Cung Mọc Ascendant là gì?",
+      "expected_chunk_ids": ["planets_big3", "house_1_to_3"]
+    },
+    {
+      "id": "tune_09",
+      "query": "Nhà 7 trong bản đồ sao thể hiện điều gì về hôn nhân?",
+      "expected_chunk_ids": ["house_7_to_9"]
+    },
+    {
+      "id": "tune_10",
+      "query": "Nhà 10 và Trung Thiên MC có liên quan đến sự nghiệp không?",
+      "expected_chunk_ids": ["house_10_to_12"]
+    },
+    {
+      "id": "tune_11",
+      "query": "Ý nghĩa của lá bài The Tower trong Tarot là gì?",
+      "expected_chunk_ids": ["tarot_major_challenges"]
+    },
+    {
+      "id": "tune_12",
+      "query": "Lá bài The Lovers có ý nghĩa gì trong tình duyên?",
+      "expected_chunk_ids": ["tarot_major_love"]
+    },
+    {
+      "id": "tune_13",
+      "query": "Bộ Chén Cups trong bài Tarot đại diện cho nguyên tố nào?",
+      "expected_chunk_ids": ["tarot_overview"]
+    },
+    {
+      "id": "tune_14",
+      "query": "Góc hợp Tam Hợp Trine và Vuông Góc Square có ý nghĩa gì?",
+      "expected_chunk_ids": ["aspects_and_transits"]
+    },
+    {
+      "id": "tune_15",
+      "query": "Sao Thổ Saturn mang lại bài học và kỷ luật gì?",
+      "expected_chunk_ids": ["planets_social_outer"]
+    },
+    {
+      "id": "tune_16",
+      "query": "Resonancia có những tính năng gì để tôi khám phá?",
+      "expected_chunk_ids": ["feature_navigation"]
+    }
+  ],
+  "holdout": [
+    {
+      "id": "holdout_01",
+      "query": "Xử Nữ khi yêu sẽ bộc lộ tình cảm như thế nào?",
+      "expected_chunk_ids": ["zodiac_virgo"]
+    },
+    {
+      "id": "holdout_02",
+      "query": "Thiên Bình có tính cách công bằng và ngoại giao ra sao?",
+      "expected_chunk_ids": ["zodiac_libra"]
+    },
+    {
+      "id": "holdout_03",
+      "query": "Bọ Cạp có phải là cung hoàng đạo chung thủy và sâu sắc không?",
+      "expected_chunk_ids": ["zodiac_scorpio"]
+    },
+    {
+      "id": "holdout_04",
+      "query": "Nhân Mã thích tự do và triết lý khám phá cuộc sống thế nào?",
+      "expected_chunk_ids": ["zodiac_sagittarius"]
+    },
+    {
+      "id": "holdout_05",
+      "query": "Ma Kết có tham vọng và kiên nhẫn trong sự nghiệp ra sao?",
+      "expected_chunk_ids": ["zodiac_capricorn"]
+    },
+    {
+      "id": "holdout_06",
+      "query": "Bảo Bình có tư duy độc lập và đột phá như thế nào?",
+      "expected_chunk_ids": ["zodiac_aquarius"]
+    },
+    {
+      "id": "holdout_07",
+      "query": "Song Ngư thuộc nguyên tố Nước có đặc điểm gì về trực giác?",
+      "expected_chunk_ids": ["zodiac_pisces"]
+    },
+    {
+      "id": "holdout_08",
+      "query": "Nhà 1, Nhà 2 và Nhà 3 có ý nghĩa gì về bản thân và tiền tài?",
+      "expected_chunk_ids": ["house_1_to_3"]
+    },
+    {
+      "id": "holdout_09",
+      "query": "Nhà 4 và Nhà 5 cai quản gia đình và tình yêu lãng mạn ra sao?",
+      "expected_chunk_ids": ["house_4_to_6"]
+    },
+    {
+      "id": "holdout_10",
+      "query": "Sao Hỏa Mars đại diện cho hành động và ý chí như thế nào?",
+      "expected_chunk_ids": ["planets_personal"]
+    },
+    {
+      "id": "holdout_11",
+      "query": "Lá bài Death Cái Chết trong Tarot có phải là sự kết thúc để tái sinh?",
+      "expected_chunk_ids": ["tarot_major_challenges"]
+    },
+    {
+      "id": "holdout_12",
+      "query": "Lá The Fool mang thông điệp gì về khởi đầu mới?",
+      "expected_chunk_ids": ["tarot_major_love"]
+    },
+    {
+      "id": "holdout_13",
+      "query": "Vận hạn quá cảnh Transit là gì trong chiêm tinh?",
+      "expected_chunk_ids": ["aspects_and_transits"]
+    }
+  ]
+}
