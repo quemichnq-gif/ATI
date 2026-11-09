@@ -92,7 +92,7 @@ export default function PredictionPage() {
   }, [profile.sun]);
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-6">
       <button onClick={() => navigate('/home')} className="text-purple-300 hover:text-white text-sm">← Về Trang Chủ</button>
 
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>

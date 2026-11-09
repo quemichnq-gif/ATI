@@ -73,9 +73,29 @@ def init_chat_db():
             sender_avatar TEXT,
             text TEXT,
             timestamp INTEGER,
-            read INTEGER DEFAULT 0
+            read INTEGER DEFAULT 0,
+            type TEXT DEFAULT 'text',
+            file_url TEXT,
+            file_name TEXT,
+            file_size TEXT
         )
     ''')
+    try:
+        cursor.execute("ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE messages ADD COLUMN file_url TEXT")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE messages ADD COLUMN file_name TEXT")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE messages ADD COLUMN file_size TEXT")
+    except Exception:
+        pass
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id, timestamp)')
     conn.commit()
     conn.close()
@@ -159,6 +179,11 @@ def send_message():
     if sender_id != uid:
         return jsonify({'error': 'Sender does not match authenticated user'}), 403
 
+    msg_type = data.get('type', 'text')
+    file_url = data.get('fileUrl')
+    file_name = data.get('fileName')
+    file_size = data.get('fileSize')
+
     msg_id = f"msg_{int(time.time() * 1000)}_{os.urandom(4).hex()}"
     now = int(time.time() * 1000)
 
@@ -167,11 +192,12 @@ def send_message():
 
     # 1. Lưu tin nhắn
     cursor.execute('''
-        INSERT INTO messages (id, chat_id, sender_id, sender_name, sender_avatar, text, timestamp, read)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-    ''', (msg_id, chat_id, sender_id, sender_name, sender_avatar, text, now))
+        INSERT INTO messages (id, chat_id, sender_id, sender_name, sender_avatar, text, timestamp, read, type, file_url, file_name, file_size)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+    ''', (msg_id, chat_id, sender_id, sender_name, sender_avatar, text, now, msg_type, file_url, file_name, file_size))
 
     # 2. Cập nhật hoặc tạo cuộc trò chuyện
+    last_msg_preview = '[Hình ảnh]' if msg_type == 'image' else (f'[Tệp: {file_name}]' if msg_type == 'file' else text)
     row = load_chat_for_user(cursor, chat_id, uid)
     if not row:
         conn.close()
@@ -180,7 +206,7 @@ def send_message():
         cursor.execute('''
             UPDATE chats SET last_message = ?, last_timestamp = ?, last_sender_id = ?
             WHERE chat_id = ?
-        ''', (text, now, sender_id, chat_id))
+        ''', (last_msg_preview, now, sender_id, chat_id))
     else:
         cursor.execute('''
             INSERT INTO chats (chat_id, participants, participant_names, participant_avatars, last_message, last_timestamp, last_sender_id, created_at)
@@ -190,7 +216,7 @@ def send_message():
             json.dumps([sender_id]),
             json.dumps({sender_id: sender_name}),
             json.dumps({sender_id: sender_avatar}),
-            text,
+            last_msg_preview,
             now,
             sender_id,
             now
@@ -209,7 +235,11 @@ def send_message():
             'senderAvatar': sender_avatar,
             'text': text,
             'timestamp': now,
-            'read': False
+            'read': False,
+            'type': msg_type,
+            'fileUrl': file_url,
+            'fileName': file_name,
+            'fileSize': file_size
         }
     })
 
@@ -249,7 +279,11 @@ def get_chat_messages(chat_id):
             'senderAvatar': r['sender_avatar'],
             'text': r['text'],
             'timestamp': r['timestamp'],
-            'read': bool(r['read'])
+            'read': bool(r['read']),
+            'type': r['type'] if 'type' in r.keys() and r['type'] else 'text',
+            'fileUrl': r['file_url'] if 'file_url' in r.keys() else None,
+            'fileName': r['file_name'] if 'file_name' in r.keys() else None,
+            'fileSize': r['file_size'] if 'file_size' in r.keys() else None
         })
 
     conn.close()

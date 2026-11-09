@@ -39,9 +39,14 @@ export default function ChatRoomPage() {
   const [toastMsg, setToastMsg] = useState('');
   const [chats, setChats] = useState<ChatConversation[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Lắng nghe sự kiện chuyển đổi danh tính
   useEffect(() => {
@@ -112,18 +117,29 @@ export default function ChatRoomPage() {
     return unsub;
   }, [chatId]);
 
-  // Tự động cuộn xuống dưới cùng khi có tin nhắn mới
+  // Tự động cuộn xuống dưới cùng khi có tin nhắn mới (giữ trong khung hội thoại, không cuộn cả trang window)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      const container = messagesEndRef.current.parentElement;
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      }
+    }
   }, [messages]);
 
-  // Hàm gửi tin nhắn văn bản (Hỗ trợ Optimistic UI + Dual Sync)
-  const handleSendText = async (textToSend?: string) => {
-    const text = (textToSend || input).trim();
-    if (!text || !chatId || !currentUid || sending) return;
+  // Hàm gửi tin nhắn văn bản, ảnh hoặc file
+  const handleSendText = async (
+    textToSend?: string,
+    extra?: { type?: 'text' | 'image' | 'file'; fileUrl?: string; fileName?: string; fileSize?: string }
+  ) => {
+    const text = (textToSend !== undefined ? textToSend : input).trim();
+    const msgType = extra?.type || 'text';
+    if (!text && !extra?.fileUrl) return;
+    if (!chatId || !currentUid || sending) return;
 
     setSending(true);
     setInput('');
+    setShowEmojiPicker(false);
 
     // 1. Optimistic Update để UI mượt mà ngay lập tức
     const tempMsg: ChatMessage = {
@@ -132,7 +148,11 @@ export default function ChatRoomPage() {
       senderId: currentUid,
       senderName: activeIdentity.name,
       senderAvatar: activeIdentity.avatar,
-      text,
+      text: text || (msgType === 'image' ? '[Hình ảnh]' : `[Tệp: ${extra?.fileName || 'tài liệu'}]`),
+      type: msgType,
+      fileUrl: extra?.fileUrl,
+      fileName: extra?.fileName,
+      fileSize: extra?.fileSize,
       timestamp: Date.now(),
       read: false,
     };
@@ -144,7 +164,11 @@ export default function ChatRoomPage() {
         senderId: currentUid,
         senderName: activeIdentity.name,
         senderAvatar: activeIdentity.avatar,
-        text,
+        text: tempMsg.text,
+        type: msgType,
+        fileUrl: extra?.fileUrl,
+        fileName: extra?.fileName,
+        fileSize: extra?.fileSize,
       });
     } catch (e) {
       console.error('Lỗi gửi tin nhắn:', e);
@@ -153,6 +177,80 @@ export default function ChatRoomPage() {
       setSending(false);
       inputRef.current?.focus();
     }
+  };
+
+  // Xử lý gửi ảnh (Convert Base64 data URL)
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setToastMsg('Vui lòng chọn file hình ảnh hợp lệ');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setToastMsg('Kích thước ảnh tối đa là 5MB');
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      handleSendText('', {
+        type: 'image',
+        fileUrl: base64,
+        fileName: file.name,
+      });
+      setUploading(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    };
+    reader.onerror = () => {
+      setToastMsg('Không thể đọc ảnh');
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Xử lý gửi file tài liệu
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setToastMsg('Kích thước tệp tối đa là 10MB');
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    const sizeStr = file.size > 1024 * 1024
+      ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+      : `${Math.round(file.size / 1024)} KB`;
+
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      handleSendText(file.name, {
+        type: 'file',
+        fileUrl: base64,
+        fileName: file.name,
+        fileSize: sizeStr,
+      });
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.onerror = () => {
+      setToastMsg('Không thể đọc file');
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Chọn emoji
+  const handleSelectEmoji = (emoji: string) => {
+    setInput((prev) => prev + emoji);
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -563,25 +661,75 @@ export default function ChatRoomPage() {
                   )}
 
                   <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[72%]`}>
-                    <div
-                      className={`px-4 py-2.5 text-[14px] leading-relaxed break-words shadow-md transition-all ${
-                        isMine
-                          ? 'rounded-2xl rounded-br-xs text-white font-normal'
-                          : 'rounded-2xl rounded-bl-xs text-slate-100 border'
-                      }`}
-                      style={{
-                        background: isMine
-                          ? 'linear-gradient(135deg, #0084FF 0%, #0066FF 45%, #9B28FD 100%)'
-                          : 'rgba(255, 255, 255, 0.08)',
-                        borderColor: isMine ? 'transparent' : 'rgba(255, 255, 255, 0.12)',
-                        backdropFilter: 'blur(12px)',
-                        boxShadow: isMine
-                          ? '0 6px 18px rgba(0, 132, 255, 0.35)'
-                          : '0 4px 12px rgba(0, 0, 0, 0.25)',
-                      }}
-                    >
-                      {msg.text}
-                    </div>
+                    {/* Render theo loại tin nhắn: Text / Image / File */}
+                    {msg.type === 'image' && msg.fileUrl ? (
+                      <div className="rounded-2xl overflow-hidden border border-white/20 shadow-lg max-w-[280px] sm:max-w-[340px] bg-black/40 group relative">
+                        <img
+                          src={msg.fileUrl}
+                          alt="Đính kèm"
+                          className="w-full max-h-[300px] object-cover hover:scale-[1.02] transition-transform cursor-zoom-in"
+                          onClick={() => setZoomedImage(msg.fileUrl || null)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setZoomedImage(msg.fileUrl || null)}
+                          className="absolute bottom-2 right-2 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+                          title="Phóng to ảnh"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="15 3 21 3 21 9" />
+                            <polyline points="9 21 3 21 3 15" />
+                            <line x1="21" y1="3" x2="14" y2="10" />
+                            <line x1="3" y1="21" x2="10" y2="14" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : msg.type === 'file' && msg.fileUrl ? (
+                      <a
+                        href={msg.fileUrl}
+                        download={msg.fileName || 'file_tai_lieu'}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-md transition-all hover:scale-[1.02] border ${
+                          isMine
+                            ? 'bg-purple-600/90 text-white border-purple-400/40'
+                            : 'bg-white/10 text-purple-100 border-white/15'
+                        }`}
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="12" y1="18" x2="12" y2="12" />
+                            <polyline points="9 15 12 18 15 15" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate max-w-[180px] sm:max-w-[240px]">
+                            {msg.fileName || msg.text || 'Tệp đính kèm'}
+                          </p>
+                          <span className="text-[10px] opacity-75">{msg.fileSize || 'Tải xuống'}</span>
+                        </div>
+                      </a>
+                    ) : (
+                      <div
+                        className={`px-4 py-2.5 text-[14px] leading-relaxed break-words shadow-md transition-all ${
+                          isMine
+                            ? 'rounded-2xl rounded-br-xs text-white font-normal'
+                            : 'rounded-2xl rounded-bl-xs text-slate-100 border'
+                        }`}
+                        style={{
+                          background: isMine
+                            ? 'linear-gradient(135deg, #0084FF 0%, #0066FF 45%, #9B28FD 100%)'
+                            : 'rgba(255, 255, 255, 0.08)',
+                          borderColor: isMine ? 'transparent' : 'rgba(255, 255, 255, 0.12)',
+                          backdropFilter: 'blur(12px)',
+                          boxShadow: isMine
+                            ? '0 6px 18px rgba(0, 132, 255, 0.35)'
+                            : '0 4px 12px rgba(0, 0, 0, 0.25)',
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+                    )}
 
                     <span className="text-[10px] text-purple-300/60 mt-1 px-1 font-medium">
                       {msg.timestamp ? formatTimestamp(msg.timestamp) : 'Vừa xong'}
@@ -625,81 +773,160 @@ export default function ChatRoomPage() {
         {/* ============================================================ */}
         {/* THANH NHẬP TIN NHẮN (FLOATING GLASS CAPSULE INPUT) */}
         {/* ============================================================ */}
-        <div className="p-4 pt-2 flex items-center gap-2.5 flex-shrink-0">
-          {/* Nút gửi ảnh */}
-          <button
-            type="button"
-            onClick={() => setToastMsg('Tính năng gửi ảnh chiêm tinh đang được hoàn thiện!')}
-            className="p-2.5 rounded-full hover:bg-white/10 text-purple-200 hover:text-white transition-colors flex-shrink-0 cursor-pointer"
-            title="Đính kèm hình ảnh"
-            aria-label="Đính kèm hình ảnh"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-          </button>
+        <div className="p-4 pt-2 flex flex-col gap-2 flex-shrink-0 relative">
+          {/* Emoji Picker Popup */}
+          <AnimatePresence>
+            {showEmojiPicker && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="absolute bottom-20 left-4 z-50 p-3 rounded-2xl border border-purple-500/30 shadow-2xl backdrop-blur-2xl"
+                style={{
+                  background: 'rgba(20, 10, 50, 0.95)',
+                  boxShadow: '0 10px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(168, 85, 247, 0.3)',
+                }}
+              >
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-xs text-purple-200">
+                  <span className="font-semibold">Biểu tượng chiêm tinh & cảm xúc</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker(false)}
+                    className="text-white/60 hover:text-white px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="grid grid-cols-8 gap-1.5 max-w-[280px]">
+                  {[
+                    '✨', '🔮', '⭐', '🌙', '☀️', '🪐', '💫', '🌌',
+                    '❤️', '💖', '🥰', '😍', '😊', '🥺', '🔥', '🎉',
+                    '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏',
+                    '♐', '♑', '♒', '♓', '💌', '🌸', '🕊️', '💎',
+                  ].map((emoji, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSelectEmoji(emoji)}
+                      className="w-8 h-8 rounded-lg hover:bg-white/20 flex items-center justify-center text-base transition-transform active:scale-90"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Nút biểu tượng cảm xúc */}
-          <button
-            type="button"
-            onClick={() => setToastMsg('Biểu tượng cảm xúc vũ trụ đang tải ✨')}
-            className="p-2.5 rounded-full hover:bg-white/10 text-purple-200 hover:text-white transition-colors flex-shrink-0 cursor-pointer"
-            title="Chọn biểu tượng cảm xúc"
-            aria-label="Chọn biểu tượng cảm xúc"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-              <line x1="9" y1="9" x2="9.01" y2="9" />
-              <line x1="15" y1="9" x2="15.01" y2="9" />
-            </svg>
-          </button>
+          {/* Hidden inputs cho File & Ảnh */}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageSelect}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt,.zip,.rar"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
 
-          {/* Ô nhập tin nhắn dạng Glass Pill */}
-          <div className="flex-1 relative">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={`Nhắn tin với ${partnerName} bằng tư cách ${activeIdentity.name}... (Enter để gửi)`}
-              className="w-full bg-white/[0.08] text-white placeholder-purple-200/40 text-sm px-5 py-3 rounded-full border border-purple-400/35 focus:outline-none focus:border-cyan-400 focus:bg-white/[0.12] transition-all shadow-inner"
-            />
-          </div>
-
-          {/* Nút Gửi / Thích */}
-          {input.trim() ? (
+          <div className="flex items-center gap-2">
+            {/* Nút gửi ảnh */}
             <button
               type="button"
-              onClick={() => handleSendText()}
-              disabled={sending}
-              className="w-11 h-11 rounded-full flex items-center justify-center text-white transition-all active:scale-90 hover:scale-105 flex-shrink-0 shadow-lg cursor-pointer"
-              style={{
-                background: 'linear-gradient(135deg, #0084FF 0%, #0066FF 45%, #9B28FD 100%)',
-                boxShadow: '0 4px 18px rgba(0, 132, 255, 0.45)',
-              }}
-              title="Gửi tin nhắn"
-              aria-label="Gửi tin nhắn"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={uploading}
+              className="p-2.5 rounded-full hover:bg-white/10 text-purple-200 hover:text-white transition-colors flex-shrink-0 cursor-pointer disabled:opacity-50"
+              title="Gửi hình ảnh"
+              aria-label="Gửi hình ảnh"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
               </svg>
             </button>
-          ) : (
+
+            {/* Nút gửi File tài liệu */}
             <button
               type="button"
-              onClick={() => handleSendText('👍')}
-              className="w-11 h-11 rounded-full flex items-center justify-center text-blue-400 hover:text-blue-300 hover:bg-white/10 transition-transform active:scale-90 flex-shrink-0 text-2xl cursor-pointer"
-              title="Gửi nút thích"
-              aria-label="Gửi nút thích"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="p-2.5 rounded-full hover:bg-white/10 text-purple-200 hover:text-white transition-colors flex-shrink-0 cursor-pointer disabled:opacity-50"
+              title="Đính kèm tệp tin tài liệu"
+              aria-label="Đính kèm tệp tin tài liệu"
             >
-              👍
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
             </button>
-          )}
+
+            {/* Nút biểu tượng cảm xúc */}
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className={`p-2.5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${
+                showEmojiPicker ? 'bg-purple-600/40 text-cyan-300' : 'hover:bg-white/10 text-purple-200 hover:text-white'
+              }`}
+              title="Chọn biểu tượng cảm xúc & icon chiêm tinh"
+              aria-label="Chọn biểu tượng cảm xúc"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                <line x1="9" y1="9" x2="9.01" y2="9" />
+                <line x1="15" y1="9" x2="15.01" y2="9" />
+              </svg>
+            </button>
+
+            {/* Ô nhập tin nhắn dạng Glass Pill */}
+            <div className="flex-1 relative">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={`Nhắn tin với ${partnerName} bằng tư cách ${activeIdentity.name}... (Enter để gửi)`}
+                className="w-full bg-white/[0.08] text-white placeholder-purple-200/40 text-sm px-5 py-3 rounded-full border border-purple-400/35 focus:outline-none focus:border-cyan-400 focus:bg-white/[0.12] transition-all shadow-inner"
+              />
+            </div>
+
+            {/* Nút Gửi / Thích */}
+            {input.trim() ? (
+              <button
+                type="button"
+                onClick={() => handleSendText()}
+                disabled={sending}
+                className="w-11 h-11 rounded-full flex items-center justify-center text-white transition-all active:scale-90 hover:scale-105 flex-shrink-0 shadow-lg cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, #0084FF 0%, #0066FF 45%, #9B28FD 100%)',
+                  boxShadow: '0 4px 18px rgba(0, 132, 255, 0.45)',
+                }}
+                title="Gửi tin nhắn"
+                aria-label="Gửi tin nhắn"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleSendText('👍')}
+                className="w-11 h-11 rounded-full flex items-center justify-center text-blue-400 hover:text-blue-300 hover:bg-white/10 transition-transform active:scale-90 flex-shrink-0 text-2xl cursor-pointer"
+                title="Gửi nút thích"
+                aria-label="Gửi nút thích"
+              >
+                👍
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -719,6 +946,40 @@ export default function ChatRoomPage() {
           >
             <span>✨</span>
             <span className="font-medium">{toastMsg}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Modal Phóng To Ảnh (Lightbox Xem Ảnh Tại Chỗ) */}
+      <AnimatePresence>
+        {zoomedImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setZoomedImage(null)}
+            className="fixed inset-0 z-[999] flex items-center justify-center p-4 sm:p-8 bg-black/85 backdrop-blur-md cursor-zoom-out"
+          >
+            <button
+              type="button"
+              onClick={() => setZoomedImage(null)}
+              className="absolute top-5 right-5 p-2 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all cursor-pointer shadow-lg"
+              title="Đóng xem ảnh"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <motion.img
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              src={zoomedImage}
+              alt="Ảnh phóng to"
+              onClick={(e) => e.stopPropagation()}
+              className="max-w-[92vw] max-h-[88vh] rounded-2xl object-contain shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-white/20 cursor-default"
+            />
           </motion.div>
         )}
       </AnimatePresence>
