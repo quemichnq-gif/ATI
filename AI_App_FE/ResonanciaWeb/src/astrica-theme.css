@@ -1916,12 +1916,12 @@ a.w-webflow-badge {
    MESSENGER FAB BUTTON - HOÀN TOÀN HÌNH TRÒN (PERFECT CIRCLE)
    ============================================================ */
 .resonancia-messenger-fab {
-  width: 58px !important;
-  height: 58px !important;
-  min-width: 58px !important;
-  min-height: 58px !important;
-  max-width: 58px !important;
-  max-height: 58px !important;
+  width: 66px !important;
+  height: 66px !important;
+  min-width: 66px !important;
+  min-height: 66px !important;
+  max-width: 66px !important;
+  max-height: 66px !important;
   border-radius: 50% !important;
   border-radius: 9999px !important;
   -webkit-border-radius: 50% !important;
@@ -1944,6 +1944,135 @@ a.w-webflow-badge {
   -webkit-border-radius: 50% !important;
   -moz-border-radius: 50% !important;
   pointer-events: none !important;
+}
+
+/* ============================================================
+   HIỆU ỨNG RUNG ĐỔ CHUÔNG (MESSENGER RINGING - NHANH & DỒN DẬP)
+   ============================================================ */
+
+/* 1. Rung lắc nhanh dồn dập kiểu chuông reo dứt khoát */
+@keyframes messenger-bell-ring {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  1.5% {
+    transform: rotate(-16deg) scale(1.08);
+  }
+  3% {
+    transform: rotate(16deg) scale(1.08);
+  }
+  4.5% {
+    transform: rotate(-14deg) scale(1.06);
+  }
+  6% {
+    transform: rotate(14deg) scale(1.06);
+  }
+  7.5% {
+    transform: rotate(-11deg) scale(1.05);
+  }
+  9% {
+    transform: rotate(11deg) scale(1.05);
+  }
+  10.5% {
+    transform: rotate(-8deg) scale(1.03);
+  }
+  12% {
+    transform: rotate(8deg) scale(1.03);
+  }
+  13.5% {
+    transform: rotate(-4deg) scale(1.02);
+  }
+  15% {
+    transform: rotate(4deg) scale(1.02);
+  }
+  16.5% {
+    transform: rotate(-1deg) scale(1.01);
+  }
+  18% {
+    transform: rotate(0deg) scale(1);
+  }
+  /* Khoảng nghỉ giữa các đợt đổ chuông */
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+/* 2. Sóng âm lan tỏa đợt 1 khi đổ chuông */
+@keyframes messenger-ring-wave-1 {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  20% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+/* 3. Sóng âm lan tỏa đợt 2 (lệch pha) */
+@keyframes messenger-ring-wave-2 {
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  4% {
+    transform: scale(1.02);
+    opacity: 0.8;
+  }
+  26% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.messenger-ring-container {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+
+.messenger-ringing {
+  animation: messenger-bell-ring 2.2s cubic-bezier(0.36, 0.07, 0.19, 0.97) infinite;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.messenger-ring-container:hover .messenger-ringing,
+.messenger-ringing:hover {
+  animation-play-state: paused !important;
+}
+
+.messenger-wave-1 {
+  position: absolute !important;
+  inset: -2px !important;
+  border-radius: 50% !important;
+  -webkit-border-radius: 50% !important;
+  border: 2px solid rgba(0, 180, 255, 0.75);
+  box-shadow: 0 0 18px rgba(0, 180, 255, 0.5);
+  pointer-events: none !important;
+  animation: messenger-ring-wave-1 2.2s ease-out infinite;
+  z-index: 0;
+}
+
+.messenger-wave-2 {
+  position: absolute !important;
+  inset: -2px !important;
+  border-radius: 50% !important;
+  -webkit-border-radius: 50% !important;
+  border: 1.5px solid rgba(168, 85, 247, 0.75);
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.5);
+  pointer-events: none !important;
+  animation: messenger-ring-wave-2 2.2s ease-out infinite;
+  z-index: 0;
 }
 
 /* Hide scrollbar completely */

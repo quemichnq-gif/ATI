@@ -218,17 +218,17 @@ export default function ChatFab() {
   if (isHidden) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[1000] font-sans">
-      {/* 1. CỬA SỔ CHAT MESSENGER POPUP */}
+    <div className="fixed bottom-6 right-6 z-[1000] font-sans flex flex-col items-end pointer-events-none">
+      {/* 1. CỬA SỔ CHAT MESSENGER POPUP (Ở BÊN PHẢI TRONG CÙNG CỐ ĐỊNH) */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
             key="messenger-window"
-            initial={{ opacity: 0, scale: 0.88, y: 24 }}
+            initial={{ opacity: 0, scale: 0.9, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.88, y: 24 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 320 }}
-            className="mb-4 w-[380px] max-w-[calc(100vw-32px)] h-[540px] max-h-[calc(100vh-110px)] rounded-2xl flex flex-col overflow-hidden shadow-2xl border"
+            exit={{ opacity: 0, scale: 0.9, y: 16 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 340 }}
+            className="pointer-events-auto mb-3 w-[410px] max-w-[calc(100vw-32px)] h-[580px] max-h-[calc(100vh-120px)] rounded-2xl flex flex-col overflow-hidden shadow-2xl border"
             style={{
               background: 'linear-gradient(165deg, rgba(16, 10, 42, 0.96) 0%, rgba(9, 4, 26, 0.98) 100%)',
               borderColor: 'rgba(168, 85, 247, 0.35)',
@@ -621,70 +621,68 @@ export default function ChatFab() {
         )}
       </AnimatePresence>
 
-      {/* 2. NÚT NỔI MESSENGER (FAB CHAT HEAD - HOÀN TOÀN HÌNH TRÒN) */}
-      <motion.button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        className="resonancia-messenger-fab relative rounded-full flex items-center justify-center cursor-pointer shadow-2xl transition-all"
-        style={{
-          width: 58,
-          height: 58,
-          minWidth: 58,
-          minHeight: 58,
-          borderRadius: '50%',
-          WebkitBorderRadius: '50%',
-          aspectRatio: '1 / 1',
-          background: isOpen
-            ? 'linear-gradient(135deg, #1f1147 0%, #100a2a 100%)'
-            : '#ffffff',
-          border: isOpen ? '1.5px solid rgba(168, 85, 247, 0.6)' : 'none',
-          boxShadow: '0 8px 30px rgba(0, 120, 255, 0.35), 0 0 20px rgba(168, 85, 247, 0.4)',
-        }}
-        aria-label={isOpen ? 'Đóng Messenger' : 'Mở Messenger'}
-        title="Messenger - Trò chuyện"
-      >
-        {/* Glow pulsing ring phía sau nút - Hoàn toàn hình tròn */}
-        <span
-          className="resonancia-messenger-fab-glow absolute -inset-1 rounded-full opacity-60 pointer-events-none animate-pulse"
+      {/* 2. NÚT NỔI MESSENGER (FAB CHAT HEAD - TO HƠN, RUNG NHANH, BÊN PHẢI TRONG CÙNG) */}
+      <div className={`pointer-events-auto messenger-ring-container ${!isOpen ? 'messenger-ringing' : ''}`}>
+        {/* Vòng sóng âm 1 tỏa ra khi đổ chuông */}
+        {!isOpen && <span className="messenger-wave-1" aria-hidden="true" />}
+        {/* Vòng sóng âm 2 tỏa ra lệch pha khi đổ chuông */}
+        {!isOpen && <span className="messenger-wave-2" aria-hidden="true" />}
+
+        <motion.button
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.92 }}
+          className="resonancia-messenger-fab relative rounded-full flex items-center justify-center cursor-pointer shadow-2xl transition-all"
           style={{
+            width: 66,
+            height: 66,
+            minWidth: 66,
+            minHeight: 66,
             borderRadius: '50%',
             WebkitBorderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(0, 180, 255, 0.45) 0%, rgba(168, 85, 247, 0.35) 60%, transparent 100%)',
+            aspectRatio: '1 / 1',
+            background: '#ffffff',
+            border: isOpen ? '1.5px solid rgba(168, 85, 247, 0.6)' : 'none',
+            boxShadow: isOpen
+              ? '0 8px 30px rgba(0, 120, 255, 0.35), 0 0 20px rgba(168, 85, 247, 0.4)'
+              : '0 8px 25px rgba(0, 120, 255, 0.4), 0 0 20px rgba(168, 85, 247, 0.45)',
           }}
-        />
-
-        {/* Biểu tượng Messenger hoặc dấu đóng X */}
-        {isOpen ? (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e9d5ff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        ) : (
-          <MessengerLogo size={36} />
-        )}
-
-        {/* Badge số tin nhắn chưa đọc (Đỏ hồng như Messenger) */}
-        {!isOpen && unreadCount > 0 && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute min-w-[20px] h-5 px-1.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-[#100a2a] shadow-md pointer-events-none"
-            style={{
-              top: -2,
-              right: -2,
-              borderRadius: '9999px',
-            }}
-          >
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </motion.span>
-        )}
-
-        {/* Chấm online xanh lá (Messenger Active Status) bám theo đường cong hình tròn */}
-        {!isOpen && (
+          aria-label={isOpen ? 'Thu nhỏ Messenger' : 'Mở Messenger'}
+          title="Messenger - Trò chuyện"
+        >
+          {/* Glow pulsing ring phía sau nút - Hoàn toàn hình tròn */}
           <span
-            className="absolute w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white shadow-sm pointer-events-none"
+            className="resonancia-messenger-fab-glow absolute -inset-1 rounded-full opacity-60 pointer-events-none animate-pulse"
+            style={{
+              borderRadius: '50%',
+              WebkitBorderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(0, 180, 255, 0.45) 0%, rgba(168, 85, 247, 0.35) 60%, transparent 100%)',
+            }}
+          />
+
+          {/* Biểu tượng Messenger tròn to hơn - Bỏ dấu X thứ 2 (chỉ giữ dấu X ở trên header) */}
+          <MessengerLogo size={42} />
+
+          {/* Badge số tin nhắn chưa đọc (Đỏ hồng như Messenger) */}
+          {!isOpen && unreadCount > 0 && (
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute min-w-[20px] h-5 px-1.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-[#100a2a] shadow-md pointer-events-none"
+              style={{
+                top: -3,
+                right: -3,
+                borderRadius: '9999px',
+              }}
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </motion.span>
+          )}
+
+          {/* Chấm online xanh lá (Messenger Active Status) bám theo đường cong hình tròn */}
+          <span
+            className="absolute w-4 h-4 rounded-full bg-emerald-400 border-[2.5px] border-white shadow-sm pointer-events-none"
             style={{
               bottom: 2,
               right: 2,
@@ -692,8 +690,8 @@ export default function ChatFab() {
               WebkitBorderRadius: '50%',
             }}
           />
-        )}
-      </motion.button>
+        </motion.button>
+      </div>
     </div>
   );
 }
