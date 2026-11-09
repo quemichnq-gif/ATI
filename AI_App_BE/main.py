@@ -71,6 +71,8 @@ cloudinary.config(
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 CORS(app)
+from chat_service import chat_bp
+app.register_blueprint(chat_bp)
 
 
 @app.before_request
@@ -121,6 +123,7 @@ def authenticate_api_request():
         view_args.get("uid"),
         body.get("userId"),
         request.args.get("userId"),
+        body.get("senderId"),
     )
     if any(uid and uid != user_uid for uid in requested_uids):
         return jsonify({"error": "User does not have access to this resource"}), 403

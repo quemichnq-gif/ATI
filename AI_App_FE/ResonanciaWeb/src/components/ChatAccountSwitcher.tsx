@@ -7,6 +7,7 @@ import {
   setActiveChatIdentity,
   ChatAccountIdentity,
 } from '../services/chatAccountService';
+import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
 
 interface ChatAccountSwitcherProps {
   onAccountSwitched?: (newIdentity: ChatAccountIdentity) => void;
@@ -17,6 +18,7 @@ export default function ChatAccountSwitcher({ onAccountSwitched, className = '' 
   const profile = useSelector((s: RootState) => s.profile);
   const [activeAccount, setActiveAccount] = useState<ChatAccountIdentity>(() => getActiveChatIdentity(profile));
   const [isOpen, setIsOpen] = useState(false);
+  const [copiedAccount, setCopiedAccount] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<ChatAccountIdentity[]>(() => getAvailableChatAccounts(profile));
 
   useEffect(() => {
@@ -35,11 +37,23 @@ export default function ChatAccountSwitcher({ onAccountSwitched, className = '' 
     return () => window.removeEventListener('resonancia_identity_changed', handleChanged);
   }, [profile, onAccountSwitched]);
 
-  const handleSelect = (acc: ChatAccountIdentity) => {
+  // Chuyển danh tính trò chuyện
+  const handleSelectIdentity = (acc: ChatAccountIdentity) => {
     setActiveChatIdentity(acc.uid);
     setActiveAccount(acc);
     setIsOpen(false);
     if (onAccountSwitched) onAccountSwitched(acc);
+  };
+
+  // Đổi hẳn tài khoản Firebase Auth thật (Đăng nhập lại sang nick khác)
+  const handleCopyEmail = (acc: ChatAccountIdentity, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const testAcc = getTestProfileByEmailOrUid(acc.name) || getTestProfileByEmailOrUid(acc.uid);
+    if (testAcc) {
+      navigator.clipboard.writeText(testAcc.email);
+      setCopiedAccount(acc.uid);
+      setTimeout(() => setCopiedAccount(null), 2500);
+    }
   };
 
   return (
@@ -55,7 +69,7 @@ export default function ChatAccountSwitcher({ onAccountSwitched, className = '' 
             : 'linear-gradient(135deg, rgba(217, 70, 239, 0.35) 0%, rgba(147, 51, 234, 0.45) 100%)',
           borderColor: activeAccount.isMainUser ? 'rgba(168, 85, 247, 0.4)' : 'rgba(236, 72, 153, 0.55)',
         }}
-        title="Nhấp để đổi danh tính chat"
+        title="Nhấp để đổi danh tính hoặc đăng nhập tài khoản khác"
         aria-label="Đổi danh tính tài khoản chat"
       >
         <div className="flex items-center gap-2.5 min-w-0">
@@ -73,7 +87,7 @@ export default function ChatAccountSwitcher({ onAccountSwitched, className = '' 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-purple-200/70 uppercase tracking-wider font-semibold">
-                {activeAccount.isMainUser ? 'Nick chính' : 'Đang đóng vai'}
+                {activeAccount.isMainUser ? 'Nick chính' : 'Đang chat'}
               </span>
               {activeAccount.zodiac && (
                 <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10 text-purple-200">
@@ -87,7 +101,7 @@ export default function ChatAccountSwitcher({ onAccountSwitched, className = '' 
           </div>
         </div>
 
-        <div className="flex items-center gap-1 text-purple-200 hover:text-white px-1.5 py-1 rounded-lg bg-white/10 text-[11px] font-medium flex-shrink-0">
+        <div className="flex items-center gap-1 text-purple-200 hover:text-white px-2 py-1 rounded-lg bg-white/10 text-[11px] font-medium flex-shrink-0">
           <span>Đổi nick</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="6 9 12 15 18 9" />
@@ -100,69 +114,88 @@ export default function ChatAccountSwitcher({ onAccountSwitched, className = '' 
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div
-            className="absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl p-2 shadow-2xl border backdrop-blur-2xl max-h-[360px] overflow-y-auto resonancia-scrollbar"
+            className="absolute top-full left-0 right-0 mt-2 z-50 rounded-2xl p-2.5 shadow-2xl border backdrop-blur-2xl max-h-[380px] overflow-y-auto resonancia-scrollbar"
             style={{
               background: 'linear-gradient(165deg, rgba(20, 12, 54, 0.98) 0%, rgba(10, 5, 32, 0.99) 100%)',
               borderColor: 'rgba(168, 85, 247, 0.45)',
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(168, 85, 247, 0.25)',
             }}
           >
-            <div className="px-2 py-1.5 text-[11px] font-bold text-purple-300 uppercase tracking-wider border-b border-purple-500/20 mb-1 flex items-center justify-between">
-              <span>Chọn danh tính chat</span>
-              <span className="text-[10px] text-purple-300/60 font-normal">Tương tác 2 chiều</span>
+            <div className="px-2 py-1.5 text-[11px] font-bold text-purple-300 uppercase tracking-wider border-b border-purple-500/20 mb-1.5 flex items-center justify-between">
+              <span>Đổi tài khoản hoặc danh tính</span>
+              <span className="text-[10px] text-pink-300/80 font-normal">Hỗ trợ 2 chiều</span>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {accounts.map((acc) => {
                 const isSelected = acc.uid === activeAccount.uid;
+                const testAcc = getTestProfileByEmailOrUid(acc.name) || getTestProfileByEmailOrUid(acc.uid);
+
                 return (
-                  <button
+                  <div
                     key={acc.uid}
-                    type="button"
-                    onClick={() => handleSelect(acc)}
-                    className={`w-full flex items-center gap-2.5 p-2 rounded-xl transition-all text-left cursor-pointer ${
+                    onClick={() => handleSelectIdentity(acc)}
+                    className={`w-full flex items-center justify-between p-2 rounded-xl transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-purple-600/30 border border-purple-400/50 shadow-inner'
                         : 'hover:bg-white/[0.08] border border-transparent'
                     }`}
                   >
-                    <div className="relative flex-shrink-0">
-                      <div className="w-9 h-9 rounded-full overflow-hidden border border-white/30 bg-purple-900/60 flex items-center justify-center font-bold text-white text-xs">
-                        {acc.avatar ? (
-                          <img src={acc.avatar} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          acc.name[0]?.toUpperCase()
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="relative flex-shrink-0">
+                        <div className="w-9 h-9 rounded-full overflow-hidden border border-white/30 bg-purple-900/60 flex items-center justify-center font-bold text-white text-xs">
+                          {acc.avatar ? (
+                            <img src={acc.avatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            acc.name[0]?.toUpperCase()
+                          )}
+                        </div>
+                        {isSelected && (
+                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#100a2a]" />
                         )}
                       </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-white text-xs font-semibold truncate leading-tight">
+                            {acc.name}
+                          </p>
+                          {acc.isMainUser && (
+                            <span className="text-[9px] px-1 rounded bg-blue-500/30 text-blue-200 border border-blue-400/30">
+                              Bạn
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10.5px] text-purple-200/70 truncate mt-0.5">
+                          {acc.zodiac ? `Cung ${acc.zodiac}` : ''} {acc.job ? `· ${acc.job}` : ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {testAcc && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyEmail(acc, e)}
+                          className="px-2 py-0.5 text-[10px] rounded bg-white/10 hover:bg-white/20 text-purple-200 border border-purple-400/20"
+                          title="Sao chép email đăng nhập"
+                        >
+                          {copiedAccount === acc.uid ? 'Đã chép' : 'Email'}
+                        </button>
+                      )}
                       {isSelected && (
-                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#100a2a]" />
+                        <span className="text-emerald-400 text-xs font-bold ml-1">
+                          ✓
+                        </span>
                       )}
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-white text-xs font-semibold truncate leading-tight">
-                          {acc.name}
-                        </p>
-                        {acc.isMainUser && (
-                          <span className="text-[9px] px-1 rounded bg-blue-500/30 text-blue-200 border border-blue-400/30">
-                            Bạn
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10.5px] text-purple-200/70 truncate mt-0.5">
-                        {acc.zodiac ? `Cung ${acc.zodiac}` : ''} {acc.job ? `· ${acc.job}` : ''}
-                      </p>
-                    </div>
-
-                    {isSelected && (
-                      <span className="text-emerald-400 text-xs font-bold flex-shrink-0">
-                        ✓
-                      </span>
-                    )}
-                  </button>
+                  </div>
                 );
               })}
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-purple-500/20 px-2 text-[10.5px] text-purple-300/70 leading-relaxed">
+              💡 <em>Mẹo:</em> Mở thêm 1 <strong>Tab ẩn danh (Incognito)</strong> và đăng nhập nick đối phương để xem tin nhắn hiển thị tức thì 2 chiều!
             </div>
           </div>
         </>

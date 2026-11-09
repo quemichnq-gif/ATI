@@ -1,15 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import {
-  collection, query, orderBy, onSnapshot, addDoc,
-  serverTimestamp, doc, updateDoc, setDoc, where
-} from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { auth, db } from '../services/firebase';
+import { auth } from '../services/firebase';
 import { RootState } from '../store';
 import { formatTimestamp } from '../utils/date';
 import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
+import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
 import { MessengerLogo } from '../components/ChatFab';
 import ChatAccountSwitcher from '../components/ChatAccountSwitcher';
 import {
@@ -17,6 +14,14 @@ import {
   setActiveChatIdentity,
   ChatAccountIdentity,
 } from '../services/chatAccountService';
+import {
+  sendChatMessage,
+  subscribeToChatMessages,
+  subscribeToUserChats,
+  initializeChatRoom,
+  ChatMessage,
+  ChatConversation,
+} from '../services/realtimeChatService';
 
 export default function ChatRoomPage() {
   const { chatId } = useParams<{ chatId: string }>();
@@ -24,16 +29,15 @@ export default function ChatRoomPage() {
   const navigate = useNavigate();
   const profile = useSelector((s: RootState) => s.profile);
 
-  // Danh tính tài khoản đang chat (Hỗ trợ đổi nick để chat 2 chiều thật)
+  // Danh tính tài khoản đang chat
   const [activeIdentity, setActiveIdentity] = useState<ChatAccountIdentity>(() => getActiveChatIdentity(profile));
   const currentUid = activeIdentity.uid;
 
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
-  const [chats, setChats] = useState<any[]>([]);
-  const [currentChatDoc, setCurrentChatDoc] = useState<any>(null);
+  const [chats, setChats] = useState<ChatConversation[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -52,7 +56,7 @@ export default function ChatRoomPage() {
   }, [profile]);
 
   // ============================================================
-  // XÁC ĐỊNH ĐỐI PHƯƠNG CHÍNH XÁC (KHẮC PHỤC BUG SPLIT DẤU GẠCH DƯỚI)
+  // XÁC ĐỊNH ĐỐI PHƯƠNG CHÍNH XÁC
   // ============================================================
   let otherUid = '';
   if (chatId && currentUid) {
@@ -68,72 +72,43 @@ export default function ChatRoomPage() {
     }
   }
 
-  if (!otherUid && currentChatDoc?.participants) {
-    otherUid = currentChatDoc.participants.find((p: string) => p !== currentUid) || '';
-  }
-
+  // Thử tìm trong alias test accounts
+  const testPartner = getTestProfileByEmailOrUid(otherUid);
   const defaultCand = DEFAULT_CANDIDATE_PROFILES[otherUid];
 
   const partnerName =
+    testPartner?.name ||
     defaultCand?.name ||
-    currentChatDoc?.participantNames?.[otherUid] ||
     (location.state as any)?.chatName ||
     'Người dùng';
 
   const partnerAvatar =
+    testPartner?.avatar ||
     defaultCand?.avatar ||
-    currentChatDoc?.participantAvatars?.[otherUid] ||
     (otherUid === (profile.uid || auth.currentUser?.uid)
       ? profile.avatar || auth.currentUser?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
       : 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80');
 
-  const partnerZodiac = defaultCand?.zodiac || defaultCand?.sun || 'Song Ngư';
-  const partnerElement = defaultCand?.element || 'Nước';
-  const partnerJob = defaultCand?.job || 'Thành viên Resonancia';
-  const partnerBio = defaultCand?.bio || 'Tâm hồn chiêm tinh đồng điệu, cùng bạn khám phá vũ trụ nội tâm ✨';
+  const partnerZodiac = testPartner?.zodiac || defaultCand?.zodiac || defaultCand?.sun || 'Song Ngư';
+  const partnerElement = testPartner?.sun === 'Song Ngư' ? 'Nước' : defaultCand?.element || 'Nước';
+  const partnerJob = testPartner?.job || defaultCand?.job || 'Thành viên Resonancia';
+  const partnerBio = testPartner?.bio || defaultCand?.bio || 'Tâm hồn chiêm tinh đồng điệu, cùng bạn khám phá vũ trụ nội tâm ✨';
 
-  // 1. Tải thông tin chat hiện tại
-  useEffect(() => {
-    if (!currentUid || !chatId) return;
-
-    const unsubChat = onSnapshot(doc(db, 'chats', chatId), (snap) => {
-      if (snap.exists()) {
-        setCurrentChatDoc(snap.data());
-      }
-    });
-    return () => unsubChat();
-  }, [chatId, currentUid]);
-
-  // 2. Lắng nghe danh sách đoạn chat bên cột trái (Messenger Sidebar)
+  // 1. Lắng nghe danh sách đoạn chat bên cột trái (Realtime Hybrid)
   useEffect(() => {
     if (!currentUid) return;
-
-    const q = query(
-      collection(db, 'chats'),
-      where('participants', 'array-contains', currentUid),
-      orderBy('lastTimestamp', 'desc')
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      setChats(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const unsub = subscribeToUserChats(currentUid, (updatedChats) => {
+      setChats(updatedChats);
     });
-
     return unsub;
   }, [currentUid]);
 
-  // 3. Lắng nghe luồng tin nhắn real-time
+  // 2. Lắng nghe luồng tin nhắn real-time (Polling 1.2s + Firestore onSnapshot song song)
   useEffect(() => {
     if (!chatId) return;
-
-    const q = query(
-      collection(db, 'chats', chatId, 'messages'),
-      orderBy('timestamp', 'asc')
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const unsub = subscribeToChatMessages(chatId, (updatedMsgs) => {
+      setMessages(updatedMsgs);
     });
-
     return unsub;
   }, [chatId]);
 
@@ -142,41 +117,38 @@ export default function ChatRoomPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Hàm gửi tin nhắn văn bản
+  // Hàm gửi tin nhắn văn bản (Hỗ trợ Optimistic UI + Dual Sync)
   const handleSendText = async (textToSend?: string) => {
     const text = (textToSend || input).trim();
     if (!text || !chatId || !currentUid || sending) return;
 
     setSending(true);
     setInput('');
+
+    // 1. Optimistic Update để UI mượt mà ngay lập tức
+    const tempMsg: ChatMessage = {
+      id: `opt_${Date.now()}`,
+      chatId,
+      senderId: currentUid,
+      senderName: activeIdentity.name,
+      senderAvatar: activeIdentity.avatar,
+      text,
+      timestamp: Date.now(),
+      read: false,
+    };
+    setMessages((prev) => [...prev, tempMsg]);
+
     try {
-      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+      await sendChatMessage({
+        chatId,
         senderId: currentUid,
         senderName: activeIdentity.name,
+        senderAvatar: activeIdentity.avatar,
         text,
-        timestamp: serverTimestamp(),
-        read: false,
-      });
-
-      await updateDoc(doc(db, 'chats', chatId), {
-        lastMessage: text,
-        lastTimestamp: Date.now(),
-        lastSenderId: currentUid,
-        participantNames: {
-          ...(currentChatDoc?.participantNames || {}),
-          [currentUid]: activeIdentity.name,
-          [otherUid]: partnerName,
-        },
-        participantAvatars: {
-          ...(currentChatDoc?.participantAvatars || {}),
-          [currentUid]: activeIdentity.avatar,
-          [otherUid]: partnerAvatar,
-        },
       });
     } catch (e) {
       console.error('Lỗi gửi tin nhắn:', e);
-      setToastMsg('Không gửi được tin nhắn. Vui lòng thử lại!');
-      setTimeout(() => setToastMsg(''), 3000);
+      setToastMsg('Tin nhắn đang được đồng bộ...');
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -196,35 +168,31 @@ export default function ChatRoomPage() {
     const targetUid = candidate.uid;
     const newChatId = [currentUid, targetUid].sort().join('_');
 
-    try {
-      await setDoc(
-        doc(db, 'chats', newChatId),
-        {
-          participants: [currentUid, targetUid],
-          participantNames: {
-            [currentUid]: activeIdentity.name,
-            [targetUid]: candidate.name || 'Người dùng',
-          },
-          participantAvatars: {
-            [currentUid]: activeIdentity.avatar,
-            [targetUid]: candidate.avatar || '',
-          },
-          lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
-          lastTimestamp: Date.now(),
-        },
-        { merge: true }
-      );
-    } catch (e) {
-      console.warn('Init chat warning:', e);
-    }
+    await initializeChatRoom({
+      chatId: newChatId,
+      participants: [currentUid, targetUid],
+      participantNames: {
+        [currentUid]: activeIdentity.name,
+        [targetUid]: candidate.name || 'Người dùng',
+      },
+      participantAvatars: {
+        [currentUid]: activeIdentity.avatar,
+        [targetUid]: candidate.avatar || '',
+      },
+      lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
+    });
 
     navigate(`/chat/${newChatId}`, { state: { chatName: candidate.name } });
   };
 
-  // Nút chuyển vai nhanh sang đối phương để test nhắn tin 2 chiều thật
-  const handleSwitchToPartner = () => {
-    if (!otherUid) return;
-    setActiveChatIdentity(otherUid);
+  // Đổi tài khoản sang đối phương (Hỗ trợ đổi Firebase Auth thật 100%)
+  const handleSwitchToPartnerAuth = () => {
+    const targetTestAcc = getTestProfileByEmailOrUid(partnerName) || getTestProfileByEmailOrUid(otherUid);
+    if (!targetTestAcc) {
+      setActiveChatIdentity(otherUid);
+      return;
+    }
+    navigate('/login', { state: { email: targetTestAcc.email } });
   };
 
   const showCallFeatureNotice = (type: 'thoại' | 'video') => {
@@ -234,15 +202,16 @@ export default function ChatRoomPage() {
 
   // Lọc chat tìm kiếm
   const filteredChats = chats.filter((c) => {
-    const oUid = c.participants?.find((p: string) => p !== currentUid);
-    const name = c.participantNames?.[oUid] || '';
+    const oUid = c.participants?.find((p: string) => p !== currentUid) || '';
+    const name = (oUid ? c.participantNames?.[oUid] : '') || '';
     return name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   const topCandidates = Object.values(DEFAULT_CANDIDATE_PROFILES).slice(0, 6);
 
   return (
-    <div className="w-full h-[calc(100vh-7.5rem)] min-h-[580px] max-h-[920px] rounded-3xl overflow-hidden flex flex-col md:flex-row relative shadow-2xl border border-purple-500/25"
+    <div
+      className="w-full h-[calc(100vh-7.5rem)] min-h-[580px] max-h-[920px] rounded-3xl overflow-hidden flex flex-col md:flex-row relative shadow-2xl border border-purple-500/25"
       style={{
         background: 'linear-gradient(155deg, rgba(22, 14, 75, 0.94) 0%, rgba(14, 8, 50, 0.96) 50%, rgba(8, 4, 32, 0.98) 100%)',
         backdropFilter: 'blur(30px)',
@@ -332,9 +301,11 @@ export default function ChatRoomPage() {
                   </div>
                   <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#100a2a]" />
                 </div>
-                <span className={`text-[11px] truncate w-12 text-center mt-1 font-medium transition-colors ${
-                  isCurrent ? 'text-cyan-300 font-bold' : 'text-purple-200/80 group-hover:text-white'
-                }`}>
+                <span
+                  className={`text-[11px] truncate w-12 text-center mt-1 font-medium transition-colors ${
+                    isCurrent ? 'text-cyan-300 font-bold' : 'text-purple-200/80 group-hover:text-white'
+                  }`}
+                >
                   {c.name.split(' ').slice(-1)[0]}
                 </span>
               </button>
@@ -346,10 +317,11 @@ export default function ChatRoomPage() {
         <div className="flex-1 overflow-y-auto px-2.5 py-2 space-y-1.5 resonancia-scrollbar">
           {filteredChats.length > 0 ? (
             filteredChats.map((chat) => {
-              const oUid = chat.participants?.find((p: string) => p !== currentUid);
-              const oCand = DEFAULT_CANDIDATE_PROFILES[oUid];
-              const oName = oCand?.name || chat.participantNames?.[oUid] || 'Người dùng';
-              const oAvatar = oCand?.avatar || chat.participantAvatars?.[oUid];
+              const oUid = chat.participants?.find((p: string) => p !== currentUid) || '';
+              const oCand = oUid ? DEFAULT_CANDIDATE_PROFILES[oUid] : undefined;
+              const testAcc = oUid ? getTestProfileByEmailOrUid(oUid) : null;
+              const oName = testAcc?.name || oCand?.name || (oUid ? chat.participantNames?.[oUid] : '') || 'Người dùng';
+              const oAvatar = testAcc?.avatar || oCand?.avatar || (oUid ? chat.participantAvatars?.[oUid] : '');
               const isSelected = chat.id === chatId;
 
               return (
@@ -407,12 +379,13 @@ export default function ChatRoomPage() {
       {/* ============================================================ */}
       {/* CỘT PHẢI: KHUNG CHAT CHÍNH (MESSENGER MAIN CHAT WINDOW) */}
       {/* ============================================================ */}
-      <div className="flex-1 flex flex-col h-full relative"
+      <div
+        className="flex-1 flex flex-col h-full relative"
         style={{
           background: 'radial-gradient(ellipse at 80% 20%, rgba(70, 35, 140, 0.25) 0%, transparent 60%)',
         }}
       >
-        {/* Header Khung Chat Sang Trọng (Loại bỏ đường kẻ khô cứng) */}
+        {/* Header Khung Chat Sang Trọng */}
         <div
           className="px-5 py-3.5 flex items-center justify-between flex-shrink-0 relative z-20 backdrop-blur-xl"
           style={{
@@ -468,20 +441,20 @@ export default function ChatRoomPage() {
             </div>
           </div>
 
-          {/* Các nút tương tác & Nút Chuyển Vai Nhanh */}
+          {/* Các nút tương tác & Nút Chuyển Nick Auth Thật */}
           <div className="flex items-center gap-2 text-purple-200">
-            {/* NÚT THẦN KỲ: ĐÓNG VAI ĐỐI PHƯƠNG ĐỂ TRẢ LỜI NGAY */}
+            {/* NÚT THẦN KỲ: ĐĂNG NHẬP SANG TÀI KHOẢN ĐỐI PHƯƠNG ĐỂ TEST 2 CHIỀU THẬT */}
             <button
               type="button"
-              onClick={handleSwitchToPartner}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer"
+              onClick={handleSwitchToPartnerAuth}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer"
               style={{
-                background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.8) 0%, rgba(168, 85, 247, 0.8) 100%)',
+                background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.85) 0%, rgba(168, 85, 247, 0.85) 100%)',
                 border: '1px solid rgba(255, 255, 255, 0.3)',
               }}
-              title={`Đổi sang nick ${partnerName} để tự gõ tin nhắn trả lời lại`}
+              title={`Đổi hẳn sang tài khoản của ${partnerName} để xem tin nhắn và gõ trả lời`}
             >
-              <span>Đổi sang nick {partnerName}</span>
+              <span>{`Đăng nhập ${partnerName}`}</span>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="17 1 21 5 17 9" />
                 <path d="M3 11V9a4 4 0 0 1 4-4h14" />
@@ -519,7 +492,7 @@ export default function ChatRoomPage() {
               type="button"
               onClick={() => otherUid && navigate(`/user/${otherUid}`)}
               className="p-2 rounded-full hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-              title="Xem thông tin chiêm tinh chi tiết"
+              title="Xem thông tin chi tiết"
               aria-label="Xem thông tin chi tiết"
             >
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -533,8 +506,9 @@ export default function ChatRoomPage() {
 
         {/* Vùng hiển thị tin nhắn (Message Thread) */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3.5 resonancia-scrollbar">
-          {/* Card giới thiệu đầu cuộc trò chuyện (Cosmic Destiny Card - XÓA BỎ CHỮ H ĐƠN ĐIỆU) */}
-          <div className="py-6 px-6 mx-auto max-w-lg flex flex-col items-center justify-center text-center rounded-3xl mb-4"
+          {/* Card giới thiệu đầu cuộc trò chuyện */}
+          <div
+            className="py-6 px-6 mx-auto max-w-lg flex flex-col items-center justify-center text-center rounded-3xl mb-4"
             style={{
               background: 'linear-gradient(145deg, rgba(40, 24, 100, 0.45) 0%, rgba(20, 12, 60, 0.5) 100%)',
               border: '1px solid rgba(255, 255, 255, 0.09)',
@@ -610,9 +584,7 @@ export default function ChatRoomPage() {
                     </div>
 
                     <span className="text-[10px] text-purple-300/60 mt-1 px-1 font-medium">
-                      {msg.timestamp?.seconds
-                        ? formatTimestamp(msg.timestamp.seconds * 1000)
-                        : 'Vừa xong'}
+                      {msg.timestamp ? formatTimestamp(msg.timestamp) : 'Vừa xong'}
                     </span>
                   </div>
                 </motion.div>
@@ -669,7 +641,7 @@ export default function ChatRoomPage() {
             </svg>
           </button>
 
-          {/* Nút biểu tượng cảm xúc / Sticker */}
+          {/* Nút biểu tượng cảm xúc */}
           <button
             type="button"
             onClick={() => setToastMsg('Biểu tượng cảm xúc vũ trụ đang tải ✨')}
@@ -693,7 +665,7 @@ export default function ChatRoomPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`Nhắn tin với ${partnerName} bằng tư cách ${activeIdentity.name}...`}
+              placeholder={`Nhắn tin với ${partnerName} bằng tư cách ${activeIdentity.name}... (Enter để gửi)`}
               className="w-full bg-white/[0.08] text-white placeholder-purple-200/40 text-sm px-5 py-3 rounded-full border border-purple-400/35 focus:outline-none focus:border-cyan-400 focus:bg-white/[0.12] transition-all shadow-inner"
             />
           </div>

@@ -15,6 +15,12 @@ import {
   getActiveChatIdentity,
   ChatAccountIdentity,
 } from '../services/chatAccountService';
+import {
+  sendChatMessage,
+  subscribeToChatMessages,
+  subscribeToUserChats,
+  initializeChatRoom,
+} from '../services/realtimeChatService';
 
 /**
  * Official Facebook Messenger SVG Logo
@@ -100,27 +106,15 @@ export default function ChatFab() {
     if (!currentUid || isHidden) return;
     setLoadingChats(true);
 
-    const q = query(
-      collection(db, 'chats'),
-      where('participants', 'array-contains', currentUid),
-      orderBy('lastTimestamp', 'desc')
-    );
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setChats(list);
-
-        let totalUnread = 0;
-        list.forEach((c: any) => {
-          if (typeof c.unreadCount === 'number') totalUnread += c.unreadCount;
-        });
-        setUnreadCount(totalUnread);
-        setLoadingChats(false);
-      },
-      () => setLoadingChats(false)
-    );
+    const unsub = subscribeToUserChats(currentUid, (list) => {
+      setChats(list as any);
+      let totalUnread = 0;
+      list.forEach((c: any) => {
+        if (typeof c.unreadCount === 'number') totalUnread += c.unreadCount;
+      });
+      setUnreadCount(totalUnread);
+      setLoadingChats(false);
+    });
 
     return unsub;
   }, [currentUid, isHidden]);
@@ -132,13 +126,8 @@ export default function ChatFab() {
       return;
     }
 
-    const q = query(
-      collection(db, 'chats', activeChat.chatId, 'messages'),
-      orderBy('timestamp', 'asc')
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const unsub = subscribeToChatMessages(activeChat.chatId, (updatedMsgs) => {
+      setMessages(updatedMsgs as any);
     });
 
     return unsub;
@@ -160,22 +149,29 @@ export default function ChatFab() {
 
     setSending(true);
     setInputText('');
+
+    const optimistic = {
+      id: `opt_${Date.now()}`,
+      chatId: activeChat.chatId,
+      senderId: currentUid,
+      senderName: activeIdentity.name,
+      senderAvatar: activeIdentity.avatar,
+      text,
+      timestamp: Date.now(),
+      read: false,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
     try {
-      await addDoc(collection(db, 'chats', activeChat.chatId, 'messages'), {
+      await sendChatMessage({
+        chatId: activeChat.chatId,
         senderId: currentUid,
         senderName: activeIdentity.name,
+        senderAvatar: activeIdentity.avatar,
         text,
-        timestamp: serverTimestamp(),
-        read: false,
-      });
-
-      await updateDoc(doc(db, 'chats', activeChat.chatId), {
-        lastMessage: text,
-        lastTimestamp: Date.now(),
-        lastSenderId: currentUid,
       });
     } catch (err) {
-      console.error('Lỗi gửi tin nhắn popup:', err);
+      console.warn('Gửi tin nhắn popup warning:', err);
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -192,27 +188,19 @@ export default function ChatFab() {
     const targetUid = candidate.uid;
     const chatId = [currentUid, targetUid].sort().join('_');
 
-    try {
-      await setDoc(
-        doc(db, 'chats', chatId),
-        {
-          participants: [currentUid, targetUid],
-          participantNames: {
-            [currentUid]: activeIdentity.name,
-            [targetUid]: candidate.name || 'Người dùng',
-          },
-          participantAvatars: {
-            [currentUid]: activeIdentity.avatar,
-            [targetUid]: candidate.avatar || '',
-          },
-          lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
-          lastTimestamp: Date.now(),
-        },
-        { merge: true }
-      );
-    } catch (e) {
-      console.warn('Init candidate chat notice:', e);
-    }
+    await initializeChatRoom({
+      chatId,
+      participants: [currentUid, targetUid],
+      participantNames: {
+        [currentUid]: activeIdentity.name,
+        [targetUid]: candidate.name || 'Người dùng',
+      },
+      participantAvatars: {
+        [currentUid]: activeIdentity.avatar,
+        [targetUid]: candidate.avatar || '',
+      },
+      lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
+    });
 
     setActiveChat({
       chatId,
