@@ -10,6 +10,11 @@ import { auth, db } from '../services/firebase';
 import { RootState } from '../store';
 import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
 import { formatTimestamp } from '../utils/date';
+import ChatAccountSwitcher from './ChatAccountSwitcher';
+import {
+  getActiveChatIdentity,
+  ChatAccountIdentity,
+} from '../services/chatAccountService';
 
 /**
  * Official Facebook Messenger SVG Logo
@@ -77,7 +82,18 @@ export default function ChatFab() {
   const hiddenPaths = ['/chat', '/assistant', '/login', '/register', '/onboarding', '/register/step2', '/register-step2'];
   const isHidden = hiddenPaths.some((p) => pathname.startsWith(p));
 
-  const currentUid = profile.uid || auth.currentUser?.uid;
+  // Danh tính tài khoản chat hiện tại
+  const [activeIdentity, setActiveIdentity] = useState<ChatAccountIdentity>(() => getActiveChatIdentity(profile));
+  const currentUid = activeIdentity.uid;
+
+  useEffect(() => {
+    const handleIdentityChanged = () => {
+      const updated = getActiveChatIdentity(profile);
+      setActiveIdentity(updated);
+    };
+    window.addEventListener('resonancia_identity_changed', handleIdentityChanged);
+    return () => window.removeEventListener('resonancia_identity_changed', handleIdentityChanged);
+  }, [profile]);
 
   // Lắng nghe danh sách cuộc trò chuyện từ Firestore
   useEffect(() => {
@@ -147,7 +163,7 @@ export default function ChatFab() {
     try {
       await addDoc(collection(db, 'chats', activeChat.chatId, 'messages'), {
         senderId: currentUid,
-        senderName: profile.name || auth.currentUser?.displayName || 'Bạn',
+        senderName: activeIdentity.name,
         text,
         timestamp: serverTimestamp(),
         read: false,
@@ -156,6 +172,7 @@ export default function ChatFab() {
       await updateDoc(doc(db, 'chats', activeChat.chatId), {
         lastMessage: text,
         lastTimestamp: Date.now(),
+        lastSenderId: currentUid,
       });
     } catch (err) {
       console.error('Lỗi gửi tin nhắn popup:', err);
@@ -181,11 +198,11 @@ export default function ChatFab() {
         {
           participants: [currentUid, targetUid],
           participantNames: {
-            [currentUid]: profile.name || auth.currentUser?.displayName || 'Người dùng',
+            [currentUid]: activeIdentity.name,
             [targetUid]: candidate.name || 'Người dùng',
           },
           participantAvatars: {
-            [currentUid]: profile.avatar || auth.currentUser?.photoURL || '',
+            [currentUid]: activeIdentity.avatar,
             [targetUid]: candidate.avatar || '',
           },
           lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
@@ -429,7 +446,7 @@ export default function ChatFab() {
               <div className="flex flex-col h-full">
                 {/* Header danh sách */}
                 <div
-                  className="px-4 py-3 flex items-center justify-between border-b"
+                  className="px-4 py-2.5 flex items-center justify-between border-b"
                   style={{
                     borderColor: 'rgba(168, 85, 247, 0.25)',
                     background: 'linear-gradient(90deg, rgba(30, 16, 75, 0.8) 0%, rgba(20, 10, 55, 0.8) 100%)',
@@ -477,6 +494,11 @@ export default function ChatFab() {
                   </div>
                 </div>
 
+                {/* Chuyển đổi danh tính chat trong popup */}
+                <div className="p-2.5 pb-0">
+                  <ChatAccountSwitcher />
+                </div>
+
                 {/* Thanh tìm kiếm */}
                 <div className="p-3 border-b border-purple-500/20">
                   <div className="relative">
@@ -511,8 +533,9 @@ export default function ChatFab() {
                   ) : filteredChats.length > 0 ? (
                     filteredChats.map((chat) => {
                       const otherUid = chat.participants?.find((p: string) => p !== currentUid);
-                      const otherName = chat.participantNames?.[otherUid] || 'Người dùng';
-                      const otherAvatar = chat.participantAvatars?.[otherUid];
+                      const otherCand = DEFAULT_CANDIDATE_PROFILES[otherUid];
+                      const otherName = otherCand?.name || chat.participantNames?.[otherUid] || 'Người dùng';
+                      const otherAvatar = otherCand?.avatar || chat.participantAvatars?.[otherUid] || '';
                       return (
                         <button
                           key={chat.id}
