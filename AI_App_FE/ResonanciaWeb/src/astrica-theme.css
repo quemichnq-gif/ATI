@@ -1691,3 +1691,284 @@ a.w-webflow-badge {
   visibility: hidden !important;
   pointer-events: none !important;
 }
+
+
+/* ============================================================
+   CHAT FAB – Nút nổi "Nhắn tin" góc dưới phải
+   Phong cách: Glassmorphism Indigo-Purple, nhất quán với navbar
+   ============================================================ */
+
+/* Wrapper định vị cố định */
+.chat-fab-wrapper {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-direction: row-reverse;
+}
+
+/* Tooltip "Trò chuyện" */
+.chat-fab-tooltip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #e8d5ff;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  background: linear-gradient(135deg, rgba(26, 0, 60, 0.92) 0%, rgba(14, 0, 40, 0.92) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 10px rgba(157, 78, 221, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Nút FAB chính */
+.chat-fab-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(168, 85, 247, 0.55);
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  /* Glassmorphism giống chatbot trigger trong navbar */
+  background: linear-gradient(
+    135deg,
+    rgba(55, 20, 110, 0.82) 0%,
+    rgba(30, 5, 80, 0.88) 50%,
+    rgba(20, 0, 60, 0.92) 100%
+  );
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 20px rgba(130, 60, 220, 0.25);
+
+  transition: box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chat-fab-btn:hover,
+.chat-fab-btn:focus-visible {
+  border-color: rgba(168, 85, 247, 0.85);
+  background: linear-gradient(
+    135deg,
+    rgba(100, 40, 180, 0.88) 0%,
+    rgba(60, 10, 140, 0.92) 50%,
+    rgba(30, 5, 90, 0.95) 100%
+  );
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 30px rgba(157, 78, 221, 0.55),
+    0 0 60px rgba(157, 78, 221, 0.2);
+}
+
+/* Icon trong FAB */
+.chat-fab-icon {
+  width: 24px;
+  height: 24px;
+  color: #d8b4fe;
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.chat-fab-btn:hover .chat-fab-icon,
+.chat-fab-btn:focus-visible .chat-fab-icon {
+  color: #fff1b3;
+}
+
+/* Vòng glow nhấp nháy ở nền */
+.chat-fab-glow {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(157, 78, 221, 0.3) 0%, transparent 70%);
+  animation: chat-fab-glow-pulse 2.6s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes chat-fab-glow-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.12);
+  }
+}
+
+/* Badge số tin nhắn chưa đọc */
+.chat-fab-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0;
+  background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%);
+  border: 2px solid rgba(10, 0, 30, 0.9);
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.5);
+  z-index: 2;
+}
+
+/* Chấm online nhấp nháy – góc dưới trái nút */
+.chat-fab-pulse-dot {
+  position: absolute;
+  bottom: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #34d399;
+  border: 2px solid rgba(10, 0, 30, 0.85);
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
+  animation: chat-fab-dot-pulse 2s ease-in-out infinite;
+  z-index: 2;
+}
+
+@keyframes chat-fab-dot-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 6px rgba(52, 211, 153, 0.7);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 12px rgba(52, 211, 153, 0.9);
+  }
+}
+
+/* Responsive mobile */
+@media (max-width: 640px) {
+  .chat-fab-wrapper {
+    bottom: 20px;
+    right: 18px;
+  }
+
+  .chat-fab-btn {
+    width: 48px;
+    height: 48px;
+  }
+
+  .chat-fab-icon {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+
+/* ============================================================
+   RESONANCIA MESSENGER FRAME - Matching Resonancia AI Theme
+   ============================================================ */
+.resonancia-messenger-frame {
+  border: 1px solid rgba(120, 100, 255, 0.55) !important;
+  border-radius: 22px !important;
+  background-color: #1c1560 !important;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E"),
+    linear-gradient(
+      145deg,
+      rgba(55, 40, 160, 0.9) 0%,
+      rgba(42, 28, 130, 0.92) 35%,
+      rgba(62, 22, 120, 0.9) 65%,
+      rgba(38, 18, 95, 0.94) 100%
+    ) !important;
+  background-repeat: repeat, no-repeat !important;
+  box-shadow:
+    0 24px 60px rgba(8, 4, 30, 0.75),
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 20px rgba(130, 100, 255, 0.12),
+    0 0 40px rgba(120, 80, 255, 0.25) !important;
+  backdrop-filter: blur(24px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.4) !important;
+}
+
+/* ============================================================
+   MESSENGER FAB BUTTON - HOÀN TOÀN HÌNH TRÒN (PERFECT CIRCLE)
+   ============================================================ */
+.resonancia-messenger-fab {
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  min-height: 58px !important;
+  max-width: 58px !important;
+  max-height: 58px !important;
+  border-radius: 50% !important;
+  border-radius: 9999px !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+  aspect-ratio: 1 / 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  outline: none !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+.resonancia-messenger-fab-glow {
+  position: absolute !important;
+  inset: -3px !important;
+  border-radius: 50% !important;
+  -webkit-border-radius: 50% !important;
+  -moz-border-radius: 50% !important;
+  pointer-events: none !important;
+}
+
+/* Hide scrollbar completely */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Elegant scrollbar for message stream */
+.resonancia-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.resonancia-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.resonancia-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(120, 100, 255, 0.35);
+  border-radius: 999px;
+}
+.resonancia-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 120, 255, 0.65);
+}

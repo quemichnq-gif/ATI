@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import ErrorBoundary from './ErrorBoundary';
+import ChatFab from './ChatFab';
 
 export default function MainLayout() {
   const { pathname } = useLocation();
@@ -67,6 +68,9 @@ export default function MainLayout() {
       </main>
 
       {!isAssistantPage && <Footer />}
+
+      {/* Nút nổi Nhắn Tin – hiển thị ở mọi trang trừ /chat và /assistant */}
+      <ChatFab />
     </div>
   );
 }
