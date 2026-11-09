@@ -1144,7 +1144,7 @@ body,
   background-repeat: no-repeat !important;
   background-size: cover !important;
   padding-top: 80px !important;
-  padding-bottom: 0 !important;
+  padding-bottom: 24px !important;
   overflow: hidden !important;
   border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 -20px 60px rgba(4, 3, 22, 0.95) !important;
@@ -1309,11 +1309,11 @@ body,
 }
 
 .astrica-footer .bottom-footer {
-  margin-bottom: -40px !important;
+  margin-bottom: 0px !important;
   margin-left: -50px !important;
   margin-right: -50px !important;
-  padding-top: 45px !important;
-  margin-top: -35px !important;
+  padding-top: 35px !important;
+  margin-top: -15px !important;
   text-align: center !important;
   overflow: visible !important;
   user-select: none !important;

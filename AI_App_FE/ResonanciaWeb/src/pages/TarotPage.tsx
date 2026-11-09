@@ -194,7 +194,7 @@ export default function TarotPage() {
       : TAROT_CARDS;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto px-4 pb-16">
+    <div className="space-y-6 pb-16">
       {/* Header & Quay về */}
       <div className="flex items-center justify-between">
         <button
@@ -312,7 +312,7 @@ export default function TarotPage() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="w-full max-w-xl space-y-4"
+                className="w-full space-y-4"
               >
                 {/* Ý nghĩa lá bài gốc Rider-Waite */}
                 <div className="glass-card p-5">

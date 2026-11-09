@@ -32,6 +32,10 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   read?: boolean;
+  type?: 'text' | 'image' | 'file';
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: string;
 }
 
 export interface ChatConversation {
@@ -53,8 +57,12 @@ export async function sendChatMessage(params: {
   senderName: string;
   senderAvatar?: string;
   text: string;
+  type?: 'text' | 'image' | 'file';
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: string;
 }): Promise<ChatMessage> {
-  const { chatId, senderId, senderName, senderAvatar, text } = params;
+  const { chatId, senderId, senderName, senderAvatar, text, type = 'text', fileUrl, fileName, fileSize } = params;
   const now = Date.now();
 
   let sentMessage: ChatMessage = {
@@ -64,6 +72,10 @@ export async function sendChatMessage(params: {
     senderName,
     senderAvatar: senderAvatar || '',
     text,
+    type,
+    fileUrl,
+    fileName,
+    fileSize,
     timestamp: now,
     read: false,
   };
@@ -79,6 +91,10 @@ export async function sendChatMessage(params: {
         senderName,
         senderAvatar: senderAvatar || '',
         text,
+        type,
+        fileUrl,
+        fileName,
+        fileSize,
       }),
     });
     if (res?.ok) {
@@ -98,6 +114,10 @@ export async function sendChatMessage(params: {
       senderName,
       senderAvatar: senderAvatar || '',
       text,
+      type,
+      fileUrl,
+      fileName,
+      fileSize,
       timestamp: serverTimestamp(),
       read: false,
     }).catch(() => {});
@@ -105,7 +125,7 @@ export async function sendChatMessage(params: {
     setDoc(
       doc(db, 'chats', chatId),
       {
-        lastMessage: text,
+        lastMessage: type === 'image' ? '[Hình ảnh]' : type === 'file' ? `[Tệp tin: ${fileName || 'tài liệu'}]` : text,
         lastTimestamp: now,
         lastSenderId: senderId,
       },
@@ -185,6 +205,10 @@ export function subscribeToChatMessages(
               text: data.text || '',
               timestamp: ts,
               read: Boolean(data.read),
+              type: data.type || 'text',
+              fileUrl: data.fileUrl,
+              fileName: data.fileName,
+              fileSize: data.fileSize,
             });
             hasNew = true;
           }

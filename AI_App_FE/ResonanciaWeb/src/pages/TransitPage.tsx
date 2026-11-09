@@ -172,7 +172,7 @@ export default function TransitPage() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-7 pb-16 max-w-4xl mx-auto">
+    <div className="space-y-6 sm:space-y-7 pb-16">
       {/* Nút quay lại */}
       <button
         onClick={() => navigate('/home')}

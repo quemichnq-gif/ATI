@@ -133,11 +133,16 @@ export default function ChatFab() {
     return unsub;
   }, [activeChat?.chatId]);
 
-  // Tự động cuộn xuống tin nhắn mới nhất
+  // Tự động cuộn xuống tin nhắn mới nhất trong popup
   useEffect(() => {
     if (activeChat && messages.length > 0) {
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (messagesEndRef.current) {
+          const container = messagesEndRef.current.parentElement;
+          if (container) {
+            container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+          }
+        }
       }, 50);
     }
   }, [messages, activeChat]);
