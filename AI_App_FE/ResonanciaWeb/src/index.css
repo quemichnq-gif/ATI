@@ -92,6 +92,7 @@ body {
   box-shadow: 0 0 4px rgba(255, 255, 255, 0.7);
   animation: twinkle var(--duration, 3s) ease-in-out infinite;
   animation-delay: var(--delay, 0s);
+  will-change: transform, opacity;
 }
 
 /* Gradient text */
@@ -432,25 +433,20 @@ body {
   will-change: transform;
 }
 
-/* 3. Sao bang vu tru (Meteor effect) - ro rang, duoi dai sang ruc */
+/* 3. Sao bang vu tru (Meteor effect) - chuyen dong luon tuc, khong ngung nghi */
 @keyframes meteor {
   0% {
-    transform: rotate(215deg) translateX(0);
+    transform: rotate(215deg) translateX(120px);
     opacity: 0;
   }
-  4% {
+  6% {
     opacity: 1;
   }
-  40% {
-    transform: rotate(215deg) translateX(-750px);
+  75% {
     opacity: 1;
-  }
-  50% {
-    transform: rotate(215deg) translateX(-900px);
-    opacity: 0;
   }
   100% {
-    transform: rotate(215deg) translateX(-900px);
+    transform: rotate(215deg) translateX(-1100px);
     opacity: 0;
   }
 }
@@ -464,7 +460,10 @@ body {
   box-shadow: 0 0 12px 2px #4cc9f0, 0 0 24px 4px rgba(157, 78, 221, 0.8);
   transform: rotate(215deg);
   pointer-events: none;
-  animation: meteor 4.5s linear infinite;
+  opacity: 0;
+  animation: meteor 3.5s linear infinite;
+  animation-fill-mode: both;
+  will-change: transform, opacity;
 }
 
 .meteor-item::before {
@@ -472,10 +471,11 @@ body {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 170px;
+  width: 180px;
   height: 2px;
-  background: linear-gradient(90deg, #ffffff, #4cc9f0 40%, #9d4edd 75%, transparent);
+  background: linear-gradient(90deg, #ffffff 0%, #4cc9f0 40%, #9d4edd 75%, transparent 100%);
   box-shadow: 0 0 8px rgba(76, 201, 240, 0.7);
+  border-radius: 999px;
 }
 
 /* 4. Bui sao vu tru troi bong benh (Stardust drift) */
@@ -502,6 +502,9 @@ body {
   pointer-events: none;
   background: #ffffff;
   box-shadow: 0 0 6px 1px rgba(157, 78, 221, 0.8), 0 0 12px 2px rgba(255, 255, 255, 0.6);
+  opacity: 0;
   animation: stardust-drift var(--duration, 7s) ease-in-out infinite;
   animation-delay: var(--delay, 0s);
+  animation-fill-mode: both;
+  will-change: transform, opacity;
 }

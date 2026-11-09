@@ -12,7 +12,7 @@ function getCachedStars(count: number): Star[] {
       size: ((i * 3.7) % 1.6) + 0.6,
       color: (i % 3 === 0) ? 'rgba(216, 180, 254, 0.55)' : 'rgba(255, 255, 255, 0.5)',
       duration: ((i * 1.9) % 5) + 3,
-      delay: (i * 0.7) % 6,
+      delay: -((i * 0.7) % 6),
     }));
     STAR_CACHE.set(count, cached);
   }
