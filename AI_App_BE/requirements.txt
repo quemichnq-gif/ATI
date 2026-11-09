@@ -6,3 +6,5 @@ google-generativeai
 firebase-admin
 cloudinary
 uvicorn
+numpy
+pytest

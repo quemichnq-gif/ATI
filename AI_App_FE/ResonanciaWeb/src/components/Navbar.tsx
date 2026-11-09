@@ -331,32 +331,59 @@ export default function Navbar() {
             </nav>
 
             {/* Thông tin tài khoản người dùng & Nút Đăng xuất */}
-            <div className="astrica-menu-account">
-              <Link to="/profile" onClick={() => setMenuOpen(false)} className="astrica-profile-link">
-                <div className="astrica-avatar-wrap">
-                  <span className="astrica-avatar" aria-hidden="true">
-                    {profile.avatar ? (
-                      <img src={profile.avatar} alt="" />
-                    ) : (
-                      displayName[0]?.toUpperCase() || 'U'
-                    )}
-                  </span>
-                  <span className="astrica-avatar-badge" aria-hidden="true" />
-                </div>
-                <div className="astrica-profile-info">
-                  <span className="astrica-profile-name">{displayName}</span>
-                  <span className="astrica-profile-sub">
-                    {profile.sun ? `Cung ${profile.sun} · Xem hồ sơ` : 'Hồ sơ cá nhân & Bản đồ sao'}
-                  </span>
-                </div>
-              </Link>
-              <button type="button" onClick={handleLogout} className="astrica-logout-button">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-                <span>Đăng xuất</span>
-              </button>
-            </div>
+            {authUser.uid ? (
+              <div className="astrica-menu-account">
+                <Link to="/profile" onClick={() => setMenuOpen(false)} className="astrica-profile-link">
+                  <div className="astrica-avatar-wrap">
+                    <span className="astrica-avatar" aria-hidden="true">
+                      {profile.avatar ? (
+                        <img src={profile.avatar} alt="" />
+                      ) : (
+                        displayName[0]?.toUpperCase() || 'U'
+                      )}
+                    </span>
+                    <span className="astrica-avatar-badge" aria-hidden="true" />
+                  </div>
+                  <div className="astrica-profile-info">
+                    <span className="astrica-profile-name">{displayName}</span>
+                    <span className="astrica-profile-sub">
+                      {profile.sun ? `Cung ${profile.sun} · Xem hồ sơ` : 'Hồ sơ cá nhân & Bản đồ sao'}
+                    </span>
+                  </div>
+                </Link>
+                <button type="button" onClick={handleLogout} className="astrica-logout-button">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
+            ) : (
+              <div className="astrica-menu-account">
+                <Link to="/login" onClick={() => setMenuOpen(false)} className="astrica-profile-link">
+                  <div className="astrica-avatar-wrap">
+                    <span className="astrica-avatar" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                        <polyline points="10 17 15 12 10 7" />
+                        <line x1="15" y1="12" x2="3" y2="12" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="astrica-profile-info">
+                    <span className="astrica-profile-name">Đăng nhập</span>
+                    <span className="astrica-profile-sub">Truy cập hồ sơ &amp; tính năng</span>
+                  </div>
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setMenuOpen(false)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 shadow-[0_0_12px_rgba(168,85,247,0.4)] transition-all whitespace-nowrap"
+                >
+                  Đăng ký
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

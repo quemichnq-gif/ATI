@@ -1,5 +1,6 @@
 # Python cache & bytecode
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *$py.class
 AI_App_BE/__pycache__/
@@ -15,13 +16,21 @@ serviceAccount*.json
 *.key
 AI_App_BE/.env
 AI_App_FE/ResonanciaWeb/.env
+AI_App_FE/ResonanciaWeb/node_modules/
 AI_App_FE/ResonanciaWeb/.env.local
 
 # Virtual environment
 AI_App_BE/venv/
 AI_App_BE/.venv/
+AI_App_BE/.venv
 venv/
+venv
 .venv/
+.venv
+
+# Editor settings
+.vscode/
+AI_App_BE/.vscode/
 
 # Node modules
 node_modules/
@@ -48,3 +57,6 @@ docker-compose.yml
 AI_App_BE/Dockerfile
 AI_App_FE/ResonanciaWeb/Dockerfile
 **/Dockerfile
+*.dockerignore
+.dockerignore
+**/.dockerignore

@@ -1,9 +1,15 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
 
 const serviceTargets: Record<string, { route: string; label: string }> = {
   'Natal/Birth chart reading': { route: '/natal', label: 'Mở Bản Đồ Sao' },
   'Zodiac compatibility': { route: '/match', label: 'Mở Ghép Đôi' },
   'Tarot card reading': { route: '/tarot', label: 'Mở Tarot' },
+  'Đọc bản đồ sao ngày sinh': { route: '/natal', label: 'Mở Bản Đồ Sao' },
+  'Tương hợp cung hoàng đạo': { route: '/match', label: 'Mở Ghép Đôi' },
+  'Trải bài Tarot định mệnh': { route: '/tarot', label: 'Mở Tarot' },
 };
 
 const caseTargets: Record<string, string> = {
@@ -11,10 +17,82 @@ const caseTargets: Record<string, string> = {
   'how astrology can elevate your event planning': '/prediction',
   'career guidance through the lens of astrology': '/natal',
   'unveiling relationship dynamics through astrology': '/match',
+  'định hướng giáo dục qua lăng kính chiêm tinh': '/natal',
+  'cách chiêm tinh nâng tầm kế hoạch sự kiện của bạn': '/prediction',
+  'tiếp cận mới trong chăm sóc sức khỏe cá nhân': '/natal',
+  'định hướng sự nghiệp qua lăng kính chiêm tinh': '/natal',
 };
 
 export default function ReferenceHomeSections() {
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const navigate = useNavigate();
+  const { uid } = useSelector((s: RootState) => s.auth);
+  const uidRef = useRef(uid);
+
+  const applyActionLinks = (targetDoc: Document) => {
+    targetDoc.querySelectorAll<HTMLAnchorElement>('a').forEach((link) => {
+      const text = link.textContent?.trim().toLowerCase() || '';
+      const isAllService = text.includes('all service') || text.includes('tất cả dịch vụ');
+      const isGetMoreDetail = text.includes('more detail') || text.includes('get more') || text.includes('chi tiết') || text.includes('tìm hiểu thêm');
+      const isArticles = text.includes('all articles') || text.includes('bài viết') || text.includes('articles');
+
+      if (isAllService || isGetMoreDetail || isArticles) {
+        const isUnauth = !uidRef.current;
+        const targetRoute = isUnauth ? '/register' : (isAllService ? '/assistant' : (isArticles ? '/glossary' : '/prediction'));
+        link.setAttribute('href', targetRoute);
+        link.setAttribute('target', '_top');
+
+        if (!link.dataset.hasAuthHandler) {
+          link.dataset.hasAuthHandler = 'true';
+          link.style.cursor = 'pointer';
+          link.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const destination = !uidRef.current ? '/register' : (isAllService ? '/assistant' : (isArticles ? '/glossary' : '/prediction'));
+            try {
+              navigate(destination);
+            } catch {
+              window.parent.location.assign(destination);
+            }
+          }, true);
+        }
+      }
+    });
+
+    // Cấu hình các thẻ bài viết (Blog cards)
+    targetDoc.querySelectorAll<HTMLElement>('.blog-item-block').forEach((card) => {
+      const isUnauth = !uidRef.current;
+      const targetRoute = isUnauth ? '/register' : '/glossary';
+
+      card.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((link) => {
+        link.setAttribute('href', targetRoute);
+        link.setAttribute('target', '_top');
+      });
+
+      if (!card.dataset.hasAuthHandler) {
+        card.dataset.hasAuthHandler = 'true';
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', (event) => {
+          const clickedElement = event.target as Element | null;
+          if (clickedElement?.closest('a, button')) return;
+          const finalRoute = !uidRef.current ? '/register' : '/glossary';
+          try {
+            navigate(finalRoute);
+          } catch {
+            window.parent.location.assign(finalRoute);
+          }
+        });
+      }
+    });
+  };
+
+  useEffect(() => {
+    uidRef.current = uid;
+    const doc = frameRef.current?.contentDocument;
+    if (doc) {
+      applyActionLinks(doc);
+    }
+  }, [uid]);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -61,12 +139,27 @@ export default function ReferenceHomeSections() {
       // 1. Cấu hình các liên kết điều hướng dịch vụ
       doc.querySelectorAll<HTMLElement>('.service-item-block').forEach((card) => {
         const titleLink = card.querySelector<HTMLAnchorElement>('.service-item-title');
-        const target = titleLink?.textContent?.trim();
-        const destination = target ? serviceTargets[target] : undefined;
+        const target = titleLink?.textContent?.trim() || '';
+        let destination = serviceTargets[target];
+
+        if (!destination) {
+          const lower = target.toLowerCase();
+          if (lower.includes('bản đồ') || lower.includes('natal') || lower.includes('birth chart')) {
+            destination = serviceTargets['Đọc bản đồ sao ngày sinh'];
+          } else if (lower.includes('tương hợp') || lower.includes('compatibility')) {
+            destination = serviceTargets['Tương hợp cung hoàng đạo'];
+          } else if (lower.includes('tarot')) {
+            destination = serviceTargets['Trải bài Tarot định mệnh'];
+          }
+        }
+
         if (!destination) return;
 
+        const isUnauth = !uidRef.current;
+        const targetRoute = isUnauth ? '/register' : destination.route;
+
         card.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((link) => {
-          link.setAttribute('href', destination.route);
+          link.setAttribute('href', targetRoute);
           link.setAttribute('target', '_top');
           if (link.classList.contains('thumbnail-link-block')) {
             link.setAttribute('aria-label', destination.label);
@@ -77,7 +170,12 @@ export default function ReferenceHomeSections() {
         card.addEventListener('click', (event) => {
           const clickedElement = event.target as Element | null;
           if (clickedElement?.closest('a, button')) return;
-          window.parent.location.assign(destination.route);
+          const finalRoute = !uidRef.current ? '/register' : destination.route;
+          try {
+            navigate(finalRoute);
+          } catch {
+            window.parent.location.assign(finalRoute);
+          }
         });
       });
 
@@ -93,8 +191,11 @@ export default function ReferenceHomeSections() {
           }
         }
 
+        const isUnauth = !uidRef.current;
+        const finalRoute = isUnauth ? '/register' : targetRoute;
+
         card.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((link) => {
-          link.setAttribute('href', targetRoute);
+          link.setAttribute('href', finalRoute);
           link.setAttribute('target', '_top');
         });
 
@@ -102,11 +203,76 @@ export default function ReferenceHomeSections() {
         card.addEventListener('click', (event) => {
           const clickedElement = event.target as Element | null;
           if (clickedElement?.closest('a, button')) return;
-          window.parent.location.assign(targetRoute);
+          const destination = !uidRef.current ? '/register' : targetRoute;
+          try {
+            navigate(destination);
+          } catch {
+            window.parent.location.assign(destination);
+          }
         });
       });
 
-      // 3. Hiệu ứng cuộn vòng hoàng đạo “Secret Universe’s”
+      // 3. Cấu hình các nút "All service" và "Get more detail"
+      applyActionLinks(doc);
+
+      // 4. Đồng bộ & tinh chỉnh giao diện CTA Section (Secret Universe's)
+      const ctaTitle = ctaSection?.querySelector<HTMLElement>('.cta-title');
+      if (ctaTitle) {
+        // Gỡ bỏ hình nhỏ cạnh chữ Secret
+        ctaTitle.querySelectorAll('.cta-title-image').forEach((img) => img.remove());
+
+        let secretEl = ctaTitle.querySelector<HTMLElement>('.cta-title-secret');
+        let universeEl = ctaTitle.querySelector<HTMLElement>('.cta-title-span');
+
+        if (!secretEl) {
+          ctaTitle.innerHTML = `
+            <span class="cta-title-secret">Secret</span>
+            <span class="cta-title-span">Universe's</span>
+          `;
+          secretEl = ctaTitle.querySelector<HTMLElement>('.cta-title-secret');
+          universeEl = ctaTitle.querySelector<HTMLElement>('.cta-title-span');
+        }
+
+        if (secretEl) {
+          secretEl.style.display = 'block';
+          secretEl.style.textAlign = 'center';
+          secretEl.style.fontStyle = 'italic';
+          secretEl.style.color = '#ffffff';
+        }
+
+        if (universeEl) {
+          universeEl.style.display = 'block';
+          universeEl.style.textAlign = 'center';
+          universeEl.style.background = 'linear-gradient(135deg, #ffffff 5%, #d8b4fe 25%, #ff6eb4 50%, #4cc9f0 75%, #9d4edd 100%)';
+          universeEl.style.setProperty('-webkit-background-clip', 'text');
+          universeEl.style.setProperty('-webkit-text-fill-color', 'transparent');
+          universeEl.style.backgroundClip = 'text';
+          universeEl.style.filter = 'drop-shadow(0 0 35px rgba(168, 85, 247, 0.6)) drop-shadow(0 0 65px rgba(76, 201, 240, 0.4))';
+        }
+
+        ctaTitle.style.display = 'flex';
+        ctaTitle.style.flexDirection = 'column';
+        ctaTitle.style.alignItems = 'center';
+        ctaTitle.style.justifyContent = 'center';
+        ctaTitle.style.textAlign = 'center';
+      }
+
+      const ctaDesc = ctaSection?.querySelector<HTMLElement>('.cta-info-desc');
+      if (ctaDesc) {
+        ctaDesc.textContent = 'Khám phá những điều vũ trụ đã an bài cho bạn. Hãy bắt đầu hành trình ngay hôm nay!';
+      }
+
+      const ctaBtnText = ctaSection?.querySelector<HTMLElement>('.cta-btn-block .btn-block-text');
+      if (ctaBtnText) {
+        ctaBtnText.textContent = 'Xem chi tiết';
+      }
+
+      const ctaInfoWrapper = ctaSection?.querySelector<HTMLElement>('.cta-info-wrapper');
+      if (ctaInfoWrapper) {
+        ctaInfoWrapper.style.marginTop = window.innerWidth <= 767 ? '28px' : (window.innerWidth <= 991 ? '36px' : '52px');
+      }
+
+      // 5. Hiệu ứng cuộn vòng hoàng đạo “Secret Universe’s”
       const ctaContentBlock = ctaSection?.querySelector<HTMLElement>('.cta-content-block');
       const ctaImageWrapper = ctaSection?.querySelector<HTMLElement>('.cta-image-wrapper');
       const ctaImageBlock = ctaSection?.querySelector<HTMLElement>('.cta-image-block');
@@ -508,7 +674,8 @@ export default function ReferenceHomeSections() {
     <section aria-label="Các phần giao diện tham khảo Astrica" className="reference-home-sections">
       <iframe
         ref={frameRef}
-        src="/astrica/reference-home.html"
+        key="astrica-home-frame-v8"
+        src="/astrica/reference-home.html?v=20261109_08"
         title="Các section trang chủ tham khảo Astrica"
         loading="eager"
         scrolling="no"

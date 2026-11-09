@@ -30,12 +30,17 @@ export default function App() {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/" element={<Navigate to="/onboarding" replace />} />
+      <Route path="/" element={<Navigate to="/home" replace />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/register/step2" element={<RegisterStep2Page />} />
       <Route path="/register-step2" element={<RegisterStep2Page />} />
+
+      {/* Public routes wrapped in MainLayout */}
+      <Route element={<MainLayout />}>
+        <Route path="/home" element={<HomePage />} />
+      </Route>
 
       {/* Protected routes wrapped in MainLayout */}
       <Route
@@ -45,7 +50,6 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/home" element={<HomePage />} />
         <Route path="/assistant" element={<AssistantPage />} />
         <Route path="/natal" element={<NatalChartPage />} />
         <Route path="/match" element={<MatchPage />} />
