@@ -3,10 +3,10 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { auth, db } from '../services/firebase';
 import { RootState } from '../store';
 import { MATCH_TAGS, ZODIAC_SIGNS } from '../constants/astrologyMap';
-import { apiLoveMatching, apiSendMatchRequest } from '../services/api';
+import { apiLoveMatching, apiSendMatchRequest, apiGetMatchRequests } from '../services/api';
 import { MatchTagType } from '../types';
 import UiIcon from '../components/UiIcon';
 import ZodiacIcon from '../components/ZodiacIcon';
@@ -28,23 +28,71 @@ export default function MatchPage() {
   const [toastMsg, setToastMsg] = useState('');
   const [filterLevel, setFilterLevel] = useState<'all' | 'high' | 'medium' | 'challenge'>('all');
 
+  useEffect(() => {
+    const myUid = profile.uid || auth.currentUser?.uid;
+    if (!myUid) return;
+    apiGetMatchRequests(myUid, 'sent')
+      .then(res => {
+        const list = res.data?.requests || [];
+        const map: Record<string, boolean> = {};
+        list.forEach((r: any) => {
+          if (r.receiverId && (r.status === 'pending' || r.status === 'accepted')) {
+            map[r.receiverId] = true;
+          }
+        });
+        setSentStatusMap(prev => ({ ...prev, ...map }));
+      })
+      .catch(() => {});
+  }, [profile.uid, candidates]);
+
   const handleQuickMatch = async (c: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!profile.uid || !c.uid) return;
+    const myUid = profile.uid || auth.currentUser?.uid;
+    if (!myUid) {
+      setToastMsg('Vui lòng đăng nhập để gửi lời mời ghép đôi!');
+      setTimeout(() => setToastMsg(''), 3500);
+      return;
+    }
+    if (!c.uid) return;
+
     setRequestLoading(prev => ({ ...prev, [c.uid]: true }));
     try {
-      await apiSendMatchRequest({
-        senderId: profile.uid,
+      const res = await apiSendMatchRequest({
+        senderId: myUid,
         receiverId: c.uid,
+        senderName: profile.name || auth.currentUser?.displayName || 'Người dùng',
+        senderAvatar: profile.avatar || auth.currentUser?.photoURL || '',
+        receiverName: c.name || '',
         message: `Xin chào ${c.name}! Mình thấy cung hoàng đạo của chúng ta rất tương hợp, hãy cùng kết bạn nhé ✨`,
       });
+
+      // Đồng bộ vào Firestore Web SDK qua long-polling để sync trạng thái
+      try {
+        const requestId = res.data?.requestId || `${myUid}_${c.uid}`;
+        await setDoc(doc(db, 'match_requests', requestId), {
+          requestId,
+          senderId: myUid,
+          receiverId: c.uid,
+          senderName: profile.name || auth.currentUser?.displayName || 'Người dùng',
+          senderAvatar: profile.avatar || auth.currentUser?.photoURL || '',
+          receiverName: c.name || '',
+          receiverAvatar: c.avatar || '',
+          message: `Xin chào ${c.name}! Mình thấy cung hoàng đạo của chúng ta rất tương hợp, hãy cùng kết bạn nhé ✨`,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (fsErr) {
+        console.warn('Frontend direct Firestore sync notice:', fsErr);
+      }
+
       const alreadySent = !!sentStatusMap[c.uid];
       setSentStatusMap(prev => ({ ...prev, [c.uid]: true }));
       setToastMsg(alreadySent ? `Đã gửi lại lời mời kết bạn tới ${c.name}! ✨` : `Đã gửi lời mời kết bạn tới ${c.name}! ✨`);
       setTimeout(() => setToastMsg(''), 3500);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Lỗi gửi kết bạn:', err);
-      setToastMsg('Không thể gửi lời mời kết bạn. Vui lòng thử lại!');
+      const errMsg = err?.response?.data?.error || err?.message || 'Không thể gửi lời mời kết bạn. Vui lòng thử lại!';
+      setToastMsg(errMsg);
       setTimeout(() => setToastMsg(''), 3500);
     } finally {
       setRequestLoading(prev => ({ ...prev, [c.uid]: false }));

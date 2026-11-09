@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { motion } from 'framer-motion';
-import { db } from '../services/firebase';
+import { auth, db } from '../services/firebase';
 import { RootState } from '../store';
 import { apiCompatibility, apiSendMatchRequest, apiCheckMatchStatus, apiBreakup, apiAcceptMatch, apiRejectMatch } from '../services/api';
 import { ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
@@ -182,13 +182,35 @@ export default function UserProfilePage() {
   };
 
   const handleMatchRequest = async () => {
-    if (!profile.uid || !targetUid) return;
+    const myUid = profile.uid || auth.currentUser?.uid;
+    if (!myUid || !targetUid) return;
     setSending(true);
     try {
-      await apiSendMatchRequest({ senderId: profile.uid, receiverId: targetUid, message: matchMsg || 'Xin chào! Tôi muốn kết nối với bạn ✨' });
+      await apiSendMatchRequest({
+        senderId: myUid,
+        receiverId: targetUid,
+        senderName: profile.name || auth.currentUser?.displayName || 'Người dùng',
+        message: matchMsg || 'Xin chào! Tôi muốn kết nối với bạn ✨'
+      });
+      try {
+        const requestId = `${myUid}_${targetUid}`;
+        await setDoc(doc(db, 'match_requests', requestId), {
+          requestId,
+          senderId: myUid,
+          receiverId: targetUid,
+          senderName: profile.name || auth.currentUser?.displayName || 'Người dùng',
+          senderAvatar: profile.avatar || auth.currentUser?.photoURL || '',
+          message: matchMsg || 'Xin chào! Tôi muốn kết nối với bạn ✨',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch {}
       setMatchStatus('pending_sent');
-    } catch { }
-    finally { setSending(false); }
+    } catch (err: any) {
+      console.error('Lỗi khi gửi kết bạn:', err);
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleBreakup = async () => {

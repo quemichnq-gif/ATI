@@ -1,3 +1,9 @@
+import sys
+import threading
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 import time
 from flask import Flask, request, jsonify, g
 from flask_cors import CORS
@@ -46,7 +52,7 @@ try:
     key_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
     cred = credentials.Certificate(key_path) if key_path else credentials.ApplicationDefault()
     firebase_admin.initialize_app(cred)
-    db = firestore.client()
+    # Keep db None to avoid blocking gRPC calls on Windows; auth is fully supported
     FIREBASE_AVAILABLE = True
     print("Firebase Admin initialized.")
 except Exception as fe:
@@ -834,11 +840,15 @@ def delete_image():
                 print(f"⚠️ Không thể xóa ảnh: {str(e)}")
 
         # Reset field trong Firestore
-        user_ref = db.collection("users").document(uid)
-        user_ref.update({
-            image_type: "",
-            "updatedAt": firestore.SERVER_TIMESTAMP
-        })
+        if db is not None:
+            try:
+                user_ref = db.collection("users").document(uid)
+                user_ref.update({
+                    image_type: "",
+                    "updatedAt": firestore.SERVER_TIMESTAMP
+                })
+            except Exception:
+                pass
 
         return jsonify({
             "success": True,
@@ -1041,16 +1051,15 @@ IN_MEMORY_USER_RELATIONSHIPS = {}   # userId -> dict(partnerId, matchId, relatio
 IN_MEMORY_NOTIFICATIONS = {}       # userId -> list
 
 def get_user_match_info(uid):
-    if FIREBASE_AVAILABLE and db is not None:
-        try:
-            doc_snap = db.collection("users").document(uid).get(timeout=1.5)
-            if doc_snap.exists:
-                d = doc_snap.to_dict() or {}
-                if uid in IN_MEMORY_USER_RELATIONSHIPS:
-                    d.update(IN_MEMORY_USER_RELATIONSHIPS[uid])
-                return d
-        except Exception:
-            pass
+    if not uid:
+        return {"name": "Người dùng", "avatar": "", "relationshipStatus": "Độc thân"}
+    # 1. Active registered user in memory
+    if uid in REGISTERED_ACTIVE_USERS:
+        u = dict(REGISTERED_ACTIVE_USERS[uid])
+        rel = IN_MEMORY_USER_RELATIONSHIPS.get(uid, {})
+        u.update(rel)
+        return u
+    # 2. Default match candidates
     cand = next((c for c in DEFAULT_MATCH_CANDIDATES if c.get("uid") == uid or c.get("id") == uid), None)
     rel = IN_MEMORY_USER_RELATIONSHIPS.get(uid, {})
     if cand:
@@ -1062,6 +1071,25 @@ def get_user_match_info(uid):
             "partnerId": rel.get("partnerId"),
             "relationshipStatus": rel.get("relationshipStatus", "Độc thân")
         }
+    # 3. In-memory relationship
+    if uid in IN_MEMORY_USER_RELATIONSHIPS:
+        return {
+            "name": "Thành viên Resonancia",
+            "avatar": "",
+            "partnerId": rel.get("partnerId"),
+            "relationshipStatus": rel.get("relationshipStatus", "Độc thân")
+        }
+    # 4. Fallback safe check
+    if FIREBASE_AVAILABLE and db is not None:
+        try:
+            doc_snap = db.collection("users").document(uid).get(timeout=1.5)
+            if doc_snap.exists:
+                d = doc_snap.to_dict() or {}
+                if uid in IN_MEMORY_USER_RELATIONSHIPS:
+                    d.update(IN_MEMORY_USER_RELATIONSHIPS[uid])
+                return d
+        except Exception:
+            pass
     return {
         "name": "Thành viên Resonancia",
         "avatar": "",
@@ -1080,8 +1108,9 @@ def send_match_request():
     Gửi lời mời ghép đôi từ user A đến user B (cho phép kết bạn lại nếu đã chia tay / hủy)
     """
     try:
-        data = request.get_json() or {}
-        sender_id = data.get("senderId")
+        data = request.get_json(silent=True) or {}
+        auth_uid = g.get("firebase_user", {}).get("uid") if hasattr(g, "firebase_user") and g.firebase_user else None
+        sender_id = data.get("senderId") or auth_uid
         receiver_id = data.get("receiverId")
         message = data.get("message", "")
 
@@ -1090,6 +1119,10 @@ def send_match_request():
 
         sender_data = get_user_match_info(sender_id)
         receiver_data = get_user_match_info(receiver_id)
+
+        sender_name = sender_data.get("name") or data.get("senderName") or "Người dùng"
+        sender_avatar = sender_data.get("avatar") or data.get("senderAvatar") or ""
+        receiver_name = receiver_data.get("name") or data.get("receiverName") or "Người dùng"
 
         # Hủy các request cũ nếu muốn kết bạn lại
         for rid, req_item in list(IN_MEMORY_MATCH_REQUESTS.items()):
@@ -1102,33 +1135,55 @@ def send_match_request():
             "requestId": request_id,
             "senderId": sender_id,
             "receiverId": receiver_id,
-            "senderName": sender_data.get("name", "Người dùng"),
-            "senderAvatar": sender_data.get("avatar", ""),
+            "senderName": sender_name,
+            "senderAvatar": sender_avatar,
+            "receiverName": receiver_name,
             "message": message or "Xin chào! Hãy kết nối chiêm tinh cùng mình nhé ✨",
             "status": "pending",
             "createdAt": datetime.now().isoformat(),
         }
         IN_MEMORY_MATCH_REQUESTS[request_id] = match_request
 
-        # Đồng bộ Firestore nếu có
-        if FIREBASE_AVAILABLE and db is not None:
-            try:
-                db.collection("match_requests").document(request_id).set({
-                    **match_request,
-                    "createdAt": firestore.SERVER_TIMESTAMP,
-                })
-            except Exception as fe:
-                safe_print("⚠️ Firestore sync match request warning:", fe)
+        # Tạo thông báo cho receiver trong IN_MEMORY_NOTIFICATIONS
+        notif_id = str(uuid.uuid4())
+        notification = {
+            "id": notif_id,
+            "userId": receiver_id,
+            "type": "match_request",
+            "title": "Lời mời kết đôi mới ✨",
+            "message": f"{sender_name} đã gửi lời mời kết bạn và ghép đôi tới bạn!",
+            "senderId": sender_id,
+            "senderName": sender_name,
+            "senderAvatar": sender_avatar,
+            "requestId": request_id,
+            "read": False,
+            "createdAt": datetime.now().isoformat(),
+        }
+        if receiver_id not in IN_MEMORY_NOTIFICATIONS:
+            IN_MEMORY_NOTIFICATIONS[receiver_id] = []
+        IN_MEMORY_NOTIFICATIONS[receiver_id].insert(0, notification)
 
-        print(f"✅ Đã gửi lời mời kết bạn: {sender_id} -> {receiver_id} ({request_id})")
+        # Đồng bộ Firestore an toàn trong background thread nếu có db
+        if FIREBASE_AVAILABLE and db is not None:
+            def sync_fs():
+                try:
+                    db.collection("match_requests").document(request_id).set({
+                        **match_request,
+                        "createdAt": firestore.SERVER_TIMESTAMP,
+                    }, timeout=2.0)
+                except Exception as fe:
+                    safe_print("⚠️ Firestore sync match request warning:", fe)
+            threading.Thread(target=sync_fs, daemon=True).start()
+
+        safe_print(f"✅ Đã gửi lời mời kết bạn: {sender_id} -> {receiver_id} ({request_id})")
         return jsonify({
             "success": True,
             "requestId": request_id,
-            "message": "Đã gửi lời mời ghép đôi thành công"
+            "message": f"Đã gửi lời mời ghép đôi tới {receiver_name} thành công"
         }), 200
 
     except Exception as e:
-        print(f"❌ Send match request error: {str(e)}")
+        safe_print(f"❌ Send match request error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1205,7 +1260,7 @@ def accept_match_request():
                 "relationshipStatus": "Đã có đôi"
             }
 
-        print(f"✅ Ghép đôi thành công: {sender_id} <-> {receiver_id}")
+        safe_print(f"✅ Ghép đôi thành công: {sender_id} <-> {receiver_id}")
         return jsonify({
             "success": True,
             "matchId": match_id,
@@ -1213,7 +1268,7 @@ def accept_match_request():
         }), 200
 
     except Exception as e:
-        print(f"❌ Accept match error: {str(e)}")
+        safe_print(f"❌ Accept match error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1325,14 +1380,14 @@ def breakup():
             except Exception:
                 pass
 
-        print(f"✅ Đã hủy ghép đôi cho {user_id}. Hai bạn đã có thể kết bạn lại với nhau.")
+        safe_print(f"✅ Đã hủy ghép đôi cho {user_id}. Hai bạn đã có thể kết bạn lại với nhau.")
         return jsonify({
             "success": True,
             "message": "Đã hủy kết đôi thành công. Bạn đã có thể kết bạn lại với nhau bất cứ lúc nào."
         }), 200
 
     except Exception as e:
-        print(f"❌ Breakup error: {str(e)}")
+        safe_print(f"❌ Breakup error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1417,7 +1472,7 @@ def check_match_status():
         }), 200
 
     except Exception as e:
-        print(f"❌ Check match status error: {str(e)}")
+        safe_print(f"❌ Check match status error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1438,7 +1493,7 @@ def get_notifications():
         if not user_id:
             return jsonify({"error": "Thiếu userId"}), 400
 
-        print(f"🔍 Fetching notifications for user: {user_id}")
+        safe_print(f"🔍 Fetching notifications for user: {user_id}")
 
         notifications = []
         if FIREBASE_AVAILABLE and db is not None:
@@ -1469,7 +1524,7 @@ def get_notifications():
             if not any(existing.get("id") == n.get("id") for existing in notifications):
                 notifications.append(n)
 
-        print(f"✅ Found {len(notifications)} notifications")
+        safe_print(f"✅ Found {len(notifications)} notifications")
         return jsonify({
             "success": True,
             "notifications": notifications,
@@ -1477,7 +1532,7 @@ def get_notifications():
         }), 200
 
     except Exception as e:
-        print(f"❌ Get notifications error: {str(e)}")
+        safe_print(f"❌ Get notifications error: {str(e)}")
         return jsonify({
             "success": True,
             "notifications": [],
