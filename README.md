@@ -5,7 +5,7 @@ Mở PowerShell tại thư mục gốc `ATI`, sau đó chạy:
 ```powershell
 cd .\AI_App_FE\ResonanciaWeb
 npm install
-npm run dev
+npm run web
 ```
 
 Mở địa chỉ local được Vite hiển thị trong terminal (thường là `http://localhost:5173`).

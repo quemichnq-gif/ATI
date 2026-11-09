@@ -162,6 +162,7 @@ const navLinks: NavItem[] = [
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRootRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const profile = useSelector((state: RootState) => state.profile);
@@ -177,7 +178,10 @@ export default function Navbar() {
       }
     };
     const closeMenuOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
+      if (event.key === 'Escape' && menuOpen) {
+        setMenuOpen(false);
+        menuTriggerRef.current?.focus();
+      }
     };
 
     document.addEventListener('mousedown', closeMenuOnOutsideClick);
@@ -186,7 +190,11 @@ export default function Navbar() {
       document.removeEventListener('mousedown', closeMenuOnOutsideClick);
       document.removeEventListener('keydown', closeMenuOnEscape);
     };
-  }, []);
+  }, [menuOpen]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     setMenuOpen(false);
@@ -237,10 +245,11 @@ export default function Navbar() {
           <button
             type="button"
             className={`astrica-menu-trigger astrica-chatbot-trigger ${menuOpen ? 'is-active' : ''}`}
+            ref={menuTriggerRef}
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-controls="resonancia-menu"
-            aria-label="Mở Menu Resonancia AI"
+            aria-label={menuOpen ? 'Đóng menu Resonancia AI' : 'Mở menu Resonancia AI'}
             title="Menu Resonancia AI"
           >
             <div className="astrica-chatbot-badge">

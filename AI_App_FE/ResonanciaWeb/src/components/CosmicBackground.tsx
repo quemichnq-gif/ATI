@@ -1,16 +1,17 @@
 import { useMemo } from 'react';
 import StarField from './StarField';
 
-// Dense meteor shower array: staggered across varied altitudes and positions
+// Dense meteor shower array: negative delays đảm bảo sao băng chuyển động liên tục ngay từ frame đầu tiên sau khi reload, không đứng im
 const METEORS = [
-  { top: '3%', left: '40%', delay: '0s', duration: '3.8s' },
-  { top: '8%', left: '75%', delay: '0.9s', duration: '4.2s' },
-  { top: '14%', left: '55%', delay: '1.8s', duration: '3.6s' },
-  { top: '2%', left: '88%', delay: '2.6s', duration: '4.0s' },
-  { top: '20%', left: '68%', delay: '3.4s', duration: '4.4s' },
-  { top: '6%', left: '92%', delay: '4.2s', duration: '3.9s' },
-  { top: '12%', left: '48%', delay: '5.1s', duration: '4.1s' },
-  { top: '18%', left: '82%', delay: '6.0s', duration: '4.3s' },
+  { top: '3%', left: '42%', delay: '-0.4s', duration: '3.2s' },
+  { top: '8%', left: '76%', delay: '-1.5s', duration: '3.6s' },
+  { top: '14%', left: '56%', delay: '-2.6s', duration: '3.0s' },
+  { top: '2%', left: '88%', delay: '-1.0s', duration: '3.8s' },
+  { top: '20%', left: '68%', delay: '-2.2s', duration: '3.4s' },
+  { top: '6%', left: '94%', delay: '-1.8s', duration: '3.1s' },
+  { top: '12%', left: '48%', delay: '-2.9s', duration: '3.5s' },
+  { top: '18%', left: '82%', delay: '-0.7s', duration: '3.3s' },
+  { top: '24%', left: '60%', delay: '-3.1s', duration: '3.7s' },
 ];
 
 interface Stardust {
@@ -31,14 +32,14 @@ interface Stardust {
  * 4. Flowing Nebula Orbs — deep violet & pink cosmic dust shifting actively
  * 5. Hypnotic Celestial Background Drift — gentle 18s breathing motion
  */
-// Pre-generated static stardust to eliminate re-computation and garbage collection spikes on navigation
-const STATIC_STARDUST: Stardust[] = Array.from({ length: 32 }, (_, i) => ({
+// Pre-generated static stardust với negative delay để chuyển động lơ lửng liên tục ngay khi nạp trang
+const STATIC_STARDUST: Stardust[] = Array.from({ length: 36 }, (_, i) => ({
   id: i,
   left: (i * 3.1 + 7) % 96 + 2,
   top: (i * 2.7 + 13) % 85 + 15,
   size: (i % 5) * 0.3 + 1.2,
   duration: 5.5 + (i % 4) * 0.9,
-  delay: (i % 7) * 0.8,
+  delay: -((i % 7) * 0.8 + 0.2),
 }));
 
 export default function CosmicBackground() {
