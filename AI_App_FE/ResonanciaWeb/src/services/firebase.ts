@@ -4,13 +4,13 @@ import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyDJPtNpFNYyI1wt1lu03pnzyqXkyOWumgU',
-  authDomain: 'soulmateapp-new.firebaseapp.com',
-  projectId: 'soulmateapp-new',
-  storageBucket: 'soulmateapp-new.firebasestorage.app',
-  messagingSenderId: '601603073289',
-  appId: '1:601603073289:web:31a53d6d91e10802e4dfd8',
-  measurementId: 'G-2VMC8DRCNB',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
