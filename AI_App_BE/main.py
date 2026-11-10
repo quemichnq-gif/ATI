@@ -28,6 +28,23 @@ from astrology_insights import (
 )
 from rag_service import generate_rag_chat_response
 from intent_router import route_intent
+from storage_db import (
+    save_match_request,
+    cancel_previous_requests,
+    get_match_request_by_id,
+    find_pending_match_request,
+    update_match_request_status,
+    end_match_requests_between,
+    get_user_match_requests,
+    get_latest_match_request_between,
+    create_notification,
+    get_user_notifications,
+    mark_notifications_read,
+    delete_notification as db_delete_notification,
+    get_user_relationship,
+    set_user_relationship,
+    break_relationship
+)
 
 # Load biến môi trường
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -106,7 +123,10 @@ def authenticate_api_request():
             firebase_users = response.json().get("users", [])
             if not firebase_users or not firebase_users[0].get("localId"):
                 return jsonify({"error": "Invalid or expired authentication token"}), 401
-            g.firebase_user = {"uid": firebase_users[0]["localId"]}
+            g.firebase_user = {
+                "uid": firebase_users[0]["localId"],
+                "email": firebase_users[0].get("email", "")
+            }
         except requests.RequestException:
             return jsonify({"error": "Authentication service temporarily unavailable"}), 503
     else:
@@ -320,8 +340,15 @@ def update_profile():
             else:
                 print(f"ℹ️ Firebase Admin ở chế độ fallback, đã ghi nhận cập nhật thông tin cho {uid}")
 
-        # Đồng bộ trạng thái mối quan hệ vào memory nếu có
+        # Đồng bộ trạng thái mối quan hệ vào SQLite bền vững
         if "relationshipStatus" in clean_fields:
+            existing_rel = get_user_relationship(uid)
+            set_user_relationship(
+                uid,
+                relationship_status=clean_fields["relationshipStatus"],
+                partner_id=existing_rel.get("partnerId"),
+                match_id=existing_rel.get("matchId")
+            )
             if uid not in IN_MEMORY_USER_RELATIONSHIPS:
                 IN_MEMORY_USER_RELATIONSHIPS[uid] = {}
             IN_MEMORY_USER_RELATIONSHIPS[uid]["relationshipStatus"] = clean_fields["relationshipStatus"]
@@ -1056,15 +1083,16 @@ IN_MEMORY_NOTIFICATIONS = {}       # userId -> list
 def get_user_match_info(uid):
     if not uid:
         return {"name": "Người dùng", "avatar": "", "relationshipStatus": "Độc thân"}
+    rel = get_user_relationship(uid)
+    if uid in IN_MEMORY_USER_RELATIONSHIPS:
+        rel.update(IN_MEMORY_USER_RELATIONSHIPS[uid])
     # 1. Active registered user in memory
     if uid in REGISTERED_ACTIVE_USERS:
         u = dict(REGISTERED_ACTIVE_USERS[uid])
-        rel = IN_MEMORY_USER_RELATIONSHIPS.get(uid, {})
         u.update(rel)
         return u
     # 2. Default match candidates
     cand = next((c for c in DEFAULT_MATCH_CANDIDATES if c.get("uid") == uid or c.get("id") == uid), None)
-    rel = IN_MEMORY_USER_RELATIONSHIPS.get(uid, {})
     if cand:
         return {
             "name": cand.get("name") or cand.get("fullName", "Người dùng"),
@@ -1074,8 +1102,8 @@ def get_user_match_info(uid):
             "partnerId": rel.get("partnerId"),
             "relationshipStatus": rel.get("relationshipStatus", "Độc thân")
         }
-    # 3. In-memory relationship
-    if uid in IN_MEMORY_USER_RELATIONSHIPS:
+    # 3. Persistent relationship
+    if rel.get("partnerId") or rel.get("relationshipStatus") != "Độc thân":
         return {
             "name": "Thành viên Resonancia",
             "avatar": "",
@@ -1128,6 +1156,7 @@ def send_match_request():
         receiver_name = receiver_data.get("name") or data.get("receiverName") or "Người dùng"
 
         # Hủy các request cũ nếu muốn kết bạn lại
+        cancel_previous_requests(sender_id, receiver_id)
         for rid, req_item in list(IN_MEMORY_MATCH_REQUESTS.items()):
             if (req_item.get("senderId") == sender_id and req_item.get("receiverId") == receiver_id) or \
                (req_item.get("senderId") == receiver_id and req_item.get("receiverId") == sender_id):
@@ -1146,8 +1175,9 @@ def send_match_request():
             "createdAt": datetime.now().isoformat(),
         }
         IN_MEMORY_MATCH_REQUESTS[request_id] = match_request
+        save_match_request(match_request)
 
-        # Tạo thông báo cho receiver trong IN_MEMORY_NOTIFICATIONS
+        # Tạo thông báo cho receiver trong SQLite và memory
         notif_id = str(uuid.uuid4())
         notification = {
             "id": notif_id,
@@ -1165,6 +1195,7 @@ def send_match_request():
         if receiver_id not in IN_MEMORY_NOTIFICATIONS:
             IN_MEMORY_NOTIFICATIONS[receiver_id] = []
         IN_MEMORY_NOTIFICATIONS[receiver_id].insert(0, notification)
+        create_notification(notification)
 
         # Đồng bộ Firestore an toàn trong background thread nếu có db
         if FIREBASE_AVAILABLE and db is not None:
@@ -1205,14 +1236,20 @@ def accept_match_request():
         sender_id = data.get("senderId") or data.get("targetUid")
         response_message = data.get("responseMessage", "")
 
-        match_req = IN_MEMORY_MATCH_REQUESTS.get(request_id) if request_id else None
+        match_req = get_match_request_by_id(request_id) if request_id else None
+        if not match_req and request_id:
+            match_req = IN_MEMORY_MATCH_REQUESTS.get(request_id)
         if not match_req and receiver_id and sender_id:
-            for r_id, r in IN_MEMORY_MATCH_REQUESTS.items():
-                if (r.get("senderId") == sender_id and r.get("receiverId") == receiver_id and r.get("status") == "pending") or \
-                   (r.get("senderId") == receiver_id and r.get("receiverId") == sender_id and r.get("status") == "pending"):
-                    request_id = r_id
-                    match_req = r
-                    break
+            match_req = find_pending_match_request(sender_id, receiver_id)
+            if not match_req:
+                for r_id, r in IN_MEMORY_MATCH_REQUESTS.items():
+                    if (r.get("senderId") == sender_id and r.get("receiverId") == receiver_id and r.get("status") == "pending") or \
+                       (r.get("senderId") == receiver_id and r.get("receiverId") == sender_id and r.get("status") == "pending"):
+                        request_id = r_id
+                        match_req = r
+                        break
+            elif match_req:
+                request_id = match_req.get("requestId")
 
         request_found = bool(match_req)
         if match_req:
@@ -1223,6 +1260,8 @@ def accept_match_request():
             sender_id = match_req.get("senderId")
             receiver_id = match_req.get("receiverId")
             match_req["status"] = "accepted"
+            if request_id:
+                update_match_request_status(request_id, "accepted", response_message)
 
         # Đồng bộ Firestore nếu có
         if FIREBASE_AVAILABLE and db is not None and request_id:
@@ -1251,12 +1290,14 @@ def accept_match_request():
             sender_id = "user_sender"
 
         match_id = str(uuid.uuid4())
+        set_user_relationship(sender_id, "Đã có đôi", partner_id=receiver_id, match_id=match_id)
         IN_MEMORY_USER_RELATIONSHIPS[sender_id] = {
             "partnerId": receiver_id,
             "matchId": match_id,
             "relationshipStatus": "Đã có đôi"
         }
         if receiver_id:
+            set_user_relationship(receiver_id, "Đã có đôi", partner_id=sender_id, match_id=match_id)
             IN_MEMORY_USER_RELATIONSHIPS[receiver_id] = {
                 "partnerId": sender_id,
                 "matchId": match_id,
@@ -1286,14 +1327,20 @@ def reject_match_request():
         receiver_id = g.firebase_user.get("uid")
         sender_id = data.get("senderId") or data.get("targetUid")
 
-        match_req = IN_MEMORY_MATCH_REQUESTS.get(request_id) if request_id else None
+        match_req = get_match_request_by_id(request_id) if request_id else None
+        if not match_req and request_id:
+            match_req = IN_MEMORY_MATCH_REQUESTS.get(request_id)
         if not match_req and receiver_id and sender_id:
-            for r_id, r in IN_MEMORY_MATCH_REQUESTS.items():
-                if (r.get("senderId") == sender_id and r.get("receiverId") == receiver_id and r.get("status") == "pending") or \
-                   (r.get("senderId") == receiver_id and r.get("receiverId") == sender_id and r.get("status") == "pending"):
-                    request_id = r_id
-                    match_req = r
-                    break
+            match_req = find_pending_match_request(sender_id, receiver_id)
+            if not match_req:
+                for r_id, r in IN_MEMORY_MATCH_REQUESTS.items():
+                    if (r.get("senderId") == sender_id and r.get("receiverId") == receiver_id and r.get("status") == "pending") or \
+                       (r.get("senderId") == receiver_id and r.get("receiverId") == sender_id and r.get("status") == "pending"):
+                        request_id = r_id
+                        match_req = r
+                        break
+            elif match_req:
+                request_id = match_req.get("requestId")
 
         request_found = bool(match_req)
         if match_req:
@@ -1302,6 +1349,8 @@ def reject_match_request():
             if match_req.get("status") != "pending":
                 return jsonify({"error": "This request is no longer pending"}), 409
             match_req["status"] = "rejected"
+            if request_id:
+                update_match_request_status(request_id, "rejected")
 
         if FIREBASE_AVAILABLE and db is not None and request_id:
             try:
@@ -1345,10 +1394,18 @@ def breakup():
         if not user_id:
             return jsonify({"error": "Thiếu userId"}), 400
 
-        rel = IN_MEMORY_USER_RELATIONSHIPS.get(user_id, {})
+        rel = get_user_relationship(user_id)
+        if user_id in IN_MEMORY_USER_RELATIONSHIPS:
+            rel.update(IN_MEMORY_USER_RELATIONSHIPS[user_id])
         partner_id = target_partner_id or rel.get("partnerId")
 
-        # Đánh dấu các match request cũ giữa 2 user thành ended
+        # Đánh dấu các match request cũ giữa 2 user thành ended trong SQLite và memory
+        if partner_id:
+            end_match_requests_between(user_id, partner_id)
+            break_relationship(user_id, partner_id)
+        else:
+            break_relationship(user_id)
+
         for req in IN_MEMORY_MATCH_REQUESTS.values():
             if (req.get("senderId") == user_id and req.get("receiverId") == partner_id) or \
                (req.get("senderId") == partner_id and req.get("receiverId") == user_id):
@@ -1416,7 +1473,9 @@ def check_match_status():
             return jsonify({"error": "Thiếu userId hoặc targetId"}), 400
 
         # 1. Kiểm tra xem 2 người đã kết đôi chưa
-        rel = IN_MEMORY_USER_RELATIONSHIPS.get(user_id, {})
+        rel = get_user_relationship(user_id)
+        if user_id in IN_MEMORY_USER_RELATIONSHIPS:
+            rel.update(IN_MEMORY_USER_RELATIONSHIPS[user_id])
         if rel.get("partnerId") == target_id:
             return jsonify({
                 "success": True,
@@ -1425,31 +1484,32 @@ def check_match_status():
                 "message": "Đã ghép đôi"
             }), 200
 
-        # 2. Kiểm tra match requests trong memory
-        for req in sorted(IN_MEMORY_MATCH_REQUESTS.values(), key=lambda r: r.get("createdAt", ""), reverse=True):
-            if req.get("senderId") == user_id and req.get("receiverId") == target_id:
-                if req.get("status") == "pending":
+        # 2. Kiểm tra match requests trong SQLite trước, sau đó fallback memory
+        latest_req = get_latest_match_request_between(user_id, target_id)
+        if latest_req:
+            if latest_req.get("senderId") == user_id and latest_req.get("receiverId") == target_id:
+                if latest_req.get("status") == "pending":
                     return jsonify({
                         "success": True,
                         "status": "pending_sent",
-                        "requestId": req.get("requestId"),
+                        "requestId": latest_req.get("requestId"),
                         "message": "Đang chờ đối phương phản hồi"
                     }), 200
-                elif req.get("status") == "accepted":
+                elif latest_req.get("status") == "accepted":
                     return jsonify({
                         "success": True,
                         "status": "matched",
                         "message": "Đã ghép đôi"
                     }), 200
-            elif req.get("senderId") == target_id and req.get("receiverId") == user_id:
-                if req.get("status") == "pending":
+            elif latest_req.get("senderId") == target_id and latest_req.get("receiverId") == user_id:
+                if latest_req.get("status") == "pending":
                     return jsonify({
                         "success": True,
                         "status": "pending_received",
-                        "requestId": req.get("requestId"),
+                        "requestId": latest_req.get("requestId"),
                         "message": "Lời mời đang chờ bạn đồng ý"
                     }), 200
-                elif req.get("status") == "accepted":
+                elif latest_req.get("status") == "accepted":
                     return jsonify({
                         "success": True,
                         "status": "matched",
@@ -1498,7 +1558,8 @@ def get_notifications():
 
         safe_print(f"🔍 Fetching notifications for user: {user_id}")
 
-        notifications = []
+        notifications = get_user_notifications(user_id, limit=50)
+
         if FIREBASE_AVAILABLE and db is not None:
             try:
                 notifications_ref = db.collection("notifications").where("userId", "==", user_id)
@@ -1515,7 +1576,8 @@ def get_notifications():
                         notif_data["id"] = doc.id
                         if "read" not in notif_data:
                             notif_data["read"] = False
-                        notifications.append(notif_data)
+                        if not any(existing.get("id") == notif_data["id"] for existing in notifications):
+                            notifications.append(notif_data)
                     except Exception:
                         pass
             except Exception as fe:
@@ -1526,6 +1588,8 @@ def get_notifications():
         for n in mem_notifs:
             if not any(existing.get("id") == n.get("id") for existing in notifications):
                 notifications.append(n)
+
+        notifications.sort(key=lambda x: str(x.get("createdAt") or ""), reverse=True)
 
         safe_print(f"✅ Found {len(notifications)} notifications")
         return jsonify({
@@ -1576,7 +1640,8 @@ def mark_notification_read():
                 except Exception:
                     pass
 
-        # Update in-memory notifications
+        # Update SQLite and in-memory notifications
+        mark_notifications_read(user_id, notification_ids)
         for n in IN_MEMORY_NOTIFICATIONS.get(user_id, []):
             if n.get("id") in notification_ids:
                 n["read"] = True
@@ -1618,6 +1683,7 @@ def delete_notification():
             except Exception:
                 pass
 
+        db_delete_notification(user_id, notification_id)
         IN_MEMORY_NOTIFICATIONS[user_id] = [
             n for n in IN_MEMORY_NOTIFICATIONS.get(user_id, [])
             if n.get("id") != notification_id
@@ -1651,7 +1717,7 @@ def get_match_requests():
         if not user_id:
             return jsonify({"error": "Thiếu userId"}), 400
 
-        requests_list = []
+        requests_list = get_user_match_requests(user_id, request_type=request_type)
 
         if FIREBASE_AVAILABLE and db is not None:
             try:
@@ -1662,7 +1728,8 @@ def get_match_requests():
                         req_data = doc.to_dict()
                         req_data["requestId"] = doc.id
                         req_data["direction"] = "received"
-                        requests_list.append(req_data)
+                        if not any(x.get("requestId") == req_data["requestId"] for x in requests_list):
+                            requests_list.append(req_data)
 
                 # Lấy requests đã gửi
                 if request_type in ["sent", "all"]:
@@ -1671,7 +1738,8 @@ def get_match_requests():
                         req_data = doc.to_dict()
                         req_data["requestId"] = doc.id
                         req_data["direction"] = "sent"
-                        requests_list.append(req_data)
+                        if not any(x.get("requestId") == req_data["requestId"] for x in requests_list):
+                            requests_list.append(req_data)
             except Exception as fe:
                 print(f"⚠️ Firestore get-match-requests fallback: {fe}")
 

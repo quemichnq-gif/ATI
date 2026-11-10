@@ -199,21 +199,26 @@ def send_message():
     # 2. Cập nhật hoặc tạo cuộc trò chuyện
     last_msg_preview = '[Hình ảnh]' if msg_type == 'image' else (f'[Tệp: {file_name}]' if msg_type == 'file' else text)
     row = load_chat_for_user(cursor, chat_id, uid)
-    if not row:
-        conn.close()
-        return jsonify({'error': 'Chat not found or access denied'}), 404
     if row:
         cursor.execute('''
             UPDATE chats SET last_message = ?, last_timestamp = ?, last_sender_id = ?
             WHERE chat_id = ?
         ''', (last_msg_preview, now, sender_id, chat_id))
     else:
+        # Nếu phòng chat chưa có trong DB, kiểm tra xem uid có phải là người tham gia hợp lệ trong chat_id
+        valid_participant = any(u in chat_id for u in uid_aliases(uid))
+        if not valid_participant:
+            conn.close()
+            return jsonify({'error': 'Chat not found or access denied'}), 404
+
+        parts = chat_id.split('_')
+        participants = parts if len(parts) >= 2 else [sender_id]
         cursor.execute('''
             INSERT INTO chats (chat_id, participants, participant_names, participant_avatars, last_message, last_timestamp, last_sender_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             chat_id,
-            json.dumps([sender_id]),
+            json.dumps(participants),
             json.dumps({sender_id: sender_name}),
             json.dumps({sender_id: sender_avatar}),
             last_msg_preview,

@@ -10,6 +10,7 @@ AI_App_BE/__pycache__/
 .env.*
 *.env
 !AI_App_BE/.env.example
+!AI_App_FE/ResonanciaWeb/.env.example
 firebase-key*.json
 serviceAccount*.json
 *.pem
@@ -32,6 +33,9 @@ venv
 # Editor settings
 .vscode/
 AI_App_BE/.vscode/
+.idea/
+AI_App_BE/.idea/
+*.iml
 
 # Node modules
 node_modules/
