@@ -268,34 +268,92 @@ def get_chat_messages(chat_id, since, uid):
     conn.close()
     return {"success": True, "messages": messages, "status": 200}
 
+def get_canonical_group_key(uid):
+    if not uid:
+        return ""
+    for idx, group in enumerate(UID_GROUPS):
+        if uid in group:
+            return f"group_{idx}"
+    return uid
+
+
 def get_chat_list(user_id):
     if not user_id:
         return {"success": True, "chats": [], "status": 200}
 
-    aliases = uid_aliases(user_id)
+    aliases = set(uid_aliases(user_id))
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM chats ORDER BY last_timestamp DESC')
     rows = cursor.fetchall()
 
     user_chats = []
+    seen_partners = set()
+
     for r in rows:
         try:
             parts = json.loads(r['participants'] or '[]')
-            is_participant = any(u in parts for u in aliases) or any(u in r['chat_id'] for u in aliases)
-            if is_participant:
-                user_chats.append({
-                    'id': r['chat_id'],
-                    'participants': parts,
-                    'participantNames': json.loads(r['participant_names'] or '{}'),
-                    'participantAvatars': json.loads(r['participant_avatars'] or '{}'),
-                    'lastMessage': r['last_message'],
-                    'lastTimestamp': r['last_timestamp'],
-                    'lastSenderId': r['last_sender_id']
-                })
+            if not parts and '_' in r['chat_id']:
+                parts = r['chat_id'].split('_')
+
+            is_participant = any(u in aliases for u in parts) or any(u in r['chat_id'] for u in aliases)
+            if not is_participant:
+                continue
+
+            # Tìm đối phương không nằm trong aliases của user_id
+            other_uids = [p for p in parts if p not in aliases]
+            if not other_uids:
+                # Toàn bộ participants là alias của chính mình -> bỏ qua
+                continue
+
+            other_uid = other_uids[0]
+            partner_key = get_canonical_group_key(other_uid)
+            if partner_key in seen_partners:
+                # Cùng một người đối thoại -> chỉ giữ lại cuộc trò chuyện mới nhất
+                continue
+            seen_partners.add(partner_key)
+
+            user_chats.append({
+                'id': r['chat_id'],
+                'participants': parts,
+                'participantNames': json.loads(r['participant_names'] or '{}'),
+                'participantAvatars': json.loads(r['participant_avatars'] or '{}'),
+                'lastMessage': r['last_message'],
+                'lastTimestamp': r['last_timestamp'],
+                'lastSenderId': r['last_sender_id']
+            })
         except Exception:
             continue
 
     conn.close()
     return {"success": True, "chats": user_chats, "status": 200}
+
+
+def delete_chat(chat_id, uid):
+    if not chat_id:
+        return {"error": "Missing chatId", "status": 400}
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    possible_chat_ids = [chat_id]
+    parts = chat_id.split('_')
+    if len(parts) == 2:
+        possible_chat_ids.append(f"{parts[1]}_{parts[0]}")
+
+    if uid:
+        aliases = set(uid_aliases(uid))
+        row = load_chat_for_user(cursor, chat_id, uid)
+        if not row and not any(a in chat_id for a in aliases):
+            conn.close()
+            return {"error": "Chat not found or access denied", "status": 403}
+
+    placeholders = ','.join(['?'] * len(possible_chat_ids))
+    cursor.execute(f'DELETE FROM messages WHERE chat_id IN ({placeholders})', possible_chat_ids)
+    cursor.execute(f'DELETE FROM chats WHERE chat_id IN ({placeholders})', possible_chat_ids)
+
+    conn.commit()
+    conn.close()
+    return {"success": True, "chatId": chat_id, "status": 200}
+
 

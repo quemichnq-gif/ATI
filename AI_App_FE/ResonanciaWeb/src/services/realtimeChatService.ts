@@ -5,6 +5,7 @@ import {
   serverTimestamp,
   doc,
   setDoc,
+  deleteDoc,
   onSnapshot,
   query,
   orderBy,
@@ -363,3 +364,25 @@ export async function initializeChatRoom(params: {
     );
   } catch {}
 }
+
+/**
+ * Xóa vĩnh viễn một cuộc trò chuyện (Backend SQLite + Firestore)
+ */
+export async function deleteChatConversation(chatId: string): Promise<boolean> {
+  let backendSuccess = false;
+  try {
+    const res = await chatFetch(`${BACKEND_URL}/api/chat/${encodeURIComponent(chatId)}`, {
+      method: 'DELETE',
+    });
+    backendSuccess = res?.ok || false;
+  } catch (err) {
+    console.warn('Backend delete chat error:', err);
+  }
+
+  try {
+    await deleteDoc(doc(db, 'chats', chatId));
+  } catch {}
+
+  return backendSuccess;
+}
+

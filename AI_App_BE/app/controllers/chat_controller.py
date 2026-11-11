@@ -4,7 +4,8 @@ from app.services.chat_service import (
     create_or_update_chat,
     send_chat_message,
     get_chat_messages,
-    get_chat_list
+    get_chat_list,
+    delete_chat
 )
 
 chat_bp = Blueprint("chat", __name__)
@@ -64,4 +65,13 @@ def get_conversations():
     res = get_chat_list(user_id)
     status_code = res.pop("status", 200)
     return jsonify(res), status_code
+
+
+@chat_bp.route("/api/chat/<path:chat_id>", methods=["DELETE"])
+def delete_conversation(chat_id):
+    uid = authenticated_uid()
+    res = delete_chat(chat_id, uid)
+    status_code = res.pop("status", 200)
+    return jsonify(res), status_code
+
 

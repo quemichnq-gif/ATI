@@ -10,11 +10,6 @@ import { auth, db } from '../services/firebase';
 import { RootState } from '../store';
 import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
 import { formatTimestamp } from '../utils/date';
-import ChatAccountSwitcher from './ChatAccountSwitcher';
-import {
-  getActiveChatIdentity,
-  ChatAccountIdentity,
-} from '../services/chatAccountService';
 import {
   sendChatMessage,
   subscribeToChatMessages,
@@ -88,18 +83,9 @@ export default function ChatFab() {
   const hiddenPaths = ['/chat', '/assistant', '/login', '/register', '/onboarding', '/register/step2', '/register-step2'];
   const isHidden = hiddenPaths.some((p) => pathname.startsWith(p));
 
-  // Danh tính tài khoản chat hiện tại
-  const [activeIdentity, setActiveIdentity] = useState<ChatAccountIdentity>(() => getActiveChatIdentity(profile));
-  const currentUid = activeIdentity.uid;
-
-  useEffect(() => {
-    const handleIdentityChanged = () => {
-      const updated = getActiveChatIdentity(profile);
-      setActiveIdentity(updated);
-    };
-    window.addEventListener('resonancia_identity_changed', handleIdentityChanged);
-    return () => window.removeEventListener('resonancia_identity_changed', handleIdentityChanged);
-  }, [profile]);
+  const currentUid = profile.uid || auth.currentUser?.uid || '';
+  const currentUserName = profile.name || auth.currentUser?.displayName || 'Người dùng';
+  const currentUserAvatar = profile.avatar || auth.currentUser?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80';
 
   // Lắng nghe danh sách cuộc trò chuyện từ Firestore
   useEffect(() => {
@@ -159,8 +145,8 @@ export default function ChatFab() {
       id: `opt_${Date.now()}`,
       chatId: activeChat.chatId,
       senderId: currentUid,
-      senderName: activeIdentity.name,
-      senderAvatar: activeIdentity.avatar,
+      senderName: currentUserName,
+      senderAvatar: currentUserAvatar,
       text,
       timestamp: Date.now(),
       read: false,
@@ -171,8 +157,8 @@ export default function ChatFab() {
       await sendChatMessage({
         chatId: activeChat.chatId,
         senderId: currentUid,
-        senderName: activeIdentity.name,
-        senderAvatar: activeIdentity.avatar,
+        senderName: currentUserName,
+        senderAvatar: currentUserAvatar,
         text,
       });
     } catch (err) {
@@ -197,11 +183,11 @@ export default function ChatFab() {
       chatId,
       participants: [currentUid, targetUid],
       participantNames: {
-        [currentUid]: activeIdentity.name,
+        [currentUid]: currentUserName,
         [targetUid]: candidate.name || 'Người dùng',
       },
       participantAvatars: {
-        [currentUid]: activeIdentity.avatar,
+        [currentUid]: currentUserAvatar,
         [targetUid]: candidate.avatar || '',
       },
       lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
@@ -485,11 +471,6 @@ export default function ChatFab() {
                       </svg>
                     </button>
                   </div>
-                </div>
-
-                {/* Chuyển đổi danh tính chat trong popup */}
-                <div className="p-2.5 pb-0">
-                  <ChatAccountSwitcher />
                 </div>
 
                 {/* Thanh tìm kiếm */}

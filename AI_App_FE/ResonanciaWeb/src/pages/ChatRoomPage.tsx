@@ -1,28 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { RootState } from '../store';
-import { setAuth } from '../store/authSlice';
-import { setProfile } from '../store/profileSlice';
 import { formatTimestamp } from '../utils/date';
 import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
-import { getTestProfileByEmailOrUid, TEST_ACCOUNT_DEFAULT_PASSWORD } from '../constants/testAccounts';
+import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
 import { MessengerLogo } from '../components/ChatFab';
-import ChatAccountSwitcher from '../components/ChatAccountSwitcher';
-import {
-  getActiveChatIdentity,
-  setActiveChatIdentity,
-  getAvailableChatAccounts,
-  ChatAccountIdentity,
-} from '../services/chatAccountService';
 import {
   sendChatMessage,
   subscribeToChatMessages,
   subscribeToUserChats,
   initializeChatRoom,
+  deleteChatConversation,
   ChatMessage,
   ChatConversation,
 } from '../services/realtimeChatService';
@@ -31,12 +22,12 @@ export default function ChatRoomPage() {
   const { chatId } = useParams<{ chatId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const profile = useSelector((s: RootState) => s.profile);
 
-  // Danh tính tài khoản đang chat
-  const [activeIdentity, setActiveIdentity] = useState<ChatAccountIdentity>(() => getActiveChatIdentity(profile));
-  const currentUid = activeIdentity.uid;
+  // Danh tính tài khoản đang đăng nhập
+  const currentUid = profile.uid || auth.currentUser?.uid || '';
+  const currentUserName = profile.name || auth.currentUser?.displayName || 'Người dùng';
+  const currentUserAvatar = profile.avatar || auth.currentUser?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -47,23 +38,13 @@ export default function ChatRoomPage() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
+  const [deletingChatName, setDeletingChatName] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Lắng nghe sự kiện chuyển đổi danh tính
-  useEffect(() => {
-    const handleIdentityChanged = () => {
-      const updated = getActiveChatIdentity(profile);
-      setActiveIdentity(updated);
-      setToastMsg(`Đã chuyển sang chat với tư cách: ${updated.name} ✨`);
-      setTimeout(() => setToastMsg(''), 3000);
-    };
-    window.addEventListener('resonancia_identity_changed', handleIdentityChanged);
-    return () => window.removeEventListener('resonancia_identity_changed', handleIdentityChanged);
-  }, [profile]);
 
   // ============================================================
   // XÁC ĐỊNH DANH TÍNH CỦA MÌNH & ĐỐI PHƯƠNG CHÍNH XÁC (ALIAS-AWARE)
@@ -169,8 +150,8 @@ export default function ChatRoomPage() {
       id: `opt_${Date.now()}`,
       chatId,
       senderId: currentUid,
-      senderName: activeIdentity.name,
-      senderAvatar: activeIdentity.avatar,
+      senderName: currentUserName,
+      senderAvatar: currentUserAvatar,
       text: text || (msgType === 'image' ? '[Hình ảnh]' : `[Tệp: ${extra?.fileName || 'tài liệu'}]`),
       type: msgType,
       fileUrl: extra?.fileUrl,
@@ -185,8 +166,8 @@ export default function ChatRoomPage() {
       await sendChatMessage({
         chatId,
         senderId: currentUid,
-        senderName: activeIdentity.name,
-        senderAvatar: activeIdentity.avatar,
+        senderName: currentUserName,
+        senderAvatar: currentUserAvatar,
         text: tempMsg.text,
         type: msgType,
         fileUrl: extra?.fileUrl,
@@ -287,18 +268,37 @@ export default function ChatRoomPage() {
   const handleStartChatWith = async (candidate: any) => {
     if (!currentUid) return;
     const targetUid = candidate.uid;
-    const newChatId = [currentUid, targetUid].sort().join('_');
+    const targetTest = getTestProfileByEmailOrUid(targetUid) || getTestProfileByEmailOrUid(candidate.name);
+    const targetAliases = new Set([
+      targetUid,
+      ...(targetTest?.aliasUids || []),
+    ]);
+
+    // Kiểm tra xem đã có cuộc trò chuyện nào giữa mình và đối phương chưa
+    const existingChat = chats.find((c) => {
+      const oUid = c.participants?.find((p) => !myAliases.has(p));
+      return oUid && (targetAliases.has(oUid) || oUid === targetUid);
+    });
+
+    if (existingChat) {
+      navigate(`/chat/${existingChat.id}`, { state: { chatName: candidate.name } });
+      return;
+    }
+
+    // Nếu chưa có, dùng canonical target UID
+    const canonicalTargetUid = targetTest?.uid || targetUid;
+    const newChatId = [currentUid, canonicalTargetUid].sort().join('_');
 
     await initializeChatRoom({
       chatId: newChatId,
-      participants: [currentUid, targetUid],
+      participants: [currentUid, canonicalTargetUid],
       participantNames: {
-        [currentUid]: activeIdentity.name,
-        [targetUid]: candidate.name || 'Người dùng',
+        [currentUid]: currentUserName,
+        [canonicalTargetUid]: candidate.name || 'Người dùng',
       },
       participantAvatars: {
-        [currentUid]: activeIdentity.avatar,
-        [targetUid]: candidate.avatar || '',
+        [currentUid]: currentUserAvatar,
+        [canonicalTargetUid]: candidate.avatar || '',
       },
       lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
     });
@@ -306,47 +306,19 @@ export default function ChatRoomPage() {
     navigate(`/chat/${newChatId}`, { state: { chatName: candidate.name } });
   };
 
-  // Đổi tài khoản sang đối phương (1-click chuyển đổi auth thật tức thì)
-  const handleSwitchToPartnerAuth = async () => {
-    const targetTestAcc = getTestProfileByEmailOrUid(partnerName) || getTestProfileByEmailOrUid(otherUid);
-    if (!targetTestAcc) {
-      setActiveChatIdentity(otherUid);
-      return;
-    }
+  const handleConfirmDeleteChat = async () => {
+    if (!deletingChatId) return;
+    const idToDelete = deletingChatId;
+    setDeletingChatId(null);
+    setDeletingChatName(null);
 
-    try {
-      setToastMsg(`Đang chuyển đăng nhập sang ${targetTestAcc.name}... ✨`);
-      const userCred = await signInWithEmailAndPassword(auth, targetTestAcc.email, TEST_ACCOUNT_DEFAULT_PASSWORD);
-      const user = userCred.user;
-      dispatch(setAuth({ uid: user.uid, email: targetTestAcc.email }));
+    setChats((prev) => prev.filter((c) => c.id !== idToDelete));
+    await deleteChatConversation(idToDelete);
 
-      const initialProfile = {
-        ...targetTestAcc,
-        uid: user.uid,
-      };
-      dispatch(setProfile(initialProfile as any));
-
-      try {
-        localStorage.setItem(`resonancia_profile_${user.uid}`, JSON.stringify(initialProfile));
-        localStorage.setItem('resonancia_last_profile', JSON.stringify(initialProfile));
-        localStorage.setItem('resonancia_active_chat_identity', user.uid);
-      } catch {}
-
-      setActiveIdentity({
-        uid: user.uid,
-        name: targetTestAcc.name,
-        avatar: targetTestAcc.avatar,
-        zodiac: targetTestAcc.zodiac || targetTestAcc.sun,
-        job: targetTestAcc.job,
-        isMainUser: true,
-      });
-
-      setToastMsg(`Đã đổi sang nick ${targetTestAcc.name}! 🎉`);
-      setTimeout(() => setToastMsg(''), 3000);
-    } catch (err: any) {
-      console.warn('Lỗi auto switch auth đối phương:', err);
-      setActiveChatIdentity(otherUid);
-      setToastMsg(`Đã chuyển danh tính chat sang ${targetTestAcc.name} ✨`);
+    if (chatId === idToDelete) {
+      navigate('/chat');
+    } else {
+      setToastMsg('Đã xóa đoạn chat thành công ✨');
       setTimeout(() => setToastMsg(''), 3000);
     }
   };
@@ -356,17 +328,33 @@ export default function ChatRoomPage() {
     setTimeout(() => setToastMsg(''), 3500);
   };
 
-  // Lọc chat tìm kiếm
+  // Lọc và gộp các cuộc trò chuyện cùng một người (deduplicate)
+  const seenPartners = new Set<string>();
   const filteredChats = chats.filter((c) => {
-    const oUid = c.participants?.find((p: string) => !myAliases.has(p)) || c.participants?.find((p: string) => p !== currentUid) || '';
-    const testAcc = oUid ? getTestProfileByEmailOrUid(oUid) : null;
-    const cand = oUid ? DEFAULT_CANDIDATE_PROFILES[oUid] : null;
-    const name = testAcc?.name || cand?.name || (oUid ? c.participantNames?.[oUid] : '') || '';
+    const oUid = c.participants?.find((p: string) => !myAliases.has(p)) || '';
+    if (!oUid) {
+      // Tự chat với chính mình -> Không hiển thị
+      return false;
+    }
+
+    const testAcc = getTestProfileByEmailOrUid(oUid);
+    const cand = DEFAULT_CANDIDATE_PROFILES[oUid];
+    const name = testAcc?.name || cand?.name || c.participantNames?.[oUid] || '';
+
+    const partnerKey = testAcc?.email || testAcc?.name || cand?.name || oUid;
+    if (seenPartners.has(partnerKey)) {
+      // Đã có cuộc trò chuyện mới hơn với người này -> bỏ qua bản sao cũ
+      return false;
+    }
+    seenPartners.add(partnerKey);
+
     return name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const availableAccounts = getAvailableChatAccounts(profile).filter((a) => !a.isMainUser && !myAliases.has(a.uid));
-  const topCandidates = availableAccounts.length > 0 ? availableAccounts.slice(0, 7) : Object.values(DEFAULT_CANDIDATE_PROFILES).slice(0, 6);
+  // Hàng ngang bạn bè gợi ý: Tuyệt đối không hiển thị chính mình
+  const topCandidates = Object.values(DEFAULT_CANDIDATE_PROFILES).filter(
+    (c) => !myAliases.has(c.uid) && c.name !== profile.name
+  ).slice(0, 6);
 
   return (
     <div
@@ -387,28 +375,23 @@ export default function ChatRoomPage() {
           boxShadow: '8px 0 25px -5px rgba(0, 0, 0, 0.4), inset -1px 0 0 rgba(255, 255, 255, 0.08)',
         }}
       >
-        {/* Header Đoạn chat & Bộ chuyển đổi danh tính */}
-        <div className="p-3.5 pb-2.5 flex flex-col gap-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <MessengerLogo size={28} />
-              <h1 className="text-white font-bold text-lg tracking-tight">Đoạn chat</h1>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate('/match')}
-              className="p-1.5 rounded-full hover:bg-white/10 text-purple-200 hover:text-white transition-colors cursor-pointer"
-              title="Khám phá người tương hợp mới"
-              aria-label="Khám phá người tương hợp mới"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
+        {/* Header Đoạn chat */}
+        <div className="p-3.5 pb-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <MessengerLogo size={28} />
+            <h1 className="text-white font-bold text-lg tracking-tight">Đoạn chat</h1>
           </div>
-
-          {/* CHAT IDENTITY SWITCHER (ĐỔI NICK NHẮN TIN 2 CHIỀU THẬT) */}
-          <ChatAccountSwitcher />
+          <button
+            type="button"
+            onClick={() => navigate('/match')}
+            className="p-1.5 rounded-full hover:bg-white/10 text-purple-200 hover:text-white transition-colors cursor-pointer"
+            title="Khám phá người tương hợp mới"
+            aria-label="Khám phá người tương hợp mới"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
         </div>
 
         {/* Thanh tìm kiếm kính mờ */}
@@ -523,6 +506,26 @@ export default function ChatRoomPage() {
                       {chat.lastMessage || 'Bắt đầu cuộc trò chuyện...'}
                     </p>
                   </div>
+
+                  {/* Nút Xóa đoạn chat trong sidebar */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingChatId(chat.id);
+                      setDeletingChatName(oName);
+                    }}
+                    className="p-1.5 rounded-lg text-purple-300/40 hover:text-rose-400 hover:bg-rose-500/15 transition-all cursor-pointer flex-shrink-0 group-hover:opacity-100 opacity-60 sm:opacity-0"
+                    title={`Xóa đoạn chat với ${oName}`}
+                    aria-label={`Xóa đoạn chat với ${oName}`}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </button>
                 </button>
               );
             })
@@ -600,28 +603,8 @@ export default function ChatRoomPage() {
             </div>
           </div>
 
-          {/* Các nút tương tác & Nút Chuyển Nick Auth Thật */}
+          {/* Các nút tương tác */}
           <div className="flex items-center gap-2 text-purple-200">
-            {/* NÚT THẦN KỲ: ĐĂNG NHẬP SANG TÀI KHOẢN ĐỐI PHƯƠNG ĐỂ TEST 2 CHIỀU THẬT */}
-            <button
-              type="button"
-              onClick={handleSwitchToPartnerAuth}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer"
-              style={{
-                background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.85) 0%, rgba(168, 85, 247, 0.85) 100%)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-              }}
-              title={`Đổi hẳn sang tài khoản của ${partnerName} để xem tin nhắn và gõ trả lời`}
-            >
-              <span>{`Đăng nhập ${partnerName}`}</span>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="17 1 21 5 17 9" />
-                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                <polyline points="7 23 3 19 7 15" />
-                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-              </svg>
-            </button>
-
             <button
               type="button"
               onClick={() => showCallFeatureNotice('thoại')}
@@ -658,6 +641,26 @@ export default function ChatRoomPage() {
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="16" x2="12" y2="12" />
                 <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (chatId) {
+                  setDeletingChatId(chatId);
+                  setDeletingChatName(partnerName);
+                }
+              }}
+              className="p-2 rounded-full hover:bg-rose-500/15 hover:text-rose-400 text-purple-200/60 transition-colors cursor-pointer"
+              title="Xóa đoạn chat này"
+              aria-label="Xóa đoạn chat này"
+            >
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
               </svg>
             </button>
           </div>
@@ -952,7 +955,7 @@ export default function ChatRoomPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Nhắn tin với ${partnerName} bằng tư cách ${activeIdentity.name}... (Enter để gửi)`}
+                placeholder={`Nhắn tin với ${partnerName}... (Enter để gửi)`}
                 className="w-full bg-white/[0.08] text-white placeholder-purple-200/40 text-sm px-5 py-3 rounded-full border border-purple-400/35 focus:outline-none focus:border-cyan-400 focus:bg-white/[0.12] transition-all shadow-inner"
               />
             </div>
@@ -1044,6 +1047,46 @@ export default function ChatRoomPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Modal Xác Nhận Xóa Đoạn Chat */}
+      {deletingChatId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div
+            className="w-full max-w-sm rounded-2xl p-5 border border-purple-500/30 shadow-2xl text-center"
+            style={{
+              background: 'linear-gradient(155deg, rgba(28, 16, 68, 0.96) 0%, rgba(16, 9, 44, 0.98) 100%)',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(168, 85, 247, 0.15)',
+            }}
+          >
+            <div className="w-12 h-12 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto mb-3.5">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </div>
+            <h3 className="text-base font-bold text-white mb-1.5">Xóa đoạn chat?</h3>
+            <p className="text-xs text-purple-200/70 mb-5 leading-relaxed">
+              Bạn có chắc chắn muốn xóa toàn bộ cuộc trò chuyện với <strong className="text-white">{deletingChatName}</strong>? Toàn bộ tin nhắn sẽ bị xóa vĩnh viễn và không thể khôi phục.
+            </p>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => { setDeletingChatId(null); setDeletingChatName(null); }}
+                className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold text-purple-200 bg-white/10 hover:bg-white/15 transition-all cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteChat}
+                className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 transition-all cursor-pointer shadow-md"
+              >
+                Xóa đoạn chat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
