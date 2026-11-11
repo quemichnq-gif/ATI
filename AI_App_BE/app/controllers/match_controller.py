@@ -36,10 +36,9 @@ def send_match_request():
 @match_bp.route("/accept-match-request", methods=["POST"])
 def accept_match_request():
     data = request.get_json(silent=True) or {}
-    auth_uid = getattr(g, "firebase_user", {}).get("uid") if hasattr(g, "firebase_user") and g.firebase_user else None
-    receiver_id = data.get("receiverId") or data.get("uid") or auth_uid
-    sender_id = data.get("senderId") or data.get("targetUid") or data.get("partnerId")
-    request_id = data.get("requestId") or (f"{sender_id}_{receiver_id}" if sender_id and receiver_id else None)
+    request_id = data.get("requestId")
+    receiver_id = data.get("receiverId") or data.get("uid") or getattr(g, "firebase_user", {}).get("uid")
+    sender_id = data.get("senderId") or data.get("targetUid")
     response_message = data.get("responseMessage", "")
 
     res = accept_match_request_service(request_id, receiver_id, sender_id, response_message)
@@ -50,13 +49,12 @@ def accept_match_request():
 @match_bp.route("/reject-match-request", methods=["POST"])
 def reject_match_request():
     data = request.get_json(silent=True) or {}
-    auth_uid = getattr(g, "firebase_user", {}).get("uid") if hasattr(g, "firebase_user") and g.firebase_user else None
-    receiver_id = data.get("receiverId") or data.get("uid") or auth_uid
+    request_id = data.get("requestId")
+    receiver_id = data.get("receiverId") or data.get("uid") or getattr(g, "firebase_user", {}).get("uid")
     sender_id = data.get("senderId") or data.get("targetUid")
-    request_id = data.get("requestId") or (f"{sender_id}_{receiver_id}" if sender_id and receiver_id else None)
     response_message = data.get("responseMessage", "")
 
-    res = reject_match_request_service(request_id, receiver_id, response_message)
+    res = reject_match_request_service(request_id, receiver_id, sender_id, response_message)
     status_code = res.pop("status", 200)
     return jsonify(res), status_code
 

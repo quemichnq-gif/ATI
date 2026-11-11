@@ -91,6 +91,42 @@ init_storage_db()
 
 
 # ==============================================================================
+# ALIAS GROUPS FOR CONSISTENT MATCH & NOTIFICATIONS
+# ==============================================================================
+
+UID_GROUPS = [
+    {
+        'cand_2_hamy',
+        '61kO1itQCOV3Nw9acgWUmQLduNT2',
+        'C6U7eytPpdQyw2YufISm4mNh6N72',
+    },
+    {
+        'cand_1_dainghia',
+        'cand_1_nghia',
+        'YykBl98StbXVCKgqave6VMVC5Bx1',
+        'PAKzF0JCu3Zh11N59MzxUlCG3pq2',
+    },
+    {
+        'user_main_tuan',
+        'user_tuan',
+        'yEQyrTCQJwWedUyffYTqt5O01ih1',
+        'Rietkt4hguXJeAyjKv6Fqo5E7OK2',
+        '37ttDQ1n6LbeJpNuieiYdSBtnal1',
+        'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    },
+]
+
+def uid_aliases(uid: str) -> List[str]:
+    if not uid:
+        return []
+    aliases = {uid}
+    for group in UID_GROUPS:
+        if uid in group:
+            aliases.update(group)
+    return list(aliases)
+
+
+# ==============================================================================
 # MATCH REQUESTS REPOSITORY
 # ==============================================================================
 
@@ -121,16 +157,23 @@ def save_match_request(data: Dict[str, Any]) -> None:
 
 
 def cancel_previous_requests(sender_id: str, receiver_id: str) -> None:
-    """Hủy các yêu cầu kết bạn cũ giữa 2 user khi gửi lời mời mới"""
+    """Hủy các yêu cầu kết bạn cũ giữa 2 user khi gửi lời mời mới (hỗ trợ alias)"""
+    if not sender_id or not receiver_id:
+        return
     conn = get_db_connection()
     try:
         with conn:
-            conn.execute('''
+            s_aliases = uid_aliases(sender_id) or [sender_id]
+            r_aliases = uid_aliases(receiver_id) or [receiver_id]
+            s_ph = ','.join(['?'] * len(s_aliases))
+            r_ph = ','.join(['?'] * len(r_aliases))
+            conn.execute(f'''
                 UPDATE match_requests 
                 SET status = 'canceled'
-                WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+                WHERE ((sender_id IN ({s_ph}) AND receiver_id IN ({r_ph}))
+                    OR (sender_id IN ({r_ph}) AND receiver_id IN ({s_ph})))
                   AND status = 'pending'
-            ''', (sender_id, receiver_id, receiver_id, sender_id))
+            ''', (*s_aliases, *r_aliases, *r_aliases, *s_aliases))
     finally:
         conn.close()
 
@@ -149,15 +192,22 @@ def get_match_request_by_id(request_id: str) -> Optional[Dict[str, Any]]:
 
 
 def find_pending_match_request(uid1: str, uid2: str) -> Optional[Dict[str, Any]]:
+    if not uid1 or not uid2:
+        return None
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute('''
+        u1_aliases = uid_aliases(uid1) or [uid1]
+        u2_aliases = uid_aliases(uid2) or [uid2]
+        u1_ph = ','.join(['?'] * len(u1_aliases))
+        u2_ph = ','.join(['?'] * len(u2_aliases))
+        cursor.execute(f'''
             SELECT * FROM match_requests
-            WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+            WHERE ((sender_id IN ({u1_ph}) AND receiver_id IN ({u2_ph}))
+                OR (sender_id IN ({u2_ph}) AND receiver_id IN ({u1_ph})))
               AND status = 'pending'
             ORDER BY created_at DESC LIMIT 1
-        ''', (uid1, uid2, uid2, uid1))
+        ''', (*u1_aliases, *u2_aliases, *u2_aliases, *u1_aliases))
         row = cursor.fetchone()
         if not row:
             return None
@@ -195,38 +245,49 @@ def update_match_request_status(request_id: str, status: str, response_message: 
 
 
 def end_match_requests_between(uid1: str, uid2: str) -> None:
-    """Đánh dấu tất cả request giữa 2 user thành ended khi chia tay"""
+    """Đánh dấu tất cả request giữa 2 user thành ended khi chia tay (hỗ trợ alias)"""
+    if not uid1 or not uid2:
+        return
     conn = get_db_connection()
     try:
         with conn:
-            conn.execute('''
+            u1_aliases = uid_aliases(uid1) or [uid1]
+            u2_aliases = uid_aliases(uid2) or [uid2]
+            u1_ph = ','.join(['?'] * len(u1_aliases))
+            u2_ph = ','.join(['?'] * len(u2_aliases))
+            conn.execute(f'''
                 UPDATE match_requests 
                 SET status = 'ended'
-                WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
-            ''', (uid1, uid2, uid2, uid1))
+                WHERE (sender_id IN ({u1_ph}) AND receiver_id IN ({u2_ph}))
+                   OR (sender_id IN ({u2_ph}) AND receiver_id IN ({u1_ph}))
+            ''', (*u1_aliases, *u2_aliases, *u2_aliases, *u1_aliases))
     finally:
         conn.close()
 
 
 def get_user_match_requests(user_id: str, request_type: str = "received") -> List[Dict[str, Any]]:
+    if not user_id:
+        return []
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        aliases = uid_aliases(user_id) or [user_id]
+        ph = ','.join(['?'] * len(aliases))
         if request_type == "received":
-            cursor.execute('SELECT * FROM match_requests WHERE receiver_id = ? ORDER BY created_at DESC', (user_id,))
+            cursor.execute(f'SELECT * FROM match_requests WHERE receiver_id IN ({ph}) ORDER BY created_at DESC', (*aliases,))
         elif request_type == "sent":
-            cursor.execute('SELECT * FROM match_requests WHERE sender_id = ? ORDER BY created_at DESC', (user_id,))
+            cursor.execute(f'SELECT * FROM match_requests WHERE sender_id IN ({ph}) ORDER BY created_at DESC', (*aliases,))
         else:  # all
-            cursor.execute('''
+            cursor.execute(f'''
                 SELECT * FROM match_requests 
-                WHERE sender_id = ? OR receiver_id = ? 
+                WHERE sender_id IN ({ph}) OR receiver_id IN ({ph}) 
                 ORDER BY created_at DESC
-            ''', (user_id, user_id))
+            ''', (*aliases, *aliases))
         rows = cursor.fetchall()
         result = []
         for r in rows:
             req = _format_match_request_row(r)
-            req["direction"] = "sent" if req["senderId"] == user_id else "received"
+            req["direction"] = "sent" if req["senderId"] in aliases else "received"
             result.append(req)
         return result
     finally:
@@ -234,14 +295,21 @@ def get_user_match_requests(user_id: str, request_type: str = "received") -> Lis
 
 
 def get_latest_match_request_between(user_id: str, target_id: str) -> Optional[Dict[str, Any]]:
+    if not user_id or not target_id:
+        return None
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute('''
+        u_aliases = uid_aliases(user_id) or [user_id]
+        t_aliases = uid_aliases(target_id) or [target_id]
+        u_ph = ','.join(['?'] * len(u_aliases))
+        t_ph = ','.join(['?'] * len(t_aliases))
+        cursor.execute(f'''
             SELECT * FROM match_requests
-            WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+            WHERE (sender_id IN ({u_ph}) AND receiver_id IN ({t_ph}))
+               OR (sender_id IN ({t_ph}) AND receiver_id IN ({u_ph}))
             ORDER BY created_at DESC LIMIT 1
-        ''', (user_id, target_id, target_id, user_id))
+        ''', (*u_aliases, *t_aliases, *t_aliases, *u_aliases))
         row = cursor.fetchone()
         if not row:
             return None
@@ -271,43 +339,12 @@ def _format_match_request_row(row: sqlite3.Row) -> Dict[str, Any]:
 # NOTIFICATIONS REPOSITORY
 # ==============================================================================
 
-UID_GROUPS = [
-    {
-        'cand_2_hamy',
-        '61kO1itQCOV3Nw9acgWUmQLduNT2',
-        'C6U7eytPpdQyw2YufISm4mNh6N72',
-    },
-    {
-        'cand_1_dainghia',
-        'cand_1_nghia',
-        'YykBl98StbXVCKgqave6VMVC5Bx1',
-        'PAKzF0JCu3Zh11N59MzxUlCG3pq2',
-    },
-    {
-        'user_main_tuan',
-        'user_tuan',
-        'yEQyrTCQJwWedUyffYTqt5O01ih1',
-        'Rietkt4hguXJeAyjKv6Fqo5E7OK2',
-        '37ttDQ1n6LbeJpNuieiYdSBtnal1',
-        'x5cEmtlghVYlrpyITC1FSaonIzt1',
-    },
-]
-
-def uid_aliases(uid: str) -> List[str]:
-    if not uid:
-        return []
-    aliases = {uid}
-    for group in UID_GROUPS:
-        if uid in group:
-            aliases.update(group)
-    return list(aliases)
-
 def create_notification(notif: Dict[str, Any]) -> None:
     conn = get_db_connection()
     try:
         with conn:
             conn.execute('''
-                INSERT INTO notifications 
+                INSERT OR REPLACE INTO notifications 
                 (id, user_id, type, title, message, sender_id, sender_name, sender_avatar, request_id, read, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (

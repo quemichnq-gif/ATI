@@ -93,7 +93,11 @@ export interface Notification {
   fromUid?: string;
   fromName?: string;
   fromAvatar?: string;
+  senderId?: string;
+  senderName?: string;
+  senderAvatar?: string;
   requestId?: string;
+  chatId?: string;
 }
 
 export interface CompatibilityScores {

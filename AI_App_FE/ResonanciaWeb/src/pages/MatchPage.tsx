@@ -1,31 +1,48 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { RootState } from '../store';
-import { MATCH_TAGS, ZODIAC_SIGNS, ELEMENT_MAP, ELEMENT_COLORS } from '../constants/astrologyMap';
-import { apiLoveMatching, apiSendMatchRequest, apiGetMatchRequests, apiAcceptMatch, apiRejectMatch } from '../services/api';
+import { MATCH_TAGS, ZODIAC_SIGNS } from '../constants/astrologyMap';
+import { apiLoveMatching, apiSendMatchRequest, apiGetMatchRequests } from '../services/api';
 import { MatchTagType } from '../types';
 import UiIcon from '../components/UiIcon';
 import ZodiacIcon from '../components/ZodiacIcon';
 import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
 import { initializeChatRoom } from '../services/realtimeChatService';
-import { getRankedCandidates, EnrichedCandidate } from '../services/matchSynastryService';
-import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
-import rawMockUsers from '../mocks/usersMockData.json';
 
 const TAG_ICONS: Record<MatchTagType, 'heart' | 'flame' | 'sparkles' | 'star'> = {
   greenflag: 'heart', redflag: 'flame', karmic: 'sparkles', destiny: 'star', twinflame: 'flame',
 };
 
+const ZODIAC_SIGNS_ORDER = [
+  'Bạch Dương', 'Kim Ngưu', 'Song Tử', 'Cự Giải',
+  'Sư Tử', 'Xử Nữ', 'Thiên Bình', 'Bọ Cạp',
+  'Nhân Mã', 'Ma Kết', 'Bảo Bình', 'Song Ngư'
+];
+
+function getZodiacConnectionType(sign1?: string, sign2?: string): MatchTagType {
+  if (!sign1 || !sign2) return 'greenflag';
+  const i1 = ZODIAC_SIGNS_ORDER.indexOf(sign1);
+  const i2 = ZODIAC_SIGNS_ORDER.indexOf(sign2);
+  if (i1 === -1 || i2 === -1) return 'greenflag';
+  const diff = Math.abs(i1 - i2);
+  const dist = Math.min(diff, 12 - diff);
+  if (dist === 4 || dist === 2) return 'greenflag';
+  if (dist === 6) return 'destiny';
+  if (dist === 0) return 'twinflame';
+  if (dist === 3) return 'redflag';
+  return 'karmic';
+}
+
 export default function MatchPage() {
   const profile = useSelector((s: RootState) => s.profile);
   const navigate = useNavigate();
-  const location = useLocation();
   const [selectedTag, setSelectedTag] = useState<MatchTagType>('greenflag');
   const [candidates, setCandidates] = useState<any[]>([]);
+  const [acceptedPartners, setAcceptedPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedTag, setLoadedTag] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -34,236 +51,87 @@ export default function MatchPage() {
   const [toastMsg, setToastMsg] = useState('');
   const [filterLevel, setFilterLevel] = useState<'all' | 'high' | 'medium' | 'challenge'>('all');
 
-  // State cho Modal xem người gửi lời mời kết đôi từ /notifications
-  const [modalSender, setModalSender] = useState<any>(null);
-  const [modalIncomingMsg, setModalIncomingMsg] = useState<string>('');
-  const [modalRequestId, setModalRequestId] = useState<string>('');
-  const [modalMatchStatus, setModalMatchStatus] = useState<'pending' | 'matched'>('pending');
-  const [acceptingMatch, setAcceptingMatch] = useState(false);
+  const applyAcceptedPartnerPriority = (rawList: any[], tag: MatchTagType, acceptedList: any[]) => {
+    if (!acceptedList || acceptedList.length === 0) return rawList;
+    const mySign = profile.sun || '';
+    let result = [...rawList];
+
+    acceptedList.forEach(partner => {
+      const test = getTestProfileByEmailOrUid(partner.uid) || getTestProfileByEmailOrUid(partner.name);
+      const testAny = test as any;
+      const candSign = testAny?.sun || testAny?.zodiac || 'Bọ Cạp';
+      const connType = getZodiacConnectionType(mySign, candSign);
+
+      // Nếu partner này thuộc nhóm phân loại của tab đang xem -> Đẩy lên hàng đầu (vị trí đầu tiên #1)
+      if (connType === tag) {
+        result = result.filter(c => c.uid !== partner.uid && (!test || c.uid !== test.uid) && c.name !== partner.name);
+        const partnerCandidate = {
+          uid: partner.uid,
+          name: partner.name || testAny?.name || 'Người dùng',
+          zodiac: candSign,
+          sun: candSign,
+          avatar: partner.avatar || testAny?.avatar || '',
+          age: testAny?.age || 24,
+          gender: testAny?.gender || 'Nam',
+          element: testAny?.element || 'Nước',
+          job: testAny?.job || 'Thành viên Resonancia',
+          personality: testAny?.bio || 'Chân thành, ấm áp, sâu sắc',
+          reason: `Đã kết bạn & ghép đôi thành công! Hai bạn có sự liên kết ${MATCH_TAGS[tag]?.label || tag} tự nhiên và đồng điệu.`,
+          compatibility_score: 100,
+          score: 100,
+          match_level: 'high',
+          match_level_text: 'Tương hợp cao',
+          isRealUser: true,
+          isMatched: true,
+          isFriend: true,
+        };
+        result.unshift(partnerCandidate);
+      }
+    });
+
+    return result;
+  };
 
   useEffect(() => {
     const myUid = profile.uid || auth.currentUser?.uid;
     if (!myUid) return;
-    apiGetMatchRequests(myUid, 'sent')
+    // Lấy toàn bộ match requests (cả gửi đi và nhận về) để xác định các bạn bè đã đồng ý kết bạn
+    apiGetMatchRequests(myUid)
       .then(res => {
         const list = res.data?.requests || [];
         const map: Record<string, boolean> = {};
+        const accepted: any[] = [];
         list.forEach((r: any) => {
           if (r.receiverId && (r.status === 'pending' || r.status === 'accepted')) {
             map[r.receiverId] = true;
           }
-        });
-        setSentStatusMap(prev => ({ ...prev, ...map }));
-      })
-      .catch(() => {});
-  }, [profile.uid, candidates]);
-
-  // Tự động mở modal hồ sơ của người gửi lời mời khi được điều hướng từ /notifications
-  useEffect(() => {
-    const routeState = location.state as any;
-    if (routeState?.highlightedSenderId || routeState?.openSenderProfile) {
-      const senderUid = routeState.highlightedSenderId;
-      const notif = routeState.matchRequestNotification;
-      const incomingMsg = notif?.message || notif?.body || 'Xin chào! Tôi muốn kết nối với bạn ✨';
-      const reqId = notif?.requestId || `${senderUid}_${profile.uid || auth.currentUser?.uid}`;
-
-      setModalIncomingMsg(incomingMsg);
-      setModalRequestId(reqId);
-      setModalMatchStatus('pending');
-
-      // 1. Tìm thông tin trong DEFAULT_CANDIDATE_PROFILES hoặc candidates
-      let foundSender = DEFAULT_CANDIDATE_PROFILES[senderUid] ||
-        candidates.find(c => c.uid === senderUid) ||
-        (rawMockUsers as any[]).find(m => m.id === senderUid || m.uid === senderUid);
-
-      if (foundSender) {
-        const senderObj = foundSender as any;
-        const zSign = senderObj.sun || senderObj.zodiac || senderObj.zodiacSign || 'Bảo Bình';
-        setModalSender({
-          ...senderObj,
-          uid: senderUid,
-          name: senderObj.name || senderObj.fullName || notif?.senderName || 'Người gửi lời mời',
-          avatar: senderObj.avatar || notif?.senderAvatar || '',
-          sun: zSign,
-          moon: senderObj.moon || 'Nhân Mã',
-          ascendant: senderObj.ascendant || 'Song Tử',
-          age: senderObj.age || 23,
-          job: senderObj.job || senderObj.occupation || 'Thành viên Resonancia',
-          bio: senderObj.bio || senderObj.personality || 'Đang kết nối năng lượng và tìm kiếm linh hồn đồng điệu ✨',
-          element: senderObj.element || ELEMENT_MAP[zSign] || 'Khí',
-          coverImage: senderObj.coverImage,
-        });
-      } else {
-        // 2. Tải trực tiếp từ Firestore nếu là người dùng mới
-        getDoc(doc(db, 'users', senderUid))
-          .then(snap => {
-            if (snap.exists()) {
-              const d = snap.data();
-              const zSign = d.sun || d.zodiac || d.zodiacSign || 'Bảo Bình';
-              setModalSender({
-                uid: senderUid,
-                name: d.name || d.fullName || notif?.senderName || 'Người gửi lời mời',
-                avatar: d.avatar || notif?.senderAvatar || '',
-                sun: zSign,
-                moon: d.moon || 'Nhân Mã',
-                ascendant: d.ascendant || 'Song Tử',
-                age: d.age || 23,
-                job: d.job || d.occupation || 'Thành viên Resonancia',
-                bio: d.bio || 'Đang kết nối năng lượng và tìm kiếm linh hồn đồng điệu ✨',
-                element: d.element || ELEMENT_MAP[zSign] || 'Khí',
-                ...d,
-              });
-            } else {
-              setModalSender({
-                uid: senderUid,
-                name: notif?.senderName || 'Người gửi lời mời',
-                avatar: notif?.senderAvatar || '',
-                sun: 'Bảo Bình',
-                moon: 'Nhân Mã',
-                ascendant: 'Song Tử',
-                age: 23,
-                job: 'Thành viên Resonancia',
-                bio: 'Đang kết nối năng lượng và tìm kiếm linh hồn đồng điệu ✨',
-                element: 'Khí',
+          if (r.status === 'accepted') {
+            const isMeSender = r.senderId === myUid || (profile.name && r.senderName === profile.name);
+            const pUid = isMeSender ? r.receiverId : r.senderId;
+            const pName = isMeSender ? r.receiverName : r.senderName;
+            const pAvatar = isMeSender ? (r.receiverAvatar || '') : (r.senderAvatar || '');
+            if (pUid && pUid !== myUid) {
+              accepted.push({
+                uid: pUid,
+                name: pName,
+                avatar: pAvatar,
+                requestId: r.requestId,
+                status: r.status,
               });
             }
-          })
-          .catch(() => {
-            setModalSender({
-              uid: senderUid,
-              name: notif?.senderName || 'Người gửi lời mời',
-              avatar: notif?.senderAvatar || '',
-              sun: 'Bảo Bình',
-              moon: 'Nhân Mã',
-              age: 23,
-              bio: 'Đang kết nối năng lượng và tìm kiếm linh hồn đồng điệu ✨',
-              element: 'Khí',
-            });
-          });
-      }
+          }
+        });
+        setSentStatusMap(prev => ({ ...prev, ...map }));
+        setAcceptedPartners(accepted);
+      })
+      .catch(() => {});
+  }, [profile.uid]);
+
+  useEffect(() => {
+    if (acceptedPartners.length > 0 && candidates.length > 0) {
+      setCandidates(prev => applyAcceptedPartnerPriority(prev, selectedTag, acceptedPartners));
     }
-  }, [location.state, profile.uid, candidates]);
-
-  const handleConfirmAcceptMatch = async () => {
-    const myUid = profile.uid || auth.currentUser?.uid;
-    const senderUid = modalSender?.uid;
-    if (!myUid || !senderUid) return;
-
-    setAcceptingMatch(true);
-    try {
-      const reqId = modalRequestId || `${senderUid}_${myUid}`;
-      await apiAcceptMatch({
-        receiverId: myUid,
-        senderId: senderUid,
-        uid: myUid,
-        targetUid: senderUid,
-        requestId: reqId,
-        responseMessage: 'Đã đồng ý kết nối cùng bạn!',
-      });
-      setModalMatchStatus('matched');
-      setToastMsg(`Đã kết đôi thành công với ${modalSender.name}! ✨`);
-      setTimeout(() => setToastMsg(''), 4000);
-
-      // Ghi thông báo kết đôi thành công lên Firestore để sync với /notifications
-      try {
-        const notifId1 = `notif_match_${myUid}_${senderUid}_${Date.now()}`;
-        const notifId2 = `notif_match_${senderUid}_${myUid}_${Date.now()}`;
-        await Promise.all([
-          setDoc(doc(db, 'notifications', notifId1), {
-            id: notifId1,
-            userId: myUid,
-            type: 'match_accepted',
-            title: 'Kết đôi thành công! ✨',
-            message: `Bạn và ${modalSender.name || 'đối phương'} đã kết đôi thành công! Hãy gửi tin nhắn đầu tiên để cùng kết nối vũ trụ.`,
-            senderId: senderUid,
-            senderName: modalSender.name || 'Người dùng',
-            senderAvatar: modalSender.avatar || '',
-            requestId: reqId,
-            read: false,
-            createdAt: new Date().toISOString(),
-          }, { merge: true }),
-          setDoc(doc(db, 'notifications', notifId2), {
-            id: notifId2,
-            userId: senderUid,
-            type: 'match_accepted',
-            title: 'Kết đôi thành công! ✨',
-            message: `${profile.name || 'Người ấy'} đã chấp nhận lời mời kết đôi của bạn! Hai bạn đã chính thức kết đôi thành công.`,
-            senderId: myUid,
-            senderName: profile.name || 'Người dùng',
-            senderAvatar: profile.avatar || auth.currentUser?.photoURL || '',
-            requestId: reqId,
-            read: false,
-            createdAt: new Date().toISOString(),
-          }, { merge: true }),
-          setDoc(doc(db, 'match_requests', reqId), {
-            status: 'accepted',
-            acceptedAt: new Date().toISOString(),
-          }, { merge: true }),
-        ]);
-      } catch (e) {
-        console.warn('Sync firestore accept match error:', e);
-      }
-    } catch (err: any) {
-      console.error('Lỗi chấp nhận kết đôi:', err);
-      setToastMsg('Lỗi khi chấp nhận kết đôi. Vui lòng thử lại!');
-      setTimeout(() => setToastMsg(''), 3000);
-    } finally {
-      setAcceptingMatch(false);
-    }
-  };
-
-  const handleRejectFromModal = async () => {
-    const myUid = profile.uid || auth.currentUser?.uid;
-    const senderUid = modalSender?.uid;
-    if (!myUid || !senderUid) return;
-
-    setAcceptingMatch(true);
-    try {
-      const reqId = modalRequestId || `${senderUid}_${myUid}`;
-      await apiRejectMatch({
-        receiverId: myUid,
-        senderId: senderUid,
-        uid: myUid,
-        targetUid: senderUid,
-        requestId: reqId,
-      });
-      setToastMsg(`Đã từ chối lời mời từ ${modalSender.name}`);
-      setTimeout(() => setToastMsg(''), 3000);
-      setModalSender(null);
-    } catch (err) {
-      console.error('Lỗi từ chối kết đôi:', err);
-    } finally {
-      setAcceptingMatch(false);
-    }
-  };
-
-  const handleStartChatFromModal = async (sender: any) => {
-    if (!profile.uid || !sender?.uid) return;
-    const targetUid = sender.uid;
-    const targetTest = getTestProfileByEmailOrUid(targetUid) || getTestProfileByEmailOrUid(sender.name);
-    const canonicalTargetUid = targetTest?.uid || targetUid;
-    const chatId = [profile.uid, canonicalTargetUid].sort().join('_');
-
-    try {
-      await initializeChatRoom({
-        chatId,
-        participants: [profile.uid, canonicalTargetUid],
-        participantNames: {
-          [profile.uid]: profile.name || 'Người dùng',
-          [canonicalTargetUid]: sender.name || 'Người dùng',
-        },
-        participantAvatars: {
-          [profile.uid]: profile.avatar || '',
-          [canonicalTargetUid]: sender.avatar || '',
-        },
-        lastMessage: 'Đã kết đôi thành công ✨',
-      });
-    } catch (e) {
-      console.error(e);
-    }
-    setModalSender(null);
-    navigate(`/chat/${chatId}`, { state: { chatName: sender.name } });
-  };
+  }, [acceptedPartners, selectedTag]);
 
   const handleQuickMatch = async (c: any, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -363,18 +231,17 @@ export default function MatchPage() {
   };
 
   const loadCandidates = async (tag: MatchTagType, forceRefresh = false) => {
+    if (!profile.uid) return;
     setLoading(true);
     setError('');
-    const myUid = profile.uid || auth.currentUser?.uid;
-
     try {
-      // 1. Kiểm tra cache từ Client Firestore nếu không yêu cầu forceRefresh
-      if (!forceRefresh && myUid) {
+      // 1. Kiểm tra cache từ Client Firestore nếu không yêu cầu forceRefresh và chưa có accepted partners
+      if (!forceRefresh && acceptedPartners.length === 0) {
         try {
-          const cacheSnap = await getDoc(doc(db, 'love_matching_results', myUid, 'types', tag));
+          const cacheSnap = await getDoc(doc(db, 'love_matching_results', profile.uid, 'types', tag));
           if (cacheSnap.exists()) {
             const data = cacheSnap.data();
-            if (data?.users && Array.isArray(data.users) && data.users.length > 0 && data.users[0]?.aspect_name) {
+            if (data?.users && Array.isArray(data.users) && data.users.length > 0) {
               setCandidates(data.users);
               setLoadedTag(tag);
               setLoading(false);
@@ -386,60 +253,36 @@ export default function MatchPage() {
         }
       }
 
-      // 2. Thử gọi backend AI phân tích
-      let users: any[] = [];
-      if (myUid) {
-        try {
-          const res = await apiLoveMatching(tag, {
-            uid: myUid,
-            userData: {
-              uid: myUid,
-              name: profile.name,
-              gender: profile.gender || '',
-              sun: profile.sun || '',
-              moon: profile.moon || '',
-              ascendant: profile.ascendant || '',
-              zodiac: profile.sun || '',
-              fireRatio: profile.fireRatio || 0,
-              earthRatio: profile.earthRatio || 0,
-              airRatio: profile.airRatio || 0,
-              waterRatio: profile.waterRatio || 0,
-            },
-          });
-          users = res.data?.users || [];
-        } catch (apiErr) {
-          console.warn('API love-matching fallback to calculated mock:', apiErr);
-        }
-      }
+      // 2. Gọi backend AI phân tích
+      const res = await apiLoveMatching(tag, {
+        uid: profile.uid,
+        userData: {
+          uid: profile.uid,
+          name: profile.name,
+          gender: profile.gender || '',
+          sun: profile.sun || '',
+          moon: profile.moon || '',
+          ascendant: profile.ascendant || '',
+          zodiac: profile.sun || '',
+          fireRatio: profile.fireRatio || 0,
+          earthRatio: profile.earthRatio || 0,
+          airRatio: profile.airRatio || 0,
+          waterRatio: profile.waterRatio || 0,
+        },
+      });
 
-      // 3. Nếu backend không có hoặc chưa có dữ liệu chiêm tinh đầy đủ, tính toán chính xác từ mock candidates
-      if (!users || users.length === 0 || !users[0]?.aspect_name) {
-        users = getRankedCandidates(profile, tag);
-      } else {
-        // Làm giàu thêm các thông tin chi tiết từ mock nếu thiếu
-        users = users.map((u: any) => {
-          const mockMatch = (DEFAULT_CANDIDATE_PROFILES as any)[u.uid];
-          return {
-            ...u,
-            avatar: u.avatar || mockMatch?.avatar || '',
-            coverImage: u.coverImage || mockMatch?.coverImage || '',
-            bio: u.bio || mockMatch?.bio || '',
-            personality: u.personality || mockMatch?.personality || '',
-            job: u.job || mockMatch?.job || 'Thành viên Resonancia',
-          };
-        });
-      }
-
+      const rawUsers = res.data?.users || [];
+      const users = applyAcceptedPartnerPriority(rawUsers, tag, acceptedPartners);
       setCandidates(users);
       setLoadedTag(tag);
 
-      // 4. Lưu cache vào Client Firestore để lần sau hiển thị tức thì
-      if (users.length > 0 && myUid) {
+      // 3. Lưu cache vào Client Firestore để lần sau hiển thị tức thì
+      if (users.length > 0) {
         try {
-          await setDoc(doc(db, 'love_matching_results', myUid, 'types', tag), {
+          await setDoc(doc(db, 'love_matching_results', profile.uid, 'types', tag), {
             type: tag,
-            uid: myUid,
-            users,
+            uid: profile.uid,
+            users: rawUsers,  // lưu cache dữ liệu gốc (không có override priority)
             updatedAt: Date.now(),
           }, { merge: true });
         } catch (saveErr) {
@@ -447,19 +290,18 @@ export default function MatchPage() {
         }
       }
     } catch {
-      // Hoàn toàn dự phòng bằng mock tính toán chuẩn xác
-      const fallbackUsers = getRankedCandidates(profile, tag);
-      setCandidates(fallbackUsers);
-      setLoadedTag(tag);
+      setError('Không thể tải danh sách. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Tự động load ứng viên khi vào trang lần đầu hoặc khi đổi profile/cung hoàng đạo
+  // Tự động load ứng viên khi vào trang lần đầu hoặc khi đổi profile
   useEffect(() => {
-    loadCandidates(selectedTag);
-  }, [profile.uid, profile.sun, profile.moon, profile.gender]);
+    if (profile.uid) {
+      loadCandidates(selectedTag);
+    }
+  }, [profile.uid]);
 
   const handleSelectTag = (tag: MatchTagType) => {
     setSelectedTag(tag);
@@ -621,189 +463,181 @@ export default function MatchPage() {
                   return true;
                 })
                 .map((c, i) => {
-                const matchScore = c.compatibility_score ?? c.score ?? 75;
-                const bdown = c.breakdown || {
-                  love: c.love || 85,
-                  trust: c.trust || 85,
-                  communication: c.communication || 85,
-                  commitment: c.marriage || c.commitment || 85,
-                };
-
-                const isHighlightedSender = (c.uid === (location.state as any)?.highlightedSenderId) || (c.uid === modalSender?.uid);
-
+                const matchScore = c.compatibility_score ?? c.score;
                 return (
                   <motion.div key={c.uid || i}
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(i * 0.02, 0.3) }}
+                    transition={{ delay: i * 0.08 }}
                     whileHover={{ y: -4 }}
                     role="link" tabIndex={0} aria-label={`Xem hồ sơ ${c.name}`}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && e.target === e.currentTarget) {
-                        if (isHighlightedSender) {
-                          setModalSender(c);
-                        } else {
-                          navigate(`/user/${c.uid}`, { state: { candidate: c } });
-                        }
-                      }
-                    }}
-                    className="glass-card p-5 cursor-pointer card-hover flex flex-col justify-between"
-                    onClick={() => {
-                      if (isHighlightedSender) {
-                        setModalSender(c);
-                      } else {
-                        navigate(`/user/${c.uid}`, { state: { candidate: c } });
-                      }
-                    }}
+                    onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) navigate(`/user/${c.uid}`, { state: { candidate: c } }); }}
+                    className="glass-card p-5 cursor-pointer card-hover"
+                    onClick={() => navigate(`/user/${c.uid}`, { state: { candidate: c } })}
                     style={{
-                      border: isHighlightedSender ? '2px solid #ec4899' : `1px solid ${tagInfo.color}33`,
-                      boxShadow: isHighlightedSender ? '0 0 25px rgba(236, 72, 153, 0.45)' : '0 8px 30px rgba(0, 0, 0, 0.25)',
+                      border: c.isMatched
+                        ? `1px solid ${tagInfo.color}88`
+                        : `1px solid ${tagInfo.color}33`,
+                      boxShadow: c.isMatched ? `0 0 16px ${tagInfo.color}22` : undefined,
                     }}
                   >
-                    <div>
-                      {isHighlightedSender && (
-                        <div className="mb-2.5 flex items-center justify-between">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-pink-500/25 text-pink-300 border border-pink-400/40 animate-pulse">
-                            ★ Đã gửi lời mời cho bạn
-                          </span>
-                          <span className="text-[11px] text-pink-300 underline font-medium">Bấm mở xác nhận</span>
-                        </div>
-                      )}
-
-                      {/* Avatar & Info */}
-                      <div className="flex items-start gap-3.5 mb-3">
-                        <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 relative shadow-md"
-                          style={{ border: `2px solid ${tagInfo.color}66` }}>
-                          {c.avatar ? (
-                            <img
-                              src={c.avatar}
-                              alt={c.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                          ) : null}
-                          <div className="w-full h-full flex items-center justify-center text-2xl -z-10 absolute inset-0"
-                            style={{ background: `linear-gradient(135deg, ${tagInfo.color}66, ${tagInfo.color}33)` }}>
-                            {ZODIAC_SIGNS[c.sun || c.zodiac || '']
-                              ? <ZodiacIcon sign={c.sun || c.zodiac} label={`Cung ${c.sun || c.zodiac}`} />
-                              : c.name?.[0]}
-                          </div>
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-1">
-                            <h3 className="text-white font-bold text-base truncate" title={c.name}>{c.name}</h3>
-                            <span className="text-xs text-purple-300/80 font-medium whitespace-nowrap">
-                              {c.age ? `${c.age} tuổi` : ''}
-                            </span>
-                          </div>
-                          <p className="text-purple-300 text-xs flex items-center gap-1 mt-0.5">
-                            {ZODIAC_SIGNS[c.sun || c.zodiac || ''] && (
-                              <ZodiacIcon sign={c.sun || c.zodiac} label="" className="inline text-xs" />
-                            )}
-                            <span className="font-semibold">{c.sun || c.zodiac}</span>
-                            {c.moon && <span className="opacity-70">· Moon {c.moon}</span>}
-                          </p>
-                          {c.job && (
-                            <p className="text-purple-300/60 text-[11px] truncate mt-0.5" title={c.job}>
-                              {c.job}
-                            </p>
-                          )}
-
-                          {/* Điểm Tương Hợp Tổng Hợp */}
-                          {matchScore != null && (
-                            <div className="space-y-1 mt-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="cosmic-progress flex-1 h-2">
-                                  <div className="h-full rounded" style={{ width: `${matchScore}%`, background: tagInfo.color }} />
-                                </div>
-                                <span className="text-xs font-bold whitespace-nowrap" style={{ color: tagInfo.color }}>{matchScore}%</span>
-                              </div>
-                              <div>
-                                <span
-                                  className="text-[10px] font-semibold px-2 py-0.5 rounded-md inline-block"
-                                  style={{
-                                    background: matchScore >= 85
-                                      ? 'rgba(52, 211, 153, 0.15)'
-                                      : matchScore >= 70
-                                        ? 'rgba(251, 191, 36, 0.15)'
-                                        : 'rgba(248, 113, 113, 0.15)',
-                                    border: matchScore >= 85
-                                      ? '1px solid rgba(52, 211, 153, 0.35)'
-                                      : matchScore >= 70
-                                        ? '1px solid rgba(251, 191, 36, 0.35)'
-                                        : '1px solid rgba(248, 113, 113, 0.35)',
-                                    color: matchScore >= 85 ? '#34d399' : matchScore >= 70 ? '#fbbf24' : '#f87171',
-                                  }}
-                                >
-                                  {c.match_level_text || (matchScore >= 85 ? 'Tương hợp cao' : matchScore >= 70 ? 'Tương hợp vừa' : 'Thử thách / Khác biệt')}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Đánh giá tương hợp / không xứng như nào */}
-                      {c.reason && (
-                        <p className="text-purple-200/90 text-xs leading-relaxed my-3">
-                          {c.reason}
-                        </p>
-                      )}
-
-                      {/* Lời khuyên ngắn ở dưới */}
-                      {c.advice && (
-                        <div className="flex items-start gap-1.5 p-2.5 rounded-xl bg-purple-950/40 border border-purple-500/20 text-[11px] text-purple-200/90 mb-3">
-                          <span className="text-amber-300 font-bold flex-shrink-0">💡 Lời khuyên:</span>
-                          <span className="leading-snug">{c.advice}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="space-y-2 mt-2 pt-2 border-t border-purple-500/20">
-                      <button
-                        onClick={(e) => handleQuickMatch(c, e)}
-                        disabled={requestLoading[c.uid]}
-                        className="w-full py-2 rounded-xl text-xs font-semibold text-white transition-all flex items-center justify-center gap-1.5 shadow-sm hover:opacity-95 active:scale-95"
-                        style={{
-                          background: sentStatusMap[c.uid]
-                            ? 'linear-gradient(135deg, rgba(76, 201, 240, 0.4), rgba(76, 201, 240, 0.2))'
-                            : `linear-gradient(135deg, ${tagInfo.color}, ${tagInfo.color}cc)`,
-                          border: `1px solid ${sentStatusMap[c.uid] ? 'rgba(76, 201, 240, 0.5)' : tagInfo.color + '66'}`,
-                        }}>
-                        {requestLoading[c.uid] ? (
-                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : sentStatusMap[c.uid] ? (
-                          <>
-                            <UiIcon name="check" label="Đã gửi" className="inline text-green-300" />
-                            <span>Đã gửi (Bấm để gửi lại)</span>
-                          </>
-                        ) : (
-                          <>
-                            <UiIcon name="heart" label="Kết bạn" className="inline" />
-                            <span>Kết Bạn & Ghép Đôi</span>
-                          </>
-                        )}
-                      </button>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={(e) => handleStartChat(c, e)}
-                          className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
-                          <UiIcon name="message" label="Nhắn tin" className="inline" />Nhắn Tin
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/user/${c.uid}`, { state: { candidate: c } });
+                    {/* Badge Đã Kết Đôi */}
+                    {c.isMatched && (
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <span
+                          className="text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1"
+                          style={{
+                            background: `linear-gradient(135deg, ${tagInfo.color}33, ${tagInfo.color}18)`,
+                            border: `1px solid ${tagInfo.color}66`,
+                            color: tagInfo.color,
                           }}
-                          className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
-                          <UiIcon name="user" label="Xem hồ sơ" className="inline" />Xem Hồ Sơ
-                        </button>
+                        >
+                          <svg viewBox="0 0 24 24" className="w-3 h-3 inline" fill="currentColor">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                          </svg>
+                          Đã Kết Đôi &amp; Bạn Bè
+                        </span>
+                      </div>
+                    )}
+                    {/* Avatar */}
+                    <div className="flex items-start gap-4 mb-3">
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 relative"
+                        style={{ border: `2px solid ${c.isMatched ? tagInfo.color : tagInfo.color + '66'}` }}>
+                        {c.avatar ? (
+                          <img
+                            src={c.avatar}
+                            alt={c.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : null}
+                        <div className="w-full h-full flex items-center justify-center text-2xl -z-10 absolute inset-0"
+                          style={{ background: `linear-gradient(135deg, ${tagInfo.color}66, ${tagInfo.color}33)` }}>
+                          {ZODIAC_SIGNS[c.sun || c.zodiac || '']
+                            ? <ZodiacIcon sign={c.sun || c.zodiac} label={`Cung ${c.sun || c.zodiac}`} />
+                            : c.name?.[0]}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-white font-bold text-base truncate">{c.name}</h3>
+                        <p className="text-purple-300 text-sm">{ZODIAC_SIGNS[c.sun || c.zodiac || ''] && <ZodiacIcon sign={c.sun || c.zodiac} label={`Cung ${c.sun || c.zodiac}`} className="mr-1 inline" />}{c.zodiac || c.sun}</p>
+                        {matchScore != null && (
+                          <div className="space-y-1.5 mt-1.5">
+                            <div className="flex items-center gap-2">
+                              <div className="cosmic-progress flex-1 h-1.5">
+                                <div className="h-full rounded" style={{ width: `${matchScore}%`, background: tagInfo.color }} />
+                              </div>
+                              <span className="text-xs font-bold" style={{ color: tagInfo.color }}>{matchScore}%</span>
+                            </div>
+                            <div>
+                              <span
+                                className="text-[10px] font-semibold px-2 py-0.5 rounded-md inline-block"
+                                style={{
+                                  background: matchScore >= 85
+                                    ? 'rgba(52, 211, 153, 0.15)'
+                                    : matchScore >= 70
+                                      ? 'rgba(251, 191, 36, 0.15)'
+                                      : 'rgba(248, 113, 113, 0.15)',
+                                  border: matchScore >= 85
+                                    ? '1px solid rgba(52, 211, 153, 0.35)'
+                                    : matchScore >= 70
+                                      ? '1px solid rgba(251, 191, 36, 0.35)'
+                                      : '1px solid rgba(248, 113, 113, 0.35)',
+                                  color: matchScore >= 85 ? '#34d399' : matchScore >= 70 ? '#fbbf24' : '#f87171',
+                                }}
+                              >
+                                {matchScore >= 85 ? 'Tương hợp cao' : matchScore >= 70 ? 'Tương hợp vừa' : 'Thử thách / Khác biệt'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </motion.div>
+                  {c.reason && (
+                    <p className="text-purple-200 text-xs leading-relaxed opacity-80 italic">"{c.reason}"</p>
+                  )}
+                  <div className="space-y-2 mt-3">
+                    {c.isMatched ? (
+                      <>
+                        {/* Trạng thái đã kết đôi — thay nút gửi lời mời */}
+                        <div
+                          className="w-full py-2 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1.5"
+                          style={{
+                            background: `linear-gradient(135deg, ${tagInfo.color}33, ${tagInfo.color}18)`,
+                            border: `1px solid ${tagInfo.color}55`,
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 inline" fill="currentColor">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                          </svg>
+                          <span>Đã kết đôi cùng bạn ✨</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => handleStartChat(c, e)}
+                            className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white transition-all hover:bg-white/15 flex items-center justify-center gap-1"
+                            style={{
+                              background: `linear-gradient(135deg, ${tagInfo.color}55, ${tagInfo.color}33)`,
+                              border: `1px solid ${tagInfo.color}44`,
+                            }}>
+                            <UiIcon name="message" label="Nhắn tin" className="inline" />Nhắn Tin
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/user/${c.uid}`, { state: { candidate: c } });
+                            }}
+                            className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
+                            <UiIcon name="user" label="Xem hồ sơ" className="inline" />Xem Hồ Sơ
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => handleQuickMatch(c, e)}
+                          disabled={requestLoading[c.uid]}
+                          className="w-full py-2 rounded-xl text-xs font-semibold text-white transition-all flex items-center justify-center gap-1.5 shadow-sm hover:opacity-95 active:scale-95"
+                          style={{
+                            background: sentStatusMap[c.uid]
+                              ? 'linear-gradient(135deg, rgba(76, 201, 240, 0.4), rgba(76, 201, 240, 0.2))'
+                              : `linear-gradient(135deg, ${tagInfo.color}, ${tagInfo.color}cc)`,
+                            border: `1px solid ${sentStatusMap[c.uid] ? 'rgba(76, 201, 240, 0.5)' : tagInfo.color + '66'}`,
+                          }}>
+                          {requestLoading[c.uid] ? (
+                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : sentStatusMap[c.uid] ? (
+                            <>
+                              <UiIcon name="check" label="Đã gửi" className="inline text-green-300" />
+                              <span>Đã gửi (Bấm để gửi lại)</span>
+                            </>
+                          ) : (
+                            <>
+                              <UiIcon name="heart" label="Kết bạn" className="inline" />
+                              <span>Kết Bạn &amp; Ghép Đôi</span>
+                            </>
+                          )}
+                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => handleStartChat(c, e)}
+                            className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
+                            <UiIcon name="message" label="Nhắn tin" className="inline" />Nhắn Tin
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/user/${c.uid}`, { state: { candidate: c } });
+                            }}
+                            className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
+                            <UiIcon name="user" label="Xem hồ sơ" className="inline" />Xem Hồ Sơ
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </motion.div>
               );
             })}
             </div>
@@ -817,189 +651,6 @@ export default function MatchPage() {
             <p className="text-white font-semibold mb-2">Chưa tìm thấy ai</p>
             <p className="text-purple-300 text-sm opacity-70">Vũ trụ đang chuẩn bị... Hãy thử lại sau!</p>
           </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal Mở giao diện người dùng gửi lời mời kết đôi với nút xác nhận ở Hành Động Kết Nối */}
-      <AnimatePresence>
-        {modalSender && (
-          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="glass-card max-w-2xl w-full rounded-3xl border border-purple-500/35 shadow-2xl overflow-hidden relative"
-              style={{ background: 'rgba(15, 8, 38, 0.97)' }}
-            >
-              {/* Nút đóng modal */}
-              <button
-                type="button"
-                onClick={() => setModalSender(null)}
-                className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/50 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer border border-white/20"
-                title="Đóng giao diện"
-                aria-label="Đóng giao diện"
-              >
-                ✕
-              </button>
-
-              {/* Cover & Avatar */}
-              <div className="relative">
-                <div
-                  className="h-36 sm:h-44 rounded-t-3xl overflow-hidden relative"
-                  style={{
-                    background: modalSender.coverImage
-                      ? `url(${modalSender.coverImage}) center/cover no-repeat`
-                      : `linear-gradient(135deg, rgba(168,85,247,0.4), rgba(236,72,153,0.3), #1a0030)`,
-                  }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0d0728] via-transparent to-black/30" />
-                  <div className="absolute inset-0 flex items-center justify-center text-8xl opacity-15">
-                    <ZodiacIcon sign={modalSender.sun || modalSender.zodiac} label="" />
-                  </div>
-                </div>
-
-                <div className="absolute -bottom-8 left-6">
-                  <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-2xl relative bg-purple-950 border-2 border-purple-400">
-                    {modalSender.avatar ? (
-                      <img src={modalSender.avatar} alt={modalSender.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-white bg-gradient-to-tr from-purple-600 to-pink-500">
-                        {modalSender.name?.[0]?.toUpperCase()}
-                      </div>
-                    )}
-                    <span className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-[#100a2a]" title="Trực tuyến" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Chi tiết thông tin người gửi */}
-              <div className="pt-11 p-6 space-y-4">
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="text-2xl font-bold text-white tracking-tight">{modalSender.name}</h2>
-                    {modalSender.age && (
-                      <span className="text-sm font-semibold text-purple-300 px-2.5 py-0.5 rounded-full glass border border-purple-400/30">
-                        {modalSender.age} tuổi
-                      </span>
-                    )}
-                  </div>
-                  {modalSender.job && (
-                    <p className="text-purple-300 text-sm mt-1 flex items-center gap-1.5 opacity-80">
-                      <UiIcon name="briefcase" label="Nghề nghiệp" className="inline text-xs" />
-                      <span>{modalSender.job}</span>
-                    </p>
-                  )}
-                </div>
-
-                {/* Chips chiêm tinh */}
-                <div className="flex flex-wrap gap-2 pt-0.5">
-                  <span className="glass px-3 py-1 rounded-full text-xs font-semibold text-white border border-purple-400/30 flex items-center gap-1.5">
-                    <ZodiacIcon sign={modalSender.sun || modalSender.zodiac} label="" className="inline text-xs" />
-                    <span>Sun {modalSender.sun || modalSender.zodiac}</span>
-                  </span>
-                  <span className="glass px-3 py-1 rounded-full text-xs font-semibold text-white border border-purple-400/30 flex items-center gap-1.5">
-                    <UiIcon name="moon" label="Mặt Trăng" className="inline text-xs text-yellow-200" />
-                    <span>Moon {modalSender.moon || 'Nhân Mã'}</span>
-                  </span>
-                  {modalSender.ascendant && (
-                    <span className="glass px-3 py-1 rounded-full text-xs font-semibold text-white border border-purple-400/30 flex items-center gap-1.5">
-                      <UiIcon name="arrow-up" label="Cung Mọc" className="inline text-xs text-cyan-300" />
-                      <span>Mọc {modalSender.ascendant}</span>
-                    </span>
-                  )}
-                  {modalSender.element && (
-                    <span className="glass px-3 py-1 rounded-full text-xs font-semibold text-purple-200 border border-purple-400/30">
-                      Hệ {modalSender.element}
-                    </span>
-                  )}
-                </div>
-
-                {/* Tiểu sử */}
-                {modalSender.bio && (
-                  <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-xs text-purple-200/90 leading-relaxed">
-                    <p className="font-semibold text-white mb-1">Giới thiệu bản thân:</p>
-                    <p className="italic">"{modalSender.bio}"</p>
-                  </div>
-                )}
-
-                {/* ========================================================= */}
-                {/* HÀNH ĐỘNG KẾT NỐI (CÓ NÚT XÁC NHẬN KẾT ĐÔI)                */}
-                {/* ========================================================= */}
-                <div className="glass-card p-4 sm:p-5 space-y-3 rounded-2xl border border-purple-500/30 bg-purple-950/40">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-white font-bold text-sm sm:text-base flex items-center gap-2">
-                      <UiIcon name="heart" label="Kết nối" className="text-pink-400" />
-                      <span>Hành Động Kết Nối</span>
-                    </h3>
-                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30 font-semibold animate-pulse">
-                      Đã gửi lời mời ghép đôi ✨
-                    </span>
-                  </div>
-
-                  {/* Lời nhắn từ người gửi */}
-                  <div className="p-3 rounded-xl bg-purple-900/30 border border-purple-400/20 text-xs text-purple-200">
-                    <p className="font-semibold text-purple-300 mb-0.5">Lời nhắn kết nối từ {modalSender.name}:</p>
-                    <p className="italic text-white">"{modalIncomingMsg || 'Xin chào! Tôi muốn kết nối với bạn ✨'}"</p>
-                  </div>
-
-                  {modalMatchStatus === 'matched' ? (
-                    <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-between gap-3 flex-wrap">
-                      <p className="text-emerald-300 text-sm font-semibold flex items-center gap-1.5">
-                        <UiIcon name="check" label="Đã kết đôi" className="inline text-emerald-400" />
-                        Đã kết đôi thành công với {modalSender.name}! ✨
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => handleStartChatFromModal(modalSender)}
-                        className="btn-cosmic px-4 py-2 text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
-                      >
-                        <UiIcon name="message" label="Nhắn tin" className="inline" /> Nhắn Tin Ngay
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2.5 pt-1 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={handleConfirmAcceptMatch}
-                        disabled={acceptingMatch}
-                        className="btn-cosmic px-5 py-2.5 text-xs sm:text-sm flex items-center gap-2 cursor-pointer shadow-lg hover:scale-105 active:scale-95 transition-all font-semibold"
-                      >
-                        {acceptingMatch ? (
-                          <>
-                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>Đang xác nhận...</span>
-                          </>
-                        ) : (
-                          <>
-                            <UiIcon name="check" label="Xác nhận kết đôi" className="inline" />
-                            <span>Xác Nhận Kết Đôi</span>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleRejectFromModal}
-                        disabled={acceptingMatch}
-                        className="glass px-4 py-2.5 text-xs sm:text-sm text-purple-300 hover:text-red-400 rounded-xl cursor-pointer transition-all"
-                      >
-                        Từ Chối
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleStartChatFromModal(modalSender)}
-                        className="glass px-3.5 py-2.5 text-xs sm:text-sm text-cyan-300 hover:text-white rounded-xl flex items-center gap-1.5 cursor-pointer ml-auto transition-all"
-                      >
-                        <UiIcon name="message" label="Nhắn tin" className="inline" />
-                        <span>Nhắn Tin</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </div>
         )}
       </AnimatePresence>
 

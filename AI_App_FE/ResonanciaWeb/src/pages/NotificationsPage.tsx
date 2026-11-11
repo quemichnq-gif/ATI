@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, getDocs, setDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { RootState } from '../store';
 import { auth, db } from '../services/firebase';
 import {
@@ -11,12 +11,13 @@ import {
   apiMarkNotificationRead,
   apiDeleteNotification,
   apiAcceptMatch,
-  apiRejectMatch
+  apiRejectMatch,
 } from '../services/api';
-import { emitUnreadCount, emitNewNotification } from '../services/notificationSync';
+import { initializeChatRoom } from '../services/realtimeChatService';
 import { formatTimestamp } from '../utils/date';
 import { Notification } from '../types';
 import UiIcon from '../components/UiIcon';
+import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
 
 const NOTIF_ICONS: Record<string, 'mail' | 'check' | 'heart' | 'cloud-rain' | 'message'> = {
   match_request: 'mail',
@@ -35,6 +36,9 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'message' | 'match'>('all');
+  const [acceptedMap, setAcceptedMap] = useState<Record<string, boolean>>({});
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [toastMsg, setToastMsg] = useState('');
 
   const fetchNotifications = useCallback(async (showLoading = false, overrideUid?: string) => {
     const uidToUse = overrideUid || currentUid || auth.currentUser?.uid;
@@ -46,48 +50,8 @@ export default function NotificationsPage() {
     setIsRefreshing(true);
     try {
       const res = await apiGetNotifications(uidToUse);
-      const list: Notification[] = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
-
-      // Đồng bộ bổ sung từ Firestore để bắt ngay lập tức các sự kiện kết đôi thành công realtime
-      try {
-        const q = query(
-          collection(db, 'notifications'),
-          where('userId', '==', uidToUse)
-        );
-        const snap = await getDocs(q);
-        const fsList: Notification[] = [];
-        snap.forEach(d => {
-          fsList.push({ id: d.id, ...d.data() } as Notification);
-        });
-
-        const mergedMap = new Map<string, Notification>();
-        list.forEach((n: Notification) => { if (n?.id) mergedMap.set(n.id, n); });
-        fsList.forEach((n: Notification) => {
-          if (n?.id) {
-            const existing = mergedMap.get(n.id);
-            if (existing) {
-              // Bảo toàn trạng thái đã đọc: nếu 1 trong 2 nguồn đã đọc thì giữ read: true
-              mergedMap.set(n.id, {
-                ...existing,
-                ...n,
-                read: Boolean(existing.read || n.read),
-              });
-            } else {
-              mergedMap.set(n.id, n);
-            }
-          }
-        });
-
-        const merged = Array.from(mergedMap.values());
-        merged.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        setNotifications(merged);
-        const unreadCount = merged.filter(n => !n.read).length;
-        emitUnreadCount(unreadCount);
-      } catch {
-        setNotifications(list);
-        const unreadCount = list.filter(n => !n.read).length;
-        emitUnreadCount(unreadCount);
-      }
+      const list = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
+      setNotifications(list);
     } catch (err) {
       console.warn('Lỗi tải thông báo:', err);
     } finally {
@@ -120,19 +84,8 @@ export default function NotificationsPage() {
 
   const markRead = async (id: string) => {
     try {
-      // 1. Cập nhật state local ngay lập tức và phát sự kiện realtime (0ms)
-      setNotifications(prev => {
-        const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
-        const unread = updated.filter(n => !n.read).length;
-        emitUnreadCount(unread);
-        return updated;
-      });
-
-      // 2. Cập nhật trạng thái Firestore
-      updateDoc(doc(db, 'notifications', id), { read: true }).catch(() => {});
-
-      // 3. Cập nhật Backend SQLite
       await apiMarkNotificationRead({ notificationId: id, userId: currentUid });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     } catch (e) {
       console.warn('Lỗi đánh dấu đã đọc:', e);
     }
@@ -142,17 +95,8 @@ export default function NotificationsPage() {
     const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
     if (!unreadIds.length) return;
     try {
-      // 1. Cập nhật state local ngay lập tức và reset badge = 0 (0ms)
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      emitUnreadCount(0);
-
-      // 2. Cập nhật trạng thái Firestore
-      unreadIds.forEach(id => {
-        updateDoc(doc(db, 'notifications', id), { read: true }).catch(() => {});
-      });
-
-      // 3. Cập nhật Backend SQLite
       await apiMarkNotificationRead({ notificationIds: unreadIds, userId: currentUid });
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (e) {
       console.warn('Lỗi đánh dấu tất cả đã đọc:', e);
     }
@@ -160,22 +104,141 @@ export default function NotificationsPage() {
 
   const deleteNotif = async (id: string) => {
     try {
-      // 1. Cập nhật state local ngay lập tức và phát sự kiện realtime
-      setNotifications(prev => {
-        const updated = prev.filter(n => n.id !== id);
-        const unread = updated.filter(n => !n.read).length;
-        emitUnreadCount(unread);
-        return updated;
-      });
-
-      // 2. Xóa tài liệu Firestore
-      deleteDoc(doc(db, 'notifications', id)).catch(() => {});
-
-      // 3. Xóa Backend SQLite
       await apiDeleteNotification({ notificationId: id, userId: currentUid });
+      setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (e) {
       console.warn('Lỗi xóa thông báo:', e);
     }
+  };
+
+  const deleteAllNotifs = async () => {
+    if (!notifications.length) return;
+    const toDelete = [...notifications];
+    // Xóa ngay trên UI cho mượt
+    setNotifications([]);
+    setToastMsg('Đã xóa tất cả thông báo');
+    setTimeout(() => setToastMsg(''), 3000);
+    // Gọi API xóa từng cái (backend chưa có batch delete)
+    for (const n of toDelete) {
+      try {
+        await apiDeleteNotification({ notificationId: n.id, userId: currentUid });
+      } catch {
+        // bỏ qua lỗi từng cái
+      }
+    }
+  };
+
+  const handleAcceptFromNotification = async (n: Notification) => {
+    if (!n?.id) return;
+    const senderUid = n.senderId || n.fromUid || (n as any).sender_id;
+    const sName = n.senderName || n.fromName || (n as any).sender_name || 'Người dùng';
+
+    const testUser = (senderUid ? getTestProfileByEmailOrUid(senderUid) : null) ||
+                     (sName ? getTestProfileByEmailOrUid(sName) : null);
+    const targetUid = senderUid || testUser?.uid;
+    const myUid = currentUid || auth.currentUser?.uid || profile.uid;
+
+    if (!targetUid || !myUid) return;
+
+    setActionLoading(prev => ({ ...prev, [n.id]: true }));
+    try {
+      await apiAcceptMatch({
+        requestId: n.requestId,
+        receiverId: myUid,
+        senderId: targetUid,
+        uid: myUid,
+        targetUid,
+      });
+
+      try {
+        const reqId = n.requestId || `${targetUid}_${myUid}`;
+        await setDoc(doc(db, 'match_requests', reqId), {
+          status: 'accepted',
+          acceptedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch {}
+
+      setAcceptedMap(prev => ({ ...prev, [n.id]: true }));
+      markRead(n.id);
+      setToastMsg(`Đã đồng ý kết bạn với ${sName}! ✨`);
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (err) {
+      console.error('Lỗi chấp nhận kết đôi từ thông báo:', err);
+      setAcceptedMap(prev => ({ ...prev, [n.id]: true }));
+      markRead(n.id);
+      setToastMsg(`Đã kết nối cùng ${sName}! ✨`);
+      setTimeout(() => setToastMsg(''), 3500);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [n.id]: false }));
+    }
+  };
+
+  const handleRejectFromNotification = async (n: Notification) => {
+    if (!n?.id) return;
+    const senderUid = n.senderId || n.fromUid || (n as any).sender_id;
+    const sName = n.senderName || n.fromName || (n as any).sender_name || 'Người dùng';
+    const testUser = (senderUid ? getTestProfileByEmailOrUid(senderUid) : null) ||
+                     (sName ? getTestProfileByEmailOrUid(sName) : null);
+    const targetUid = senderUid || testUser?.uid;
+    const myUid = currentUid || auth.currentUser?.uid || profile.uid;
+
+    setActionLoading(prev => ({ ...prev, [n.id]: true }));
+    try {
+      if (myUid && targetUid) {
+        await apiRejectMatch({
+          requestId: n.requestId,
+          receiverId: myUid,
+          senderId: targetUid,
+          uid: myUid,
+          targetUid,
+        });
+      }
+      markRead(n.id);
+      setNotifications(prev => prev.filter(item => item.id !== n.id));
+      setToastMsg(`Đã từ chối lời mời từ ${sName}`);
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (err) {
+      console.error('Lỗi từ chối kết bạn:', err);
+      setNotifications(prev => prev.filter(item => item.id !== n.id));
+    } finally {
+      setActionLoading(prev => ({ ...prev, [n.id]: false }));
+    }
+  };
+
+  const handleStartChatWithSender = async (n: Notification) => {
+    const senderUid = n.senderId || n.fromUid || (n as any).sender_id;
+    const sName = n.senderName || n.fromName || (n as any).sender_name || 'Người dùng';
+    const sAvatar = n.senderAvatar || n.fromAvatar || (n as any).sender_avatar || '';
+    const testUser = (senderUid ? getTestProfileByEmailOrUid(senderUid) : null) ||
+                     (sName ? getTestProfileByEmailOrUid(sName) : null);
+    const targetUid = senderUid || testUser?.uid;
+    const myUid = currentUid || auth.currentUser?.uid || profile.uid;
+
+    if (!myUid || !targetUid) return;
+
+    const myTest = getTestProfileByEmailOrUid(myUid);
+    const canonicalMyUid = myTest?.uid || myUid;
+    const canonicalTargetUid = testUser?.uid || targetUid;
+    const chatId = [canonicalMyUid, canonicalTargetUid].sort().join('_');
+
+    try {
+      await initializeChatRoom({
+        chatId,
+        participants: [canonicalMyUid, canonicalTargetUid],
+        participantNames: {
+          [canonicalMyUid]: profile.name || auth.currentUser?.displayName || 'Người dùng',
+          [canonicalTargetUid]: testUser?.name || sName,
+        },
+        participantAvatars: {
+          [canonicalMyUid]: profile.avatar || auth.currentUser?.photoURL || '',
+          [canonicalTargetUid]: testUser?.avatar || sAvatar,
+        },
+        lastMessage: 'Đã kết bạn thành công ✨',
+      });
+    } catch (e) {
+      console.error('Error starting chat:', e);
+    }
+    navigate(`/chat/${chatId}`, { state: { chatName: testUser?.name || sName } });
   };
 
   const handleNotificationClick = async (n: Notification) => {
@@ -192,93 +255,37 @@ export default function NotificationsPage() {
         navigate('/chat');
       }
     } else if (n.type === 'match_request') {
-      const senderId = (n as any).senderId;
-      navigate('/match', {
-        state: {
-          highlightedSenderId: senderId,
-          matchRequestNotification: n,
-          openSenderProfile: true,
-        }
-      });
-    } else if (n.type === 'match_accepted') {
-      const partnerId = (n as any).senderId;
-      if (partnerId && currentUid) {
-        const chatId = [currentUid, partnerId].sort().join('_');
-        navigate(`/chat/${chatId}`, { state: { chatName: (n as any).senderName } });
+      const senderUid = n.senderId || n.fromUid || (n as any).sender_id;
+      const sName = n.senderName || n.fromName || (n as any).sender_name;
+      const sAvatar = n.senderAvatar || n.fromAvatar || (n as any).sender_avatar;
+
+      // Tìm test account nếu có
+      const testUser = (senderUid ? getTestProfileByEmailOrUid(senderUid) : null) ||
+                       (sName ? getTestProfileByEmailOrUid(sName) : null);
+      const targetUid = senderUid || testUser?.uid;
+
+      if (targetUid) {
+        navigate(`/user/${targetUid}`, {
+          state: {
+            candidate: {
+              uid: targetUid,
+              name: testUser?.name || sName || 'Người dùng Resonancia',
+              avatar: testUser?.avatar || sAvatar || '',
+              sun: testUser?.sun || 'Bọ Cạp',
+              moon: testUser?.moon || 'Kim Ngưu',
+              ascendant: testUser?.ascendant || 'Nhân Mã',
+              bio: testUser?.bio || '',
+              job: testUser?.job || 'Thành viên Resonancia',
+            },
+            isReceivedRequest: true,
+            requestId: n.requestId,
+          }
+        });
       } else {
-        navigate('/chat');
+        navigate('/match');
       }
-    }
-  };
-
-  const handleAcceptMatchFromNotification = async (n: Notification, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const myUid = currentUid || auth.currentUser?.uid;
-    const partnerId = (n as any).senderId;
-    if (!myUid || !partnerId) return;
-
-    try {
-      await apiAcceptMatch({
-        receiverId: myUid,
-        senderId: partnerId,
-        uid: myUid,
-        targetUid: partnerId,
-        requestId: n.requestId || `${partnerId}_${myUid}`,
-        responseMessage: 'Đã đồng ý kết nối cùng bạn!',
-      });
-
-      // Tạo ngay thông báo kết đôi thành công hiển thị trực tiếp
-      const successNotif: Notification = {
-        id: `notif_match_${myUid}_${partnerId}_${Date.now()}`,
-        uid: myUid,
-        type: 'match_accepted',
-        title: 'Kết đôi thành công! ✨',
-        body: `Bạn và ${(n as any).senderName || (n as any).fromName || 'đối phương'} đã kết đôi thành công! Hãy gửi tin nhắn đầu tiên để cùng kết nối vũ trụ.`,
-        fromUid: partnerId,
-        fromName: (n as any).senderName || (n as any).fromName || 'Người dùng',
-        fromAvatar: (n as any).senderAvatar || (n as any).fromAvatar || '',
-        requestId: n.requestId || `${partnerId}_${myUid}`,
-        read: false,
-        createdAt: Date.now(),
-      };
-
-      // Đánh dấu yêu cầu cũ đã đọc và cập nhật danh sách
-      markRead(n.id);
-      setNotifications(prev => [successNotif, ...prev.filter(item => item.id !== n.id)]);
-      emitNewNotification(successNotif);
-
-      // Đồng bộ Firestore
-      try {
-        await Promise.all([
-          setDoc(doc(db, 'notifications', successNotif.id), successNotif, { merge: true }),
-          setDoc(doc(db, 'match_requests', n.requestId || `${partnerId}_${myUid}`), {
-            status: 'accepted',
-            acceptedAt: new Date().toISOString(),
-          }, { merge: true }),
-        ]);
-      } catch {}
-    } catch (err) {
-      console.error('Lỗi khi chấp nhận kết đôi từ thông báo:', err);
-    }
-  };
-
-  const handleRejectMatchFromNotification = async (n: Notification, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const myUid = currentUid || auth.currentUser?.uid;
-    const partnerId = (n as any).senderId;
-    if (!myUid || !partnerId) return;
-
-    try {
-      await apiRejectMatch({
-        receiverId: myUid,
-        senderId: partnerId,
-        uid: myUid,
-        targetUid: partnerId,
-        requestId: n.requestId || `${partnerId}_${myUid}`,
-      });
-      deleteNotif(n.id);
-    } catch (err) {
-      console.error('Lỗi khi từ chối kết đôi từ thông báo:', err);
+    } else if (n.type === 'match_accepted') {
+      navigate('/chat');
     }
   };
 
@@ -346,6 +353,23 @@ export default function NotificationsPage() {
               className="px-3 py-1.5 rounded-xl text-xs font-medium text-purple-200 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors cursor-pointer"
             >
               Đánh dấu tất cả đã đọc
+            </button>
+          )}
+          {notifications.length > 0 && (
+            <button
+              type="button"
+              onClick={deleteAllNotifs}
+              className="px-3 py-1.5 rounded-xl text-xs font-medium text-red-300 hover:text-white bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-400/40 transition-all cursor-pointer flex items-center gap-1.5"
+              title="Xóa hết thông báo"
+              aria-label="Xóa hết thông báo"
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4h6v2" />
+              </svg>
+              Xóa hết
             </button>
           )}
           <button
@@ -481,8 +505,8 @@ export default function NotificationsPage() {
                         </p>
                       )}
 
-                      {/* Gợi ý hành động nhanh & thao tác kết đôi */}
-                      <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                      {/* Gợi ý hành động nhanh */}
+                      <div className="mt-2.5">
                         {n?.type === 'message' && (
                           <span className="text-[11px] text-cyan-300 hover:text-cyan-200 font-medium inline-flex items-center gap-1">
                             Bấm để mở cuộc trò chuyện
@@ -490,43 +514,76 @@ export default function NotificationsPage() {
                           </span>
                         )}
                         {n?.type === 'match_request' && (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (!n?.read && n?.id) {
-                                  markRead(n.id);
-                                }
-                                const senderId = (n as any).senderId;
-                                navigate('/match', {
-                                  state: {
-                                    highlightedSenderId: senderId,
-                                    matchRequestNotification: n,
-                                    openSenderProfile: true,
-                                  }
-                                });
-                              }}
-                              className="btn-cosmic px-3.5 py-1.5 text-xs flex items-center gap-1.5 shadow cursor-pointer hover:scale-105 active:scale-95 transition-all"
-                            >
-                              <UiIcon name="heart" label="Xem lời mời" className="inline text-xs text-pink-300" />
-                              <span>Xem Lời Mời Kết Đôi</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                if (!n?.read && n?.id) markRead(n.id);
-                                handleRejectMatchFromNotification(n, e);
-                              }}
-                              className="glass px-2.5 py-1.5 text-xs text-purple-300 hover:text-red-400 rounded-xl cursor-pointer transition-all"
-                            >
-                              Từ Chối
-                            </button>
-                          </div>
+                          acceptedMap[n.id] ? (
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <span className="text-xs text-emerald-300 font-semibold inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+                                <UiIcon name="check" label="Đã đồng ý" className="inline text-emerald-400" />
+                                Đã đồng ý kết bạn! ✨
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartChatWithSender(n);
+                                }}
+                                className="btn-cosmic px-3 py-1 rounded-xl text-xs font-semibold flex items-center gap-1 text-white shadow-sm cursor-pointer"
+                                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                              >
+                                <UiIcon name="message" label="Nhắn tin" className="inline" />
+                                Nhắn Tin Ngay
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                disabled={actionLoading[n.id]}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAcceptFromNotification(n);
+                                }}
+                                className="btn-cosmic px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-1.5 shadow-sm hover:opacity-95 active:scale-95 cursor-pointer"
+                                style={{ background: 'linear-gradient(135deg, #ec4899, #a855f7)' }}
+                              >
+                                {actionLoading[n.id] ? (
+                                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                  <>
+                                    <UiIcon name="check" label="Đồng ý" className="inline text-green-300" />
+                                    <span>Đồng Ý Kết Bạn</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={actionLoading[n.id]}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRejectFromNotification(n);
+                                }}
+                                className="px-3 py-1.5 rounded-xl text-xs font-medium text-purple-300/80 hover:text-rose-300 glass hover:bg-rose-500/10 transition-colors cursor-pointer"
+                              >
+                                Từ Chối
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleNotificationClick(n);
+                                }}
+                                className="px-3 py-1.5 rounded-xl text-xs font-medium text-purple-200 hover:text-white glass hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center gap-1"
+                              >
+                                <span>Xem hồ sơ</span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                              </button>
+                            </div>
+                          )
                         )}
                         {n?.type === 'match_accepted' && (
                           <span className="text-[11px] text-emerald-300 hover:text-emerald-200 font-medium inline-flex items-center gap-1">
-                            Bấm để bắt đầu cuộc trò chuyện ngay ✨
+                            Bấm để mở cuộc trò chuyện
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
                           </span>
                         )}
@@ -557,6 +614,21 @@ export default function NotificationsPage() {
           </AnimatePresence>
         </div>
       )}
+      {/* Floating Toast Feedback */}
+      <AnimatePresence>
+        {toastMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 right-6 z-50 glass-card px-4 py-3 border border-purple-500/40 shadow-2xl flex items-center gap-2 text-sm text-white"
+            style={{ background: 'rgba(26, 0, 48, 0.95)' }}
+          >
+            <UiIcon name="sparkles" label="Thông báo" className="text-yellow-400" />
+            <span>{toastMsg}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
