@@ -22,5 +22,6 @@ from app import create_app
 app = create_app()
 
 if __name__ == "__main__":
-    print("Starting Resonancia Backend API on http://127.0.0.1:5001")
-    app.run(port=5001, debug=True)
+    port = int(os.getenv("PORT", 5001))
+    print(f"Starting Resonancia Backend API on http://127.0.0.1:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

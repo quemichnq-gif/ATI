@@ -3,6 +3,7 @@ import sqlite3
 import json
 import time
 import os
+from datetime import datetime
 
 # Cố định đường dẫn tuyệt đối tới file chat_database.db chuẩn của AI_App_BE
 BE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -30,6 +31,57 @@ UID_GROUPS = [
     },
 ]
 
+CANONICAL_UID_MAP = {
+    # Hà My
+    'cand_2_hamy': 'C6U7eytPpdQyw2YufISm4mNh6N72',
+    '61kO1itQCOV3Nw9acgWUmQLduNT2': 'C6U7eytPpdQyw2YufISm4mNh6N72',
+    'C6U7eytPpdQyw2YufISm4mNh6N72': 'C6U7eytPpdQyw2YufISm4mNh6N72',
+    # Tuấn
+    'user_main_tuan': 'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    'user_tuan': 'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    'yEQyrTCQJwWedUyffYTqt5O01ih1': 'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    'Rietkt4hguXJeAyjKv6Fqo5E7OK2': 'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    '37ttDQ1n6LbeJpNuieiYdSBtnal1': 'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    'x5cEmtlghVYlrpyITC1FSaonIzt1': 'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    # Đại Nghĩa
+    'cand_1_dainghia': 'PAKzF0JCu3Zh11N59MzxUlCG3pq2',
+    'cand_1_nghia': 'PAKzF0JCu3Zh11N59MzxUlCG3pq2',
+    'YykBl98StbXVCKgqave6VMVC5Bx1': 'PAKzF0JCu3Zh11N59MzxUlCG3pq2',
+    'PAKzF0JCu3Zh11N59MzxUlCG3pq2': 'PAKzF0JCu3Zh11N59MzxUlCG3pq2',
+}
+
+KNOWN_USER_INFO = {
+    'C6U7eytPpdQyw2YufISm4mNh6N72': {
+        'name': 'Hà My',
+        'avatar': 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80'
+    },
+    'cand_2_hamy': {
+        'name': 'Hà My',
+        'avatar': 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80'
+    },
+    'x5cEmtlghVYlrpyITC1FSaonIzt1': {
+        'name': 'Tuấn Nguyễn Chí',
+        'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
+    },
+    'user_tuan': {
+        'name': 'Tuấn Nguyễn Chí',
+        'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
+    },
+    'PAKzF0JCu3Zh11N59MzxUlCG3pq2': {
+        'name': 'Trần Đại Nghĩa',
+        'avatar': 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80'
+    },
+    'cand_1_dainghia': {
+        'name': 'Trần Đại Nghĩa',
+        'avatar': 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80'
+    },
+}
+
+def canonical_uid(uid):
+    if not uid:
+        return ""
+    return CANONICAL_UID_MAP.get(uid, uid)
+
 def uid_aliases(uid):
     if not uid:
         return []
@@ -39,32 +91,43 @@ def uid_aliases(uid):
             aliases.update(group)
     return list(aliases)
 
+def get_possible_chat_ids(chat_id):
+    if not chat_id:
+        return []
+    result = {chat_id}
+    parts = chat_id.split('_')
+    if len(parts) == 2:
+        u1, u2 = parts[0], parts[1]
+        aliases1 = uid_aliases(u1) or [u1]
+        aliases2 = uid_aliases(u2) or [u2]
+        for a1 in aliases1:
+            for a2 in aliases2:
+                result.add(f"{a1}_{a2}")
+                result.add(f"{a2}_{a1}")
+        c1, c2 = canonical_uid(u1), canonical_uid(u2)
+        sorted_c = sorted([c1, c2])
+        result.add(f"{sorted_c[0]}_{sorted_c[1]}")
+    return list(result)
+
 def chat_contains_user(participants, uid):
+    if not uid:
+        return True
     allowed_ids = set(uid_aliases(uid))
     return any(participant in allowed_ids for participant in participants)
 
 def load_chat_for_user(cursor, chat_id, uid):
-    possible_chat_ids = [chat_id]
-    parts = chat_id.split('_')
-    if len(parts) == 2:
-        possible_chat_ids.append(f"{parts[1]}_{parts[0]}")
-
+    possible_chat_ids = get_possible_chat_ids(chat_id)
     placeholders = ','.join(['?'] * len(possible_chat_ids))
-    cursor.execute(f'SELECT * FROM chats WHERE chat_id IN ({placeholders})', possible_chat_ids)
+    cursor.execute(f'SELECT * FROM chats WHERE chat_id IN ({placeholders}) ORDER BY last_timestamp DESC', possible_chat_ids)
     rows = cursor.fetchall()
     for row in rows:
         try:
             participants = json.loads(row['participants'] or '[]')
         except (TypeError, ValueError):
             continue
-        if chat_contains_user(participants, uid):
+        if not uid or chat_contains_user(participants, uid):
             return row
     return None
-    try:
-        participants = json.loads(row['participants'] or '[]')
-    except (TypeError, ValueError):
-        return None
-    return row if chat_contains_user(participants, uid) else None
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -129,16 +192,26 @@ def create_or_update_chat(chat_id, participants, names, avatars, last_msg, uid):
     conn = get_db()
     cursor = conn.cursor()
     row = load_chat_for_user(cursor, chat_id, uid)
+    actual_chat_id = row['chat_id'] if row else chat_id
+
+    # Đảm bảo có đủ tên và avatar từ KNOWN_USER_INFO nếu thiếu
+    full_names = dict(names or {})
+    full_avatars = dict(avatars or {})
+    for p in participants:
+        if p not in full_names and p in KNOWN_USER_INFO:
+            full_names[p] = KNOWN_USER_INFO[p]['name']
+        if p not in full_avatars and p in KNOWN_USER_INFO:
+            full_avatars[p] = KNOWN_USER_INFO[p]['avatar']
 
     if not row:
         cursor.execute('''
             INSERT INTO chats (chat_id, participants, participant_names, participant_avatars, last_message, last_timestamp, last_sender_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            chat_id,
+            actual_chat_id,
             json.dumps(participants),
-            json.dumps(names),
-            json.dumps(avatars),
+            json.dumps(full_names),
+            json.dumps(full_avatars),
             last_msg,
             now,
             participants[0] if participants else '',
@@ -147,21 +220,21 @@ def create_or_update_chat(chat_id, participants, names, avatars, last_msg, uid):
     else:
         existing_names = json.loads(row['participant_names'] or '{}')
         existing_avatars = json.loads(row['participant_avatars'] or '{}')
-        existing_names.update(names)
-        existing_avatars.update(avatars)
+        existing_names.update(full_names)
+        existing_avatars.update(full_avatars)
         cursor.execute('''
-            UPDATE chats SET participant_names = ?, participant_avatars = ? WHERE chat_id = ?
-        ''', (json.dumps(existing_names), json.dumps(existing_avatars), chat_id))
+            UPDATE chats SET participant_names = ?, participant_avatars = ?, last_message = ?, last_timestamp = ? WHERE chat_id = ?
+        ''', (json.dumps(existing_names), json.dumps(existing_avatars), last_msg, now, actual_chat_id))
 
     conn.commit()
     conn.close()
-    return {"success": True, "chatId": chat_id, "status": 200}
+    return {"success": True, "chatId": actual_chat_id, "status": 200}
 
 def send_chat_message(chat_id, sender_id, sender_name, sender_avatar, text, msg_type, file_url, file_name, file_size, uid):
     if not chat_id or not sender_id or not text:
         return {"error": "Missing chatId, senderId or text", "status": 400}
 
-    if sender_id != uid:
+    if uid and sender_id != uid and sender_id not in uid_aliases(uid):
         return {"error": "Sender does not match authenticated user", "status": 403}
 
     now = int(time.time() * 1000)
@@ -170,29 +243,51 @@ def send_chat_message(chat_id, sender_id, sender_name, sender_avatar, text, msg_
     conn = get_db()
     cursor = conn.cursor()
 
+    row = load_chat_for_user(cursor, chat_id, uid or sender_id)
+    actual_chat_id = row['chat_id'] if row else chat_id
+
     cursor.execute('''
         INSERT INTO messages (id, chat_id, sender_id, sender_name, sender_avatar, text, timestamp, read, type, file_url, file_name, file_size)
         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
-    ''', (msg_id, chat_id, sender_id, sender_name, sender_avatar, text, now, msg_type, file_url, file_name, file_size))
+    ''', (msg_id, actual_chat_id, sender_id, sender_name, sender_avatar, text, now, msg_type, file_url, file_name, file_size))
 
     last_msg_preview = '[Hình ảnh]' if msg_type == 'image' else (f'[Tệp: {file_name}]' if msg_type == 'file' else text)
-    row = load_chat_for_user(cursor, chat_id, uid)
     if row:
+        existing_names = json.loads(row['participant_names'] or '{}')
+        existing_avatars = json.loads(row['participant_avatars'] or '{}')
+        existing_names[sender_id] = sender_name
+        if sender_avatar:
+            existing_avatars[sender_id] = sender_avatar
+        # Bổ sung tên người nhận nếu chưa có
+        for p in json.loads(row['participants'] or '[]'):
+            if p not in existing_names and p in KNOWN_USER_INFO:
+                existing_names[p] = KNOWN_USER_INFO[p]['name']
+            if p not in existing_avatars and p in KNOWN_USER_INFO:
+                existing_avatars[p] = KNOWN_USER_INFO[p]['avatar']
+
         cursor.execute('''
-            UPDATE chats SET last_message = ?, last_timestamp = ?, last_sender_id = ?
+            UPDATE chats SET last_message = ?, last_timestamp = ?, last_sender_id = ?,
+                             participant_names = ?, participant_avatars = ?
             WHERE chat_id = ?
-        ''', (last_msg_preview, now, sender_id, chat_id))
+        ''', (last_msg_preview, now, sender_id, json.dumps(existing_names), json.dumps(existing_avatars), actual_chat_id))
     else:
         parts = chat_id.split('_')
         participants = parts if len(parts) >= 2 else [sender_id]
+        names_dict = {sender_id: sender_name}
+        avatars_dict = {sender_id: sender_avatar}
+        for p in participants:
+            if p != sender_id and p not in names_dict and p in KNOWN_USER_INFO:
+                names_dict[p] = KNOWN_USER_INFO[p]['name']
+                avatars_dict[p] = KNOWN_USER_INFO[p]['avatar']
+
         cursor.execute('''
             INSERT INTO chats (chat_id, participants, participant_names, participant_avatars, last_message, last_timestamp, last_sender_id, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            chat_id,
+            actual_chat_id,
             json.dumps(participants),
-            json.dumps({sender_id: sender_name}),
-            json.dumps({sender_id: sender_avatar}),
+            json.dumps(names_dict),
+            json.dumps(avatars_dict),
             last_msg_preview,
             now,
             sender_id,
@@ -200,13 +295,60 @@ def send_chat_message(chat_id, sender_id, sender_name, sender_avatar, text, msg_
         ))
 
     conn.commit()
+
+    # Tìm người nhận tin nhắn để tự động tạo thông báo đến trang /notifications
+    receiver_id = None
+    if row and row['participants']:
+        try:
+            participants = json.loads(row['participants'] or '[]')
+            sender_aliases = set(uid_aliases(sender_id))
+            for p in participants:
+                if p not in sender_aliases:
+                    receiver_id = p
+                    break
+        except Exception:
+            pass
+
+    if not receiver_id:
+        parts = actual_chat_id.split('_')
+        sender_aliases = set(uid_aliases(sender_id))
+        for p in parts:
+            if p != sender_id and p not in sender_aliases:
+                receiver_id = p
+                break
+
+    if receiver_id:
+        notif_id = f"notif_{now}_{os.urandom(4).hex()}"
+        preview_text = text if msg_type == 'text' else ('[Hình ảnh]' if msg_type == 'image' else f'[Tệp: {file_name or "tài liệu"}]')
+        if len(preview_text) > 80:
+            preview_text = preview_text[:77] + '...'
+        notif = {
+            "id": notif_id,
+            "userId": receiver_id,
+            "type": "message",
+            "title": f"Tin nhắn mới từ {sender_name} 💬",
+            "message": preview_text,
+            "body": preview_text,
+            "senderId": sender_id,
+            "senderName": sender_name,
+            "senderAvatar": sender_avatar or "",
+            "requestId": actual_chat_id,
+            "read": False,
+            "createdAt": datetime.now().isoformat(),
+        }
+        try:
+            from app.repositories.storage_db import create_notification as db_create_notification
+            db_create_notification(notif)
+        except Exception as e:
+            print("Lỗi tạo thông báo tin nhắn đến:", e)
+
     conn.close()
 
     return {
         "success": True,
         "message": {
             'id': msg_id,
-            'chatId': chat_id,
+            'chatId': actual_chat_id,
             'senderId': sender_id,
             'senderName': sender_name,
             'senderAvatar': sender_avatar,
@@ -222,19 +364,15 @@ def send_chat_message(chat_id, sender_id, sender_name, sender_avatar, text, msg_
     }
 
 def get_chat_messages(chat_id, since, uid):
-    possible_chat_ids = [chat_id]
-    parts = chat_id.split('_')
-    if len(parts) == 2:
-        reversed_id = f"{parts[1]}_{parts[0]}"
-        possible_chat_ids.append(reversed_id)
-
+    possible_chat_ids = get_possible_chat_ids(chat_id)
     conn = get_db()
     cursor = conn.cursor()
 
     chat_row = load_chat_for_user(cursor, chat_id, uid)
     if not chat_row:
         allowed_ids = set(uid_aliases(uid))
-        if any(p in allowed_ids for p in parts):
+        parts = chat_id.split('_')
+        if any(p in allowed_ids for p in parts) or not uid:
             conn.close()
             return {"success": True, "messages": [], "status": 200}
         conn.close()
@@ -336,10 +474,7 @@ def delete_chat(chat_id, uid):
     conn = get_db()
     cursor = conn.cursor()
 
-    possible_chat_ids = [chat_id]
-    parts = chat_id.split('_')
-    if len(parts) == 2:
-        possible_chat_ids.append(f"{parts[1]}_{parts[0]}")
+    possible_chat_ids = get_possible_chat_ids(chat_id)
 
     if uid:
         aliases = set(uid_aliases(uid))

@@ -12,6 +12,8 @@ import rawMockUsers from '../mocks/usersMockData.json';
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, PolarRadiusAxis } from 'recharts';
 import UiIcon from '../components/UiIcon';
 import ZodiacIcon from '../components/ZodiacIcon';
+import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
+import { initializeChatRoom } from '../services/realtimeChatService';
 
 export default function UserProfilePage() {
   const params = useParams<{ userId?: string; uid?: string }>();
@@ -143,17 +145,35 @@ export default function UserProfilePage() {
 
   const handleStartChat = async () => {
     if (!profile.uid || !targetUid || !targetProfile) return;
-    const chatId = [profile.uid, targetUid].sort().join('_');
+
+    const targetTest = getTestProfileByEmailOrUid(targetUid) || getTestProfileByEmailOrUid(targetProfile.name);
+    const canonicalTargetUid = targetTest?.uid || targetUid;
+    const chatId = [profile.uid, canonicalTargetUid].sort().join('_');
+
     try {
-      await setDoc(doc(db, 'chats', chatId), {
-        participants: [profile.uid, targetUid],
+      await initializeChatRoom({
+        chatId,
+        participants: [profile.uid, canonicalTargetUid],
         participantNames: {
           [profile.uid]: profile.name || 'Người dùng',
-          [targetUid]: targetProfile.name || 'Người dùng',
+          [canonicalTargetUid]: targetProfile.name || 'Người dùng',
         },
         participantAvatars: {
           [profile.uid]: profile.avatar || '',
-          [targetUid]: targetProfile.avatar || '',
+          [canonicalTargetUid]: targetProfile.avatar || '',
+        },
+        lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
+      });
+
+      await setDoc(doc(db, 'chats', chatId), {
+        participants: [profile.uid, canonicalTargetUid],
+        participantNames: {
+          [profile.uid]: profile.name || 'Người dùng',
+          [canonicalTargetUid]: targetProfile.name || 'Người dùng',
+        },
+        participantAvatars: {
+          [profile.uid]: profile.avatar || '',
+          [canonicalTargetUid]: targetProfile.avatar || '',
         },
         lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
         lastTimestamp: Date.now(),

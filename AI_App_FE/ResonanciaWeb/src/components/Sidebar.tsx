@@ -4,6 +4,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
+import { apiGetNotifications } from '../services/api';
 import UiIcon from './UiIcon';
 
 function NavIcon({ name }: { name: string }) {
@@ -76,10 +77,27 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   };
 
   const authUser = useSelector((state: RootState) => state.auth);
+  const currentUid = profile.uid || authUser.uid || auth.currentUser?.uid || '';
   const currentEmail = profile.email || authUser.email || auth.currentUser?.email || '';
   const currentName = profile.name?.trim() || auth.currentUser?.displayName?.trim() || '';
   const displayName = currentName || (currentEmail ? currentEmail.split('@')[0] : 'Người dùng');
   const hasAstro = Boolean(profile.sun && profile.moon);
+
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  useEffect(() => {
+    if (!currentUid) return;
+    const checkUnread = async () => {
+      try {
+        const res = await apiGetNotifications(currentUid);
+        const list = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
+        setUnreadNotifs(list.filter((n: any) => !n.read).length);
+      } catch {}
+    };
+    checkUnread();
+    const timer = setInterval(checkUnread, 10000);
+    return () => clearInterval(timer);
+  }, [currentUid]);
 
   const sidebarContent = (
     <aside
@@ -168,7 +186,17 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
               boxShadow: '0 4px 12px rgba(147, 51, 234, 0.15)'
             } : {}}
           >
-            <NavIcon name={item.iconKey} />
+            <div className="relative flex-shrink-0">
+              <NavIcon name={item.iconKey} />
+              {item.path === '/notifications' && unreadNotifs > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full text-white text-[9px] font-bold flex items-center justify-center"
+                  style={{ background: 'rgba(244,63,94,0.95)', boxShadow: '0 0 6px rgba(244,63,94,0.7)', lineHeight: 1 }}
+                >
+                  {unreadNotifs > 99 ? '99+' : unreadNotifs}
+                </span>
+              )}
+            </div>
             <span className="tracking-wide">{item.label}</span>
           </NavLink>
         ))}

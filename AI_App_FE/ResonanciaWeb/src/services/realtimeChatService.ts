@@ -15,13 +15,26 @@ import {
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
 
 async function chatFetch(url: string, init: RequestInit = {}): Promise<Response | null> {
-  const user = auth.currentUser;
+  let user = auth.currentUser;
+  if (!user) {
+    try {
+      if (typeof (auth as any).authStateReady === 'function') {
+        await (auth as any).authStateReady();
+        user = auth.currentUser;
+      }
+    } catch {}
+  }
   if (!user) return null;
 
-  const token = await user.getIdToken();
-  const headers = new Headers(init.headers);
-  headers.set('Authorization', `Bearer ${token}`);
-  return fetch(url, { ...init, headers });
+  try {
+    const token = await user.getIdToken();
+    const headers = new Headers(init.headers);
+    headers.set('Authorization', `Bearer ${token}`);
+    return await fetch(url, { ...init, headers });
+  } catch (err) {
+    console.warn('chatFetch network error:', err);
+    return null;
+  }
 }
 
 export interface ChatMessage {

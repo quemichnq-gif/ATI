@@ -81,11 +81,11 @@ export default function LoginPage() {
         (userEmail ? userEmail.split('@')[0] : 'Người dùng');
 
       const initialProfile = {
+        ...(testAcc || {}),
+        ...(cachedData || {}),
         uid: user.uid,
         email: userEmail,
         name: effectiveName,
-        ...(testAcc || {}),
-        ...(cachedData || {}),
       };
 
       dispatch(setProfile(initialProfile as any));

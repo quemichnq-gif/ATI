@@ -43,7 +43,7 @@ def send_message():
     file_url = data.get("fileUrl")
     file_name = data.get("fileName")
     file_size = data.get("fileSize")
-    uid = authenticated_uid()
+    uid = authenticated_uid() or sender_id
 
     res = send_chat_message(chat_id, sender_id, sender_name, sender_avatar, text, msg_type, file_url, file_name, file_size, uid)
     status_code = res.pop("status", 200)

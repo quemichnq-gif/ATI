@@ -271,6 +271,37 @@ def _format_match_request_row(row: sqlite3.Row) -> Dict[str, Any]:
 # NOTIFICATIONS REPOSITORY
 # ==============================================================================
 
+UID_GROUPS = [
+    {
+        'cand_2_hamy',
+        '61kO1itQCOV3Nw9acgWUmQLduNT2',
+        'C6U7eytPpdQyw2YufISm4mNh6N72',
+    },
+    {
+        'cand_1_dainghia',
+        'cand_1_nghia',
+        'YykBl98StbXVCKgqave6VMVC5Bx1',
+        'PAKzF0JCu3Zh11N59MzxUlCG3pq2',
+    },
+    {
+        'user_main_tuan',
+        'user_tuan',
+        'yEQyrTCQJwWedUyffYTqt5O01ih1',
+        'Rietkt4hguXJeAyjKv6Fqo5E7OK2',
+        '37ttDQ1n6LbeJpNuieiYdSBtnal1',
+        'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    },
+]
+
+def uid_aliases(uid: str) -> List[str]:
+    if not uid:
+        return []
+    aliases = {uid}
+    for group in UID_GROUPS:
+        if uid in group:
+            aliases.update(group)
+    return list(aliases)
+
 def create_notification(notif: Dict[str, Any]) -> None:
     conn = get_db_connection()
     try:
@@ -284,7 +315,7 @@ def create_notification(notif: Dict[str, Any]) -> None:
                 notif.get("userId"),
                 notif.get("type", "match_request"),
                 notif.get("title", ""),
-                notif.get("message", ""),
+                notif.get("message", "") or notif.get("body", ""),
                 notif.get("senderId", ""),
                 notif.get("senderName", ""),
                 notif.get("senderAvatar", ""),
@@ -297,27 +328,38 @@ def create_notification(notif: Dict[str, Any]) -> None:
 
 
 def get_user_notifications(user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    if not user_id:
+        return []
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute('''
+        aliases = uid_aliases(user_id)
+        if not aliases:
+            aliases = [user_id]
+        placeholders = ','.join(['?'] * len(aliases))
+        cursor.execute(f'''
             SELECT * FROM notifications 
-            WHERE user_id = ? 
+            WHERE user_id IN ({placeholders}) 
             ORDER BY created_at DESC LIMIT ?
-        ''', (user_id, limit))
+        ''', (*aliases, limit))
         rows = cursor.fetchall()
         result = []
         for r in rows:
+            msg_text = r["message"] or ""
+            notif_type = r["type"] or "message"
+            req_id = r["request_id"] or ""
             result.append({
                 "id": r["id"],
                 "userId": r["user_id"],
-                "type": r["type"],
+                "type": notif_type,
                 "title": r["title"] or "",
-                "message": r["message"] or "",
+                "message": msg_text,
+                "body": msg_text,
                 "senderId": r["sender_id"] or "",
                 "senderName": r["sender_name"] or "",
                 "senderAvatar": r["sender_avatar"] or "",
-                "requestId": r["request_id"] or "",
+                "requestId": req_id,
+                "chatId": req_id if notif_type == "message" else "",
                 "read": bool(r["read"]),
                 "createdAt": r["created_at"] or ""
             })
@@ -331,13 +373,17 @@ def mark_notifications_read(user_id: str, notification_ids: List[str]) -> int:
         return 0
     conn = get_db_connection()
     try:
-        placeholders = ','.join(['?'] * len(notification_ids))
+        aliases = uid_aliases(user_id) if user_id else []
+        if not aliases:
+            aliases = [user_id]
+        u_placeholders = ','.join(['?'] * len(aliases))
+        id_placeholders = ','.join(['?'] * len(notification_ids))
         with conn:
             cursor = conn.execute(f'''
                 UPDATE notifications 
                 SET read = 1 
-                WHERE user_id = ? AND id IN ({placeholders})
-            ''', (user_id, *notification_ids))
+                WHERE user_id IN ({u_placeholders}) AND id IN ({id_placeholders})
+            ''', (*aliases, *notification_ids))
             return cursor.rowcount
     finally:
         conn.close()
@@ -346,11 +392,15 @@ def mark_notifications_read(user_id: str, notification_ids: List[str]) -> int:
 def delete_notification(user_id: str, notification_id: str) -> bool:
     conn = get_db_connection()
     try:
+        aliases = uid_aliases(user_id) if user_id else []
+        if not aliases:
+            aliases = [user_id]
+        u_placeholders = ','.join(['?'] * len(aliases))
         with conn:
-            cursor = conn.execute('''
+            cursor = conn.execute(f'''
                 DELETE FROM notifications 
-                WHERE user_id = ? AND id = ?
-            ''', (user_id, notification_id))
+                WHERE user_id IN ({u_placeholders}) AND id = ?
+            ''', (*aliases, notification_id))
             return cursor.rowcount > 0
     finally:
         conn.close()

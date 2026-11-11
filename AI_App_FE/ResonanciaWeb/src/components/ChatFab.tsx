@@ -9,12 +9,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { auth, db } from '../services/firebase';
 import { RootState } from '../store';
 import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
+import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
 import { formatTimestamp } from '../utils/date';
 import {
   sendChatMessage,
   subscribeToChatMessages,
   subscribeToUserChats,
   initializeChatRoom,
+  deleteChatConversation,
 } from '../services/realtimeChatService';
 
 /**
@@ -64,6 +66,8 @@ export default function ChatFab() {
   const [chats, setChats] = useState<any[]>([]);
   const [loadingChats, setLoadingChats] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
+  const [deletingChatName, setDeletingChatName] = useState<string | null>(null);
 
   // Active chat session in popup
   const [activeChat, setActiveChat] = useState<{
@@ -86,6 +90,14 @@ export default function ChatFab() {
   const currentUid = profile.uid || auth.currentUser?.uid || '';
   const currentUserName = profile.name || auth.currentUser?.displayName || 'Người dùng';
   const currentUserAvatar = profile.avatar || auth.currentUser?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80';
+
+  const myTestAcc = getTestProfileByEmailOrUid(currentUid) || getTestProfileByEmailOrUid(profile.email || '') || getTestProfileByEmailOrUid(profile.uid || '');
+  const myAliases = new Set([
+    currentUid,
+    profile.uid || '',
+    auth.currentUser?.uid || '',
+    ...(myTestAcc?.aliasUids || []),
+  ].filter(Boolean));
 
   // Lắng nghe danh sách cuộc trò chuyện từ Firestore
   useEffect(() => {
@@ -177,38 +189,71 @@ export default function ChatFab() {
     }
 
     const targetUid = candidate.uid;
-    const chatId = [currentUid, targetUid].sort().join('_');
+    const targetTest = getTestProfileByEmailOrUid(targetUid) || getTestProfileByEmailOrUid(candidate.name);
+    const canonicalTargetUid = targetTest?.uid || targetUid;
+    const chatId = [currentUid, canonicalTargetUid].sort().join('_');
 
     await initializeChatRoom({
       chatId,
-      participants: [currentUid, targetUid],
+      participants: [currentUid, canonicalTargetUid],
       participantNames: {
         [currentUid]: currentUserName,
-        [targetUid]: candidate.name || 'Người dùng',
+        [canonicalTargetUid]: candidate.name || 'Người dùng',
       },
       participantAvatars: {
         [currentUid]: currentUserAvatar,
-        [targetUid]: candidate.avatar || '',
+        [canonicalTargetUid]: candidate.avatar || '',
       },
       lastMessage: 'Đã bắt đầu cuộc trò chuyện ✨',
     });
 
     setActiveChat({
       chatId,
-      partnerId: targetUid,
+      partnerId: canonicalTargetUid,
       partnerName: candidate.name,
       partnerAvatar: candidate.avatar,
     });
   };
 
-  // Danh sách gợi ý từ default candidates khi chưa có đoạn chat
-  const suggestedCandidates = Object.values(DEFAULT_CANDIDATE_PROFILES).slice(0, 4);
+  const handleConfirmDeleteChat = async () => {
+    if (!deletingChatId) return;
+    const idToDelete = deletingChatId;
+    setDeletingChatId(null);
+    setDeletingChatName(null);
 
-  // Lọc chat theo tìm kiếm
-  const filteredChats = chats.filter((chat) => {
-    const otherUid = chat.participants?.find((p: string) => p !== currentUid);
-    const otherName = chat.participantNames?.[otherUid] || 'Người dùng';
-    return otherName.toLowerCase().includes(searchTerm.toLowerCase());
+    if (activeChat?.chatId === idToDelete) {
+      setActiveChat(null);
+    }
+
+    // Xóa ngay lập tức khỏi state để UI phản hồi tức thì
+    setChats((prev) => prev.filter((c) => c.id !== idToDelete));
+    await deleteChatConversation(idToDelete);
+  };
+
+  // Danh sách gợi ý từ default candidates khi chưa có đoạn chat (loại bỏ chính mình)
+  const suggestedCandidates = Object.values(DEFAULT_CANDIDATE_PROFILES).filter(
+    (c) => !myAliases.has(c.uid) && c.name !== profile.name
+  ).slice(0, 4);
+
+  // Lọc và gộp các cuộc trò chuyện cùng một người (deduplicate) giống ChatListPage
+  const seenPartners = new Set<string>();
+  const filteredChats = chats.filter((c) => {
+    const oUid = c.participants?.find((p: string) => !myAliases.has(p)) || '';
+    if (!oUid) {
+      return false;
+    }
+
+    const oCand = DEFAULT_CANDIDATE_PROFILES[oUid];
+    const testAcc = getTestProfileByEmailOrUid(oUid);
+    const name = testAcc?.name || oCand?.name || c.participantNames?.[oUid] || '';
+
+    const partnerKey = testAcc?.email || testAcc?.name || oCand?.name || oUid;
+    if (seenPartners.has(partnerKey)) {
+      return false;
+    }
+    seenPartners.add(partnerKey);
+
+    return name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   if (isHidden) return null;
@@ -224,7 +269,7 @@ export default function ChatFab() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 16 }}
             transition={{ type: 'spring', damping: 26, stiffness: 340 }}
-            className="pointer-events-auto mb-3 w-[410px] max-w-[calc(100vw-32px)] h-[580px] max-h-[calc(100vh-120px)] rounded-2xl flex flex-col overflow-hidden shadow-2xl border"
+            className="pointer-events-auto mb-3 w-[410px] max-w-[calc(100vw-32px)] h-[580px] max-h-[calc(100vh-120px)] rounded-2xl flex flex-col overflow-hidden shadow-2xl border relative"
             style={{
               background: 'linear-gradient(165deg, rgba(16, 10, 42, 0.96) 0%, rgba(9, 4, 26, 0.98) 100%)',
               borderColor: 'rgba(168, 85, 247, 0.35)',
@@ -280,6 +325,23 @@ export default function ChatFab() {
                   </div>
 
                   <div className="flex items-center gap-1 text-purple-300">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeletingChatId(activeChat.chatId);
+                        setDeletingChatName(activeChat.partnerName);
+                      }}
+                      className="p-1.5 rounded-lg text-purple-300/60 hover:text-rose-400 hover:bg-rose-500/15 transition-colors cursor-pointer"
+                      title="Xóa đoạn chat này"
+                      aria-label="Xóa đoạn chat này"
+                    >
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -506,30 +568,46 @@ export default function ChatFab() {
                     </div>
                   ) : filteredChats.length > 0 ? (
                     filteredChats.map((chat) => {
-                      const otherUid = chat.participants?.find((p: string) => p !== currentUid);
-                      const otherCand = DEFAULT_CANDIDATE_PROFILES[otherUid];
-                      const otherName = otherCand?.name || chat.participantNames?.[otherUid] || 'Người dùng';
-                      const otherAvatar = otherCand?.avatar || chat.participantAvatars?.[otherUid] || '';
+                      const oUid = chat.participants?.find((p: string) => !myAliases.has(p)) || chat.participants?.find((p: string) => p !== currentUid) || '';
+                      const oCand = oUid ? DEFAULT_CANDIDATE_PROFILES[oUid] : undefined;
+                      const testAcc = oUid ? getTestProfileByEmailOrUid(oUid) : null;
+                      const oName = testAcc?.name || oCand?.name || (oUid ? chat.participantNames?.[oUid] : '') || 'Người dùng';
+                      const oAvatar = testAcc?.avatar || oCand?.avatar || (oUid ? chat.participantAvatars?.[oUid] : '');
+
                       return (
-                        <button
+                        <div
                           key={chat.id}
-                          type="button"
+                          role="button"
+                          tabIndex={0}
                           onClick={() =>
                             setActiveChat({
                               chatId: chat.id,
-                              partnerId: otherUid,
-                              partnerName: otherName,
-                              partnerAvatar: otherAvatar,
+                              partnerId: oUid,
+                              partnerName: oName,
+                              partnerAvatar: oAvatar,
                             })
                           }
-                          className="w-full p-2.5 rounded-xl flex items-center gap-3 text-left transition-all hover:bg-purple-500/15 group"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setActiveChat({
+                                chatId: chat.id,
+                                partnerId: oUid,
+                                partnerName: oName,
+                                partnerAvatar: oAvatar,
+                              });
+                            }
+                          }}
+                          className="w-full p-2.5 rounded-xl flex items-center gap-3 text-left transition-all hover:bg-purple-500/15 group cursor-pointer"
                         >
                           <div className="relative flex-shrink-0">
                             <div className="w-11 h-11 rounded-full overflow-hidden border border-purple-400/30 bg-purple-900/40 flex items-center justify-center font-bold text-white text-sm">
-                              {otherAvatar ? (
-                                <img src={otherAvatar} alt="" className="w-full h-full object-cover" />
+                              {oAvatar ? (
+                                <img src={oAvatar} alt="" className="w-full h-full object-cover" />
                               ) : (
-                                otherName[0]?.toUpperCase()
+                                <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center font-bold text-white text-sm">
+                                  {oName[0]?.toUpperCase() || 'U'}
+                                </div>
                               )}
                             </div>
                             <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#100a2a]" />
@@ -538,7 +616,7 @@ export default function ChatFab() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <h4 className="text-white text-xs font-semibold truncate group-hover:text-purple-200">
-                                {otherName}
+                                {oName}
                               </h4>
                               {chat.lastTimestamp && (
                                 <span className="text-[10px] text-purple-400/60 ml-2">
@@ -547,10 +625,31 @@ export default function ChatFab() {
                               )}
                             </div>
                             <p className="text-[11px] text-purple-300/70 truncate mt-0.5">
+                              {chat.lastSenderId === currentUid || myAliases.has(chat.lastSenderId || '') ? 'Bạn: ' : ''}
                               {chat.lastMessage || 'Bắt đầu cuộc trò chuyện...'}
                             </p>
                           </div>
-                        </button>
+
+                          {/* Nút Xóa đoạn chat giống ở /chat */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingChatId(chat.id);
+                              setDeletingChatName(oName);
+                            }}
+                            className="p-1.5 rounded-lg text-purple-300/40 hover:text-rose-400 hover:bg-rose-500/15 transition-all cursor-pointer flex-shrink-0 group-hover:opacity-100 opacity-60 sm:opacity-0"
+                            title={`Xóa đoạn chat với ${oName}`}
+                            aria-label={`Xóa đoạn chat với ${oName}`}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                              <line x1="10" y1="11" x2="10" y2="17" />
+                              <line x1="14" y1="11" x2="14" y2="17" />
+                            </svg>
+                          </button>
+                        </div>
                       );
                     })
                   ) : (
@@ -611,6 +710,51 @@ export default function ChatFab() {
                       <polyline points="9 18 15 12 9 6" />
                     </svg>
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Xác Nhận Xóa Đoạn Chat trong popup Messenger */}
+            {deletingChatId && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+                <div
+                  className="w-full max-w-[340px] rounded-2xl p-5 border border-purple-500/30 shadow-2xl text-center"
+                  style={{
+                    background: 'linear-gradient(155deg, rgba(28, 16, 68, 0.98) 0%, rgba(16, 9, 44, 0.99) 100%)',
+                    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(168, 85, 247, 0.2)',
+                  }}
+                >
+                  <div className="w-12 h-12 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto mb-3.5">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                  </div>
+                  <h3 className="text-base font-bold text-white mb-1.5">Xóa đoạn chat?</h3>
+                  <p className="text-xs text-purple-200/70 mb-5 leading-relaxed">
+                    Bạn có chắc chắn muốn xóa toàn bộ cuộc trò chuyện với <strong className="text-white">{deletingChatName}</strong>? Hành động này sẽ xóa các tin nhắn và không thể hoàn tác.
+                  </p>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeletingChatId(null);
+                        setDeletingChatName(null);
+                      }}
+                      className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold text-purple-200 bg-white/10 hover:bg-white/15 transition-all cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmDeleteChat}
+                      className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 transition-all cursor-pointer shadow-md"
+                    >
+                      Xóa đoạn chat
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

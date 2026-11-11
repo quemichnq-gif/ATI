@@ -301,9 +301,14 @@ def get_notifications_service(user_id):
 
     notifs = get_user_notifications(user_id)
     if not notifs:
-        notifs = IN_MEMORY_NOTIFICATIONS.get(user_id, [])
+        from app.repositories.storage_db import uid_aliases
+        aliases = uid_aliases(user_id) if user_id else [user_id]
+        for a in aliases:
+            if a in IN_MEMORY_NOTIFICATIONS and IN_MEMORY_NOTIFICATIONS[a]:
+                notifs = IN_MEMORY_NOTIFICATIONS[a]
+                break
 
-    return {"success": True, "notifications": notifs, "status": 200}
+    return {"success": True, "notifications": notifs or [], "status": 200}
 
 
 def mark_notifications_read_service(user_id, notif_ids, notif_id):
