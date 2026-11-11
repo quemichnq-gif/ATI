@@ -230,17 +230,16 @@ export default function NotificationsPage() {
       // Tạo ngay thông báo kết đôi thành công hiển thị trực tiếp
       const successNotif: Notification = {
         id: `notif_match_${myUid}_${partnerId}_${Date.now()}`,
-        userId: myUid,
+        uid: myUid,
         type: 'match_accepted',
         title: 'Kết đôi thành công! ✨',
-        message: `Bạn và ${(n as any).senderName || 'đối phương'} đã kết đôi thành công! Hãy gửi tin nhắn đầu tiên để cùng kết nối vũ trụ.`,
-        body: `Bạn và ${(n as any).senderName || 'đối phương'} đã kết đôi thành công! Hãy gửi tin nhắn đầu tiên để cùng kết nối vũ trụ.`,
-        senderId: partnerId,
-        senderName: (n as any).senderName || 'Người dùng',
-        senderAvatar: (n as any).senderAvatar || '',
+        body: `Bạn và ${(n as any).senderName || (n as any).fromName || 'đối phương'} đã kết đôi thành công! Hãy gửi tin nhắn đầu tiên để cùng kết nối vũ trụ.`,
+        fromUid: partnerId,
+        fromName: (n as any).senderName || (n as any).fromName || 'Người dùng',
+        fromAvatar: (n as any).senderAvatar || (n as any).fromAvatar || '',
         requestId: n.requestId || `${partnerId}_${myUid}`,
         read: false,
-        createdAt: new Date().toISOString(),
+        createdAt: Date.now(),
       };
 
       // Đánh dấu yêu cầu cũ đã đọc và cập nhật danh sách

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { apiAstrologyChat } from '../services/api';
-import UiIcon from '../components/UiIcon';
+import { useVoiceChat } from '../hooks/useVoiceChat';
 
 interface FeatureLink {
   to: string;
@@ -18,7 +18,7 @@ interface AssistantMessage {
   relatedFeatures?: FeatureLink[];
 }
 
-export interface ChatSession {
+interface ChatSession {
   id: string;
   title: string;
   createdAt: number;
@@ -46,6 +46,29 @@ const STARTER_PROMPTS = [
   'Resonancia ghép đôi như thế nào?',
 ];
 
+const STORAGE_KEY_PREFIX = 'resonancia_ai_sessions_';
+
+function getStorageKey(uid?: string) {
+  return `${STORAGE_KEY_PREFIX}${uid || 'guest'}`;
+}
+
+function loadSessions(uid?: string): ChatSession[] {
+  try {
+    const raw = localStorage.getItem(getStorageKey(uid));
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSessions(sessions: ChatSession[], uid?: string) {
+  try {
+    localStorage.setItem(getStorageKey(uid), JSON.stringify(sessions));
+  } catch {}
+}
+
 function normalizeText(value: string) {
   return value
     .toLocaleLowerCase('vi')
@@ -61,202 +84,124 @@ function findRelatedFeatures(prompt: string) {
   );
 }
 
-const getStorageKey = (uid?: string) => `resonancia_ai_sessions_${uid || 'guest'}`;
-
-function loadSessionsFromStorage(uid?: string): ChatSession[] {
-  try {
-    const raw = localStorage.getItem(getStorageKey(uid));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveSessionsToStorage(uid: string | undefined, sessions: ChatSession[]) {
-  try {
-    localStorage.setItem(getStorageKey(uid), JSON.stringify(sessions));
-  } catch (err) {
-    console.error('Failed to save sessions to localStorage:', err);
-  }
-}
-
-function formatSessionTime(timestamp: number) {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday = date.toDateString() === yesterday.toDateString();
-
-  const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  if (isToday) return `Hôm nay ${timeStr}`;
-  if (isYesterday) return `Hôm qua ${timeStr}`;
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-}
-
 export default function AssistantPage() {
   const profile = useSelector((state: RootState) => state.profile);
+  const authUser = useSelector((state: RootState) => state.auth);
+  const currentUid = profile.uid || authUser.uid || '';
 
-  // Chat sessions state (CRUD)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string>('');
+  const [currentSessionId, setCurrentSessionId] = useState<string>('');
+
+  const currentSessionIdRef = useRef<string>('');
+  currentSessionIdRef.current = currentSessionId;
+
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [prompt, setPrompt] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [isHandsFree, setIsHandsFree] = useState(false);
 
-  // Sidebar UI state
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
-    return typeof window !== 'undefined' ? window.innerWidth >= 1024 : true;
-  });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
-  const [confirmingClearAll, setConfirmingClearAll] = useState(false);
+  const isHandsFreeRef = useRef(false);
+  isHandsFreeRef.current = isHandsFree;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
 
-  // Load chat sessions on mount or when user changes
+  const {
+    isSupported,
+    isListening,
+    isSpeaking,
+    speakingMessageId,
+    voiceError,
+    startListening,
+    stopListening,
+    speak,
+    stopSpeaking,
+  } = useVoiceChat();
+
+  // Khởi tạo và tải lịch sử cuộc trò chuyện từ localStorage
   useEffect(() => {
-    const stored = loadSessionsFromStorage(profile.uid);
-    if (stored.length > 0) {
-      setSessions(stored);
-      setActiveSessionId(stored[0].id);
-      setMessages(stored[0].messages || []);
+    const loaded = loadSessions(currentUid);
+    if (loaded.length > 0) {
+      setSessions(loaded);
+      const firstSession = loaded[0];
+      setCurrentSessionId(firstSession.id);
+      currentSessionIdRef.current = firstSession.id;
+      setMessages(firstSession.messages || []);
     } else {
-      const initialId = `session_${Date.now()}`;
+      const freshId = `sess_${Date.now()}`;
       const initialSession: ChatSession = {
-        id: initialId,
+        id: freshId,
         title: 'Cuộc trò chuyện mới',
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messages: [],
       };
       setSessions([initialSession]);
-      setActiveSessionId(initialId);
+      setCurrentSessionId(freshId);
+      currentSessionIdRef.current = freshId;
       setMessages([]);
-      saveSessionsToStorage(profile.uid, [initialSession]);
+      saveSessions([initialSession], currentUid);
     }
-  }, [profile.uid]);
+  }, [currentUid]);
 
   useEffect(() => {
     textareaRef.current?.focus({ preventScroll: true });
-  }, [activeSessionId]);
+  }, []);
 
   useEffect(() => {
     const conversation = conversationRef.current;
     if (conversation) {
       conversation.scrollTo({ top: conversation.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages, loading]);
+  }, [messages, loadingSessionId]);
 
-  // CREATE: Tạo cuộc trò chuyện mới
-  const handleCreateNewSession = () => {
-    const current = sessions.find((s) => s.id === activeSessionId);
-    if (current && current.messages.length === 0) {
-      if (window.innerWidth < 768) setIsSidebarOpen(false);
-      textareaRef.current?.focus();
-      return;
-    }
-
-    const newId = `session_${Date.now()}`;
-    const newSession: ChatSession = {
-      id: newId,
-      title: 'Cuộc trò chuyện mới',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: [],
-    };
-
-    const nextSessions = [newSession, ...sessions];
-    setSessions(nextSessions);
-    setActiveSessionId(newId);
-    setMessages([]);
-    setError('');
-    setPrompt('');
-    saveSessionsToStorage(profile.uid, nextSessions);
-    if (window.innerWidth < 768) setIsSidebarOpen(false);
-    setTimeout(() => textareaRef.current?.focus(), 50);
-  };
-
-  // READ: Chọn cuộc trò chuyện từ danh sách
-  const handleSelectSession = (sessionId: string) => {
-    if (sessionId === activeSessionId) {
-      if (window.innerWidth < 768) setIsSidebarOpen(false);
-      return;
-    }
-    const target = sessions.find((s) => s.id === sessionId);
-    if (target) {
-      setActiveSessionId(sessionId);
-      setMessages(target.messages || []);
-      setError('');
-      setPrompt('');
-      if (window.innerWidth < 768) setIsSidebarOpen(false);
-      setTimeout(() => textareaRef.current?.focus(), 50);
-    }
-  };
-
-  // UPDATE: Đổi tên cuộc trò chuyện
-  const handleStartRename = (session: ChatSession) => {
-    setEditingSessionId(session.id);
-    setEditingTitle(session.title);
-  };
-
-  const handleSaveRename = (sessionId: string) => {
-    const trimmed = editingTitle.trim();
-    if (trimmed) {
-      setSessions((prev) => {
-        const next = prev.map((s) =>
-          s.id === sessionId ? { ...s, title: trimmed, updatedAt: Date.now() } : s
-        );
-        saveSessionsToStorage(profile.uid, next);
-        return next;
+  // Cập nhật messages và title vào ĐÚNG session theo ID (tránh bị lẫn khi chuyển cuộc trò chuyện)
+  const updateSessionMessages = (targetSessionId: string, newMessages: AssistantMessage[], firstPrompt?: string) => {
+    setSessions((prev) => {
+      let found = false;
+      const next = prev.map((s) => {
+        if (s.id === targetSessionId) {
+          found = true;
+          let title = s.title;
+          if ((!title || title === 'Cuộc trò chuyện mới') && firstPrompt) {
+            title = firstPrompt.trim().slice(0, 32);
+          }
+          return {
+            ...s,
+            title,
+            updatedAt: Date.now(),
+            messages: newMessages,
+          };
+        }
+        return s;
       });
-    }
-    setEditingSessionId(null);
-    setEditingTitle('');
-  };
 
-  const handleCancelRename = () => {
-    setEditingSessionId(null);
-    setEditingTitle('');
-  };
-
-  // DELETE: Xóa một cuộc trò chuyện
-  const handleDeleteSession = (sessionId: string) => {
-    let nextSessions = sessions.filter((s) => s.id !== sessionId);
-
-    if (sessionId === activeSessionId) {
-      if (nextSessions.length > 0) {
-        setActiveSessionId(nextSessions[0].id);
-        setMessages(nextSessions[0].messages || []);
-      } else {
-        const freshId = `session_${Date.now()}`;
-        const freshSession: ChatSession = {
-          id: freshId,
-          title: 'Cuộc trò chuyện mới',
+      if (!found) {
+        const created: ChatSession = {
+          id: targetSessionId,
+          title: firstPrompt ? firstPrompt.trim().slice(0, 32) : 'Cuộc trò chuyện mới',
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          messages: [],
+          messages: newMessages,
         };
-        nextSessions = [freshSession];
-        setActiveSessionId(freshId);
-        setMessages([]);
+        next.unshift(created);
       }
-    }
 
-    setSessions(nextSessions);
-    saveSessionsToStorage(profile.uid, nextSessions);
-    setConfirmingDeleteId(null);
+      saveSessions(next, currentUid);
+      return next;
+    });
   };
 
-  // DELETE ALL: Xóa tất cả lịch sử
-  const handleClearAllSessions = () => {
-    const freshId = `session_${Date.now()}`;
+  /**
+   * Tạo phiên trò chuyện mới kiểu ChatGPT
+   */
+  const handleNewChat = () => {
+    stopSpeaking();
+    stopListening();
+
+    const freshId = `sess_${Date.now()}`;
     const freshSession: ChatSession = {
       id: freshId,
       title: 'Cuộc trò chuyện mới',
@@ -264,69 +209,107 @@ export default function AssistantPage() {
       updatedAt: Date.now(),
       messages: [],
     };
-    const nextSessions = [freshSession];
-    setSessions(nextSessions);
-    setActiveSessionId(freshId);
+
+    setSessions((prev) => {
+      // Giữ lại các session đã có tin nhắn, loại bỏ session rỗng trùng lặp
+      const filtered = prev.filter((s) => s.messages && s.messages.length > 0);
+      const next = [freshSession, ...filtered];
+      saveSessions(next, currentUid);
+      return next;
+    });
+
+    setCurrentSessionId(freshId);
+    currentSessionIdRef.current = freshId;
     setMessages([]);
-    saveSessionsToStorage(profile.uid, nextSessions);
-    setConfirmingClearAll(false);
-    if (window.innerWidth < 768) setIsSidebarOpen(false);
+    setPrompt('');
+    setError('');
+
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
   };
 
-  // Helper sync session messages to sessions list & storage
-  const syncSessionMessages = (targetSessionId: string, updatedMessages: AssistantMessage[], firstUserPrompt?: string) => {
+  /**
+   * Chuyển đổi an toàn giữa các cuộc trò chuyện cũ mà không làm mất hay lẫn tin nhắn
+   */
+  const handleSwitchSession = (sessionId: string) => {
+    if (sessionId === currentSessionIdRef.current) {
+      if (window.innerWidth <= 768) setSidebarOpen(false);
+      return;
+    }
+
+    stopSpeaking();
+    stopListening();
+
+    setCurrentSessionId(sessionId);
+    currentSessionIdRef.current = sessionId;
+
+    // Tìm và nạp tin nhắn của đúng session được chọn
+    const target = sessions.find((s) => s.id === sessionId);
+    setMessages(target?.messages ? [...target.messages] : []);
+    setPrompt('');
+    setError('');
+
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
+  };
+
+  /**
+   * Xóa một cuộc trò chuyện
+   */
+  const handleDeleteSession = (sessionId: string) => {
     setSessions((prev) => {
-      const idx = prev.findIndex((s) => s.id === targetSessionId);
-      let next: ChatSession[];
-      if (idx >= 0) {
-        const current = prev[idx];
-        const isFirstUserMsg = current.messages.length === 0 && Boolean(firstUserPrompt);
-        const newTitle = isFirstUserMsg && firstUserPrompt
-          ? (firstUserPrompt.length > 30 ? firstUserPrompt.slice(0, 30) + '...' : firstUserPrompt)
-          : current.title;
-        const updated: ChatSession = {
-          ...current,
-          title: newTitle,
-          updatedAt: Date.now(),
-          messages: updatedMessages,
-        };
-        next = [updated, ...prev.filter((s) => s.id !== targetSessionId)];
-      } else {
-        const newSession: ChatSession = {
-          id: targetSessionId,
-          title: firstUserPrompt
-            ? (firstUserPrompt.length > 30 ? firstUserPrompt.slice(0, 30) + '...' : firstUserPrompt)
-            : 'Cuộc trò chuyện mới',
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          messages: updatedMessages,
-        };
-        next = [newSession, ...prev];
+      const next = prev.filter((s) => s.id !== sessionId);
+      saveSessions(next, currentUid);
+
+      if (sessionId === currentSessionIdRef.current) {
+        if (next.length > 0) {
+          const nextSess = next[0];
+          setCurrentSessionId(nextSess.id);
+          currentSessionIdRef.current = nextSess.id;
+          setMessages(nextSess.messages ? [...nextSess.messages] : []);
+        } else {
+          const freshId = `sess_${Date.now()}`;
+          const freshSession: ChatSession = {
+            id: freshId,
+            title: 'Cuộc trò chuyện mới',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            messages: [],
+          };
+          setCurrentSessionId(freshId);
+          currentSessionIdRef.current = freshId;
+          setMessages([]);
+          saveSessions([freshSession], currentUid);
+          return [freshSession];
+        }
       }
-      saveSessionsToStorage(profile.uid, next);
       return next;
     });
   };
 
-  const sendMessage = async (event?: FormEvent) => {
-    event?.preventDefault();
-    const question = prompt.trim();
-    if (!question || loading) return;
+  const isCurrentLoading = loadingSessionId === currentSessionId;
 
-    const currentSessionId = activeSessionId || `session_${Date.now()}`;
-    if (!activeSessionId) {
-      setActiveSessionId(currentSessionId);
-    }
+  const sendMessage = async (event?: FormEvent, customText?: string) => {
+    event?.preventDefault();
+    const question = (customText !== undefined ? customText : prompt).trim();
+    if (!question || isCurrentLoading) return;
+
+    // Khóa chặt SessionId của phiên chat hiện tại
+    const targetSessionId = currentSessionIdRef.current;
+    if (!targetSessionId) return;
 
     const conversation = [...messages, { id: Date.now(), role: 'user' as const, content: question }];
     const relatedFeatures = findRelatedFeatures(question);
+
+    // Cập nhật giao diện và lưu trữ session
     setMessages(conversation);
+    updateSessionMessages(targetSessionId, conversation, question);
+
     setPrompt('');
     setError('');
-    setLoading(true);
-
-    // Lưu ngay tin nhắn của người dùng
-    syncSessionMessages(currentSessionId, conversation, question);
+    setLoadingSessionId(targetSessionId);
 
     try {
       const response = await apiAstrologyChat({
@@ -338,6 +321,7 @@ export default function AssistantPage() {
           ascendant: profile.ascendant,
         },
       });
+
       const answer = response.data?.answer || response.data?.prediction || 'Mình chưa có câu trả lời cho câu hỏi này.';
       const backendActions = response.data?.actions || (response.data?.action ? [response.data.action] : []);
       const mappedBackendFeatures = backendActions
@@ -350,27 +334,58 @@ export default function AssistantPage() {
       const answerFeatures = mappedBackendFeatures.length
         ? mappedBackendFeatures
         : (relatedFeatures.length ? relatedFeatures : findRelatedFeatures(answer));
-      const finalMessages: AssistantMessage[] = [
+
+      const newAssistantMsgId = Date.now() + 1;
+      const updatedConversation: AssistantMessage[] = [
         ...conversation,
-        { id: Date.now() + 1, role: 'assistant', content: answer, relatedFeatures: answerFeatures },
+        { id: newAssistantMsgId, role: 'assistant', content: answer, relatedFeatures: answerFeatures },
       ];
-      setMessages(finalMessages);
-      syncSessionMessages(currentSessionId, finalMessages);
+
+      // Lưu kết quả vào đúng session gửi câu hỏi
+      updateSessionMessages(targetSessionId, updatedConversation, question);
+
+      // Chỉ cập nhật màn hình nếu người dùng vẫn đang xem phiên này
+      if (currentSessionIdRef.current === targetSessionId) {
+        setMessages(updatedConversation);
+
+        // Đọc to nếu đang bật chế độ đối thoại rảnh tay
+        if (isHandsFreeRef.current) {
+          speak(answer, newAssistantMsgId, () => {
+            if (isHandsFreeRef.current && currentSessionIdRef.current === targetSessionId) {
+              startListening((voiceText, isFinal) => {
+                setPrompt(voiceText);
+                if (isFinal && voiceText.trim()) {
+                  void sendMessage(undefined, voiceText.trim());
+                }
+              });
+            }
+          });
+        }
+      }
     } catch {
-      setError('Hiện chưa kết nối được với trợ lý. Bạn vẫn có thể mở trực tiếp tính năng liên quan bên dưới.');
-      const finalMessages: AssistantMessage[] = [
+      const failMsg = 'Hiện chưa kết nối được với trợ lý. Bạn vẫn có thể mở trực tiếp tính năng liên quan bên dưới.';
+      const failMsgId = Date.now() + 1;
+      const updatedConversation: AssistantMessage[] = [
         ...conversation,
         {
-          id: Date.now() + 1,
+          id: failMsgId,
           role: 'assistant',
           content: 'Mình chưa nhận được phản hồi lúc này.',
           relatedFeatures,
         },
       ];
-      setMessages(finalMessages);
-      syncSessionMessages(currentSessionId, finalMessages);
+
+      updateSessionMessages(targetSessionId, updatedConversation, question);
+
+      if (currentSessionIdRef.current === targetSessionId) {
+        setError(failMsg);
+        setMessages(updatedConversation);
+        if (isHandsFreeRef.current) {
+          speak('Hiện chưa kết nối được với trợ lý, bạn hãy thử lại sau nhé.', failMsgId);
+        }
+      }
     } finally {
-      setLoading(false);
+      setLoadingSessionId((cur) => (cur === targetSessionId ? null : cur));
     }
   };
 
@@ -381,291 +396,183 @@ export default function AssistantPage() {
     }
   };
 
-  const filteredSessions = sessions.filter((s) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    const titleMatch = s.title.toLowerCase().includes(q);
-    const contentMatch = s.messages.some((m) => m.content.toLowerCase().includes(q));
-    return titleMatch || contentMatch;
-  });
+  /**
+   * Bấm nút Micro để nói câu hỏi (Push-to-Talk)
+   */
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      if (isSpeaking) {
+        stopSpeaking();
+      }
+      startListening((voiceText, isFinal) => {
+        setPrompt(voiceText);
+        if (isFinal) {
+          textareaRef.current?.focus();
+        }
+      });
+    }
+  };
+
+  /**
+   * Bật/tắt chế độ Đối Thoại Trực Tiếp (Hands-free Voice Call)
+   */
+  const toggleHandsFree = () => {
+    if (!isSupported) {
+      setError('Trình duyệt chưa hỗ trợ Web Speech hoặc bị chặn quyền micro. Bạn nên dùng Google Chrome, Edge hoặc Safari nhé.');
+      return;
+    }
+
+    if (isHandsFree) {
+      setIsHandsFree(false);
+      isHandsFreeRef.current = false;
+      stopListening();
+      stopSpeaking();
+    } else {
+      setIsHandsFree(true);
+      isHandsFreeRef.current = true;
+      if (isSpeaking) {
+        stopSpeaking();
+      }
+      startListening((voiceText, isFinal) => {
+        setPrompt(voiceText);
+        if (isFinal && voiceText.trim()) {
+          void sendMessage(undefined, voiceText.trim());
+        }
+      });
+    }
+  };
+
+  /**
+   * Đọc to câu trả lời của AI hoặc dừng phát
+   */
+  const handleToggleSpeak = (msgId: number, content: string) => {
+    if (isSpeaking && speakingMessageId === msgId) {
+      stopSpeaking();
+    } else {
+      speak(content, msgId);
+    }
+  };
 
   return (
     <section className="astrica-assistant-page" aria-label="Resonancia AI">
       {/* Heading slot */}
       <header className="astrica-assistant-heading">
-        <div className="flex items-center gap-3">
-          <img src="/astrica/images/6870b7473503e2e6d021b012_Nav_icon.svg" alt="" aria-hidden="true" />
-          <div>
-            <h1>Resonancia AI</h1>
-            <p>Hỏi về chiêm tinh hoặc mở nhanh một tính năng</p>
-          </div>
+        {/* Nút bật/tắt Lịch sử Chat kiểu ChatGPT */}
+        <button
+          type="button"
+          className={`astrica-sidebar-toggle-btn ${sidebarOpen ? 'is-active' : ''}`}
+          onClick={() => setSidebarOpen((open) => !open)}
+          aria-label={sidebarOpen ? 'Đóng lịch sử trò chuyện' : 'Mở lịch sử trò chuyện'}
+          title={sidebarOpen ? 'Đóng lịch sử trò chuyện' : 'Lịch sử cuộc trò chuyện (như ChatGPT)'}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 3v18" />
+          </svg>
+        </button>
+
+        <img src="/astrica/images/6870b7473503e2e6d021b012_Nav_icon.svg" alt="" aria-hidden="true" />
+        <div>
+          <h1>Resonancia AI</h1>
+          <p>Hỏi về chiêm tinh hoặc mở nhanh một tính năng</p>
         </div>
 
-        {/* Header Actions */}
-        <div className="flex items-center gap-2">
+        {/* Nút bật/tắt Chế độ Đàm thoại Trực tiếp (Hands-free) - Luôn hiển thị */}
+        <div className="astrica-voice-toggle-wrap">
           <button
             type="button"
-            onClick={() => setIsSidebarOpen((prev) => !prev)}
-            className="astrica-assistant-history-btn"
-            aria-label="Lịch sử trò chuyện"
-            title={isSidebarOpen ? 'Đóng thanh lịch sử' : 'Mở thanh lịch sử'}
+            className={`astrica-handsfree-btn ${isHandsFree ? 'is-active' : ''}`}
+            onClick={toggleHandsFree}
+            aria-pressed={isHandsFree}
+            aria-label={isHandsFree ? 'Tắt đối thoại trực tiếp' : 'Bật đối thoại trực tiếp bằng giọng nói'}
+            title={
+              !isSupported
+                ? 'Bấm để đối thoại trực tiếp bằng giọng nói (khuyên dùng Chrome, Edge, Safari)'
+                : isHandsFree
+                ? 'Tắt đối thoại trực tiếp'
+                : 'Bật đối thoại 2 chiều rảnh tay'
+            }
           >
-            <UiIcon name="history" label="Lịch sử" className="text-sm text-purple-300" />
-            <span className="hidden sm:inline">Lịch sử</span>
-            {sessions.length > 0 && (
-              <span className="astrica-assistant-badge">{sessions.length}</span>
+            {isHandsFree ? (
+              <span className="astrica-handsfree-dot" aria-hidden="true" />
+            ) : (
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                <path d="M14.05 2a9 9 0 0 1 8 7.94" />
+                <path d="M14.05 6A5 5 0 0 1 18 10" />
+              </svg>
             )}
-          </button>
-          <button
-            type="button"
-            onClick={handleCreateNewSession}
-            className="astrica-assistant-newchat-btn"
-            aria-label="Cuộc trò chuyện mới"
-            title="Cuộc trò chuyện mới"
-          >
-            <UiIcon name="plus" label="Tạo mới" className="text-xs" />
-            <span className="hidden xs:inline">Đoạn chat mới</span>
+            <span>{isHandsFree ? 'Đang đối thoại' : 'Đối thoại trực tiếp'}</span>
           </button>
         </div>
       </header>
 
-      {/* Main Layout with Sidebar */}
-      <div className="astrica-assistant-layout">
-        {/* Mobile backdrop */}
-        {isSidebarOpen && (
+      {/* Body: Sidebar Lịch sử + Khung Chat chính */}
+      <div className="astrica-assistant-body">
+        {/* Backdrop cho mobile khi mở sidebar */}
+        {sidebarOpen && (
           <div
-            className="astrica-assistant-sidebar-backdrop md:hidden"
-            onClick={() => setIsSidebarOpen(false)}
+            className="astrica-sidebar-backdrop"
+            onClick={() => setSidebarOpen(false)}
             aria-hidden="true"
           />
         )}
 
-        {/* Thanh bên (Sidebar) Lịch sử trò chuyện */}
-        <aside
-          className={`astrica-assistant-sidebar ${isSidebarOpen ? 'is-open' : 'is-collapsed'}`}
-          aria-label="Lịch sử cuộc trò chuyện"
-        >
-          {/* Sidebar Header */}
-          <div className="astrica-assistant-sidebar-header">
-            <div className="flex items-center gap-2 text-white font-medium text-xs sm:text-sm">
-              <UiIcon name="history" label="Lịch sử" className="text-purple-400" />
-              <span>Lịch Sử Trò Chuyện</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleCreateNewSession}
-                className="astrica-sidebar-action-btn"
-                title="Tạo cuộc trò chuyện mới"
-                aria-label="Tạo cuộc trò chuyện mới"
-              >
-                <UiIcon name="plus" label="Tạo mới" className="text-xs text-purple-300" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(false)}
-                className="astrica-sidebar-action-btn md:hidden"
-                title="Đóng thanh bên"
-                aria-label="Đóng thanh bên"
-              >
-                <UiIcon name="close" label="Đóng" className="text-xs text-purple-300" />
-              </button>
-            </div>
-          </div>
+        {/* Sidebar Lịch sử Chat kiểu ChatGPT */}
+        <aside className={`astrica-assistant-sidebar ${sidebarOpen ? 'is-open' : ''}`}>
+          <button
+            type="button"
+            className="astrica-new-chat-btn"
+            onClick={handleNewChat}
+            aria-label="Tạo cuộc trò chuyện mới"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span>Cuộc trò chuyện mới</span>
+          </button>
 
-          {/* Search/Filter bar */}
-          <div className="astrica-sidebar-search-wrap">
-            <div className="relative flex items-center">
-              <UiIcon
-                name="search"
-                label="Tìm kiếm"
-                className="absolute left-2.5 text-xs text-purple-300/60 pointer-events-none"
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm trong lịch sử..."
-                className="astrica-sidebar-search-input"
-                aria-label="Tìm kiếm cuộc trò chuyện"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 text-purple-300/60 hover:text-white text-xs"
-                  aria-label="Xóa tìm kiếm"
-                >
-                  <UiIcon name="close" label="Xóa" />
-                </button>
-              )}
-            </div>
-          </div>
+          <span className="astrica-sidebar-label">Lịch sử trò chuyện</span>
 
-          {/* Sessions List */}
-          <div className="astrica-sidebar-list" role="list">
-            {filteredSessions.length === 0 ? (
-              <div className="astrica-sidebar-empty">
-                <UiIcon name="message" label="Trống" className="text-2xl text-purple-400/40 mb-1" />
-                <p>{searchQuery ? 'Không tìm thấy cuộc trò chuyện' : 'Chưa có lịch sử trò chuyện'}</p>
-              </div>
+          <div className="astrica-sidebar-history-list">
+            {sessions.length === 0 ? (
+              <p className="astrica-sidebar-empty">Chưa có lịch sử trò chuyện</p>
             ) : (
-              filteredSessions.map((session) => (
+              sessions.map((sess) => (
                 <div
-                  key={session.id}
-                  role="listitem"
-                  className={`astrica-sidebar-item ${session.id === activeSessionId ? 'is-active' : ''}`}
+                  key={sess.id}
+                  className={`astrica-history-item ${sess.id === currentSessionId ? 'is-active' : ''}`}
+                  onClick={() => handleSwitchSession(sess.id)}
                 >
-                  {editingSessionId === session.id ? (
-                    /* Chế độ sửa tên (Inline Rename) */
-                    <div className="flex items-center gap-1.5 w-full">
-                      <input
-                        type="text"
-                        value={editingTitle}
-                        onChange={(e) => setEditingTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveRename(session.id);
-                          if (e.key === 'Escape') handleCancelRename();
-                        }}
-                        autoFocus
-                        className="astrica-sidebar-edit-input"
-                        aria-label="Tên cuộc trò chuyện"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleSaveRename(session.id)}
-                        className="astrica-sidebar-mini-btn text-emerald-400 hover:text-emerald-300"
-                        title="Lưu"
-                        aria-label="Lưu tên mới"
-                      >
-                        <UiIcon name="check" label="Lưu" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCancelRename}
-                        className="astrica-sidebar-mini-btn text-rose-400 hover:text-rose-300"
-                        title="Hủy"
-                        aria-label="Hủy chỉnh sửa"
-                      >
-                        <UiIcon name="close" label="Hủy" />
-                      </button>
-                    </div>
-                  ) : confirmingDeleteId === session.id ? (
-                    /* Chế độ xác nhận xóa (Inline Confirm Delete) */
-                    <div className="flex items-center justify-between w-full text-xs text-rose-300 px-1 py-0.5">
-                      <span>Xóa đoạn chat này?</span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSession(session.id)}
-                          className="astrica-sidebar-mini-btn bg-rose-900/60 text-rose-200 hover:bg-rose-800/80 hover:text-white px-2 py-0.5 rounded text-[11px]"
-                          title="Xác nhận xóa"
-                        >
-                          Xóa
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingDeleteId(null)}
-                          className="astrica-sidebar-mini-btn text-purple-300/80 hover:text-white px-1.5 py-0.5 text-[11px]"
-                          title="Hủy"
-                        >
-                          Hủy
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Hiển thị bình thường */
-                    <div
-                      className="flex items-center justify-between w-full group/item"
-                      onClick={() => handleSelectSession(session.id)}
-                    >
-                      <div className="flex items-start gap-2 min-w-0 flex-1 pr-1 cursor-pointer">
-                        <UiIcon
-                          name="message"
-                          label=""
-                          className={`mt-0.5 text-xs flex-shrink-0 ${
-                            session.id === activeSessionId ? 'text-purple-300' : 'text-purple-400/60'
-                          }`}
-                        />
-                        <div className="min-w-0 flex-1 text-left">
-                          <p className="astrica-sidebar-item-title" title={session.title}>
-                            {session.title || 'Cuộc trò chuyện'}
-                          </p>
-                          <span className="astrica-sidebar-item-time">
-                            {formatSessionTime(session.updatedAt || session.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Các nút CRUD: Đổi tên & Xóa */}
-                      <div
-                        className="astrica-sidebar-item-actions flex items-center gap-1"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleStartRename(session)}
-                          className="astrica-sidebar-item-btn hover:text-purple-200"
-                          title="Đổi tên"
-                          aria-label={`Đổi tên ${session.title}`}
-                        >
-                          <UiIcon name="edit" label="Đổi tên" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingDeleteId(session.id)}
-                          className="astrica-sidebar-item-btn hover:text-rose-400"
-                          title="Xóa cuộc trò chuyện"
-                          aria-label={`Xóa ${session.title}`}
-                        >
-                          <UiIcon name="trash" label="Xóa" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span className="astrica-history-title">{sess.title}</span>
+                  <button
+                    type="button"
+                    className="astrica-history-delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteSession(sess.id);
+                    }}
+                    aria-label={`Xóa cuộc trò chuyện ${sess.title}`}
+                    title="Xóa cuộc trò chuyện này"
+                  >
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
                 </div>
               ))
             )}
           </div>
-
-          {/* Sidebar Footer */}
-          {sessions.length > 0 && (
-            <div className="astrica-sidebar-footer">
-              <span className="text-[11px] text-purple-300/60">
-                {sessions.length} cuộc trò chuyện
-              </span>
-              {confirmingClearAll ? (
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-rose-300">Xóa hết?</span>
-                  <button
-                    type="button"
-                    onClick={handleClearAllSessions}
-                    className="text-[10px] text-rose-300 hover:text-rose-100 font-semibold underline"
-                  >
-                    Có
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingClearAll(false)}
-                    className="text-[10px] text-purple-300/80 hover:text-white ml-1"
-                  >
-                    Hủy
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmingClearAll(true)}
-                  className="text-[11px] text-purple-400/70 hover:text-rose-300 transition-colors"
-                >
-                  Xóa tất cả
-                </button>
-              )}
-            </div>
-          )}
         </aside>
 
-        {/* Khung chat chính (Main conversation & composer) */}
+        {/* Khung chat chính */}
         <div className="astrica-assistant-main">
           {/* Conversation slot */}
           <div
@@ -699,6 +606,32 @@ export default function AssistantPage() {
                     )}
                     <div className="astrica-message-body">
                       <p>{message.content}</p>
+
+                      {/* Nút Loa nghe câu trả lời của AI */}
+                      {message.role === 'assistant' && (
+                        <button
+                          type="button"
+                          className={`astrica-speak-btn ${speakingMessageId === message.id ? 'is-speaking' : ''}`}
+                          onClick={() => handleToggleSpeak(message.id, message.content)}
+                          aria-label={speakingMessageId === message.id ? 'Dừng đọc' : 'Đọc to câu trả lời'}
+                          title={speakingMessageId === message.id ? 'Dừng đọc' : 'Đọc to câu trả lời'}
+                        >
+                          {speakingMessageId === message.id ? (
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                              <line x1="22" x2="16" y1="9" y2="15" />
+                              <line x1="16" x2="22" y1="9" y2="15" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+
                       {Boolean(message.relatedFeatures?.length) && (
                         <div className="astrica-related-links">
                           <span>Tính năng liên quan</span>
@@ -715,7 +648,7 @@ export default function AssistantPage() {
                     </div>
                   </article>
                 ))}
-                {loading && (
+                {isCurrentLoading && (
                   <div className="astrica-assistant-loading" role="status" aria-label="Resonancia AI đang trả lời">
                     <img src="/astrica/images/6870b7473503e2e6d021b012_Nav_icon.svg" alt="" aria-hidden="true" />
                     <span />
@@ -729,23 +662,59 @@ export default function AssistantPage() {
 
           {/* Composer slot */}
           <div className="astrica-assistant-composer-wrap">
-            {error && <p className="astrica-assistant-error" role="status">{error}</p>}
+            {/* Thanh trạng thái giọng nói mini khi đang nghe hoặc đọc */}
+            {(isListening || isSpeaking || isHandsFree) && (
+              <div className="astrica-voice-status-bar" role="status" aria-live="polite">
+                <div className="astrica-voice-wave" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <span>
+                  {isListening
+                    ? 'Đang lắng nghe bạn nói... Hãy đặt câu hỏi.'
+                    : isSpeaking
+                    ? 'AstroBot đang phát âm thanh câu trả lời...'
+                    : 'Chế độ đối thoại trực tiếp đang bật · Nói để trò chuyện cùng AI'}
+                </span>
+              </div>
+            )}
+
+            {(error || voiceError) && <p className="astrica-assistant-error" role="status">{error || voiceError}</p>}
             <form className="astrica-assistant-composer" onSubmit={(event) => void sendMessage(event)}>
               <textarea
                 ref={textareaRef}
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
-                placeholder="Hỏi Resonancia AI..."
+                placeholder={isListening ? 'Đang lắng nghe bạn nói...' : 'Hỏi Resonancia AI...'}
                 aria-label="Tin nhắn cho Resonancia AI"
                 rows={1}
-                disabled={loading}
+                disabled={isCurrentLoading}
               />
-              <button type="submit" disabled={!prompt.trim() || loading} aria-label="Gửi tin nhắn">
+
+              {/* Nút Micro nói chuyện */}
+              <button
+                type="button"
+                className={`astrica-voice-btn ${isListening ? 'is-listening' : ''}`}
+                onClick={toggleVoiceInput}
+                disabled={isCurrentLoading}
+                aria-label={isListening ? 'Dừng thu âm' : 'Nói câu hỏi'}
+                title={isListening ? 'Dừng thu âm' : 'Bấm để nói bằng giọng nói'}
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" x2="12" y1="19" y2="22" />
+                </svg>
+              </button>
+
+              {/* Nút Gửi tin nhắn */}
+              <button type="submit" disabled={!prompt.trim() || isCurrentLoading} aria-label="Gửi tin nhắn">
                 <img src="/astrica/images/687774a75b297b454d3aa551_arrow_right-right.svg" alt="" aria-hidden="true" />
               </button>
             </form>
-            <p className="astrica-assistant-hint">Enter để gửi · Shift + Enter để xuống dòng</p>
+            <p className="astrica-assistant-hint">Enter để gửi · Shift + Enter để xuống dòng · Hoặc bấm Micro để nói</p>
           </div>
         </div>
       </div>

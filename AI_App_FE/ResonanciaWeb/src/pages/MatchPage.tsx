@@ -77,20 +77,21 @@ export default function MatchPage() {
         (rawMockUsers as any[]).find(m => m.id === senderUid || m.uid === senderUid);
 
       if (foundSender) {
-        const zSign = foundSender.sun || foundSender.zodiac || foundSender.zodiacSign || 'Bảo Bình';
+        const senderObj = foundSender as any;
+        const zSign = senderObj.sun || senderObj.zodiac || senderObj.zodiacSign || 'Bảo Bình';
         setModalSender({
+          ...senderObj,
           uid: senderUid,
-          name: foundSender.name || foundSender.fullName || notif?.senderName || 'Người gửi lời mời',
-          avatar: foundSender.avatar || notif?.senderAvatar || '',
+          name: senderObj.name || senderObj.fullName || notif?.senderName || 'Người gửi lời mời',
+          avatar: senderObj.avatar || notif?.senderAvatar || '',
           sun: zSign,
-          moon: foundSender.moon || 'Nhân Mã',
-          ascendant: foundSender.ascendant || 'Song Tử',
-          age: foundSender.age || 23,
-          job: foundSender.job || foundSender.occupation || 'Thành viên Resonancia',
-          bio: foundSender.bio || foundSender.personality || 'Đang kết nối năng lượng và tìm kiếm linh hồn đồng điệu ✨',
-          element: foundSender.element || ELEMENT_MAP[zSign] || 'Khí',
-          coverImage: foundSender.coverImage,
-          ...foundSender,
+          moon: senderObj.moon || 'Nhân Mã',
+          ascendant: senderObj.ascendant || 'Song Tử',
+          age: senderObj.age || 23,
+          job: senderObj.job || senderObj.occupation || 'Thành viên Resonancia',
+          bio: senderObj.bio || senderObj.personality || 'Đang kết nối năng lượng và tìm kiếm linh hồn đồng điệu ✨',
+          element: senderObj.element || ELEMENT_MAP[zSign] || 'Khí',
+          coverImage: senderObj.coverImage,
         });
       } else {
         // 2. Tải trực tiếp từ Firestore nếu là người dùng mới
@@ -256,7 +257,6 @@ export default function MatchPage() {
           [canonicalTargetUid]: sender.avatar || '',
         },
         lastMessage: 'Đã kết đôi thành công ✨',
-        lastTimestamp: Date.now(),
       });
     } catch (e) {
       console.error(e);

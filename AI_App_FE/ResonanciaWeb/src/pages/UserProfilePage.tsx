@@ -192,9 +192,9 @@ export default function UserProfilePage() {
 
     setLoadingCompat(true);
 
-    const targetSun = target.sun || target.zodiac || target.zodiacSign || 'Bảo Bình';
+    const targetSun = (target as any).sun || (target as any).zodiac || (target as any).zodiacSign || 'Bảo Bình';
     const targetMoon = target.moon || 'Nhân Mã';
-    const mySun = profile.sun || profile.zodiac || 'Bạch Dương';
+    const mySun = profile.sun || (profile as any).zodiac || 'Bạch Dương';
     const myMoon = profile.moon || 'Song Ngư';
     const myElem = ELEMENT_MAP[mySun] || 'Hoả';
     const targetElem = ELEMENT_MAP[targetSun] || 'Khí';
