@@ -30,8 +30,17 @@ FIREBASE_AVAILABLE = False
 db = None
 try:
     key_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
-    cred = credentials.Certificate(key_path) if key_path else credentials.ApplicationDefault()
-    firebase_admin.initialize_app(cred)
+    if not key_path or not os.path.exists(key_path):
+        key_path = os.path.join(BASE_DIR, "firebase-key.json")
+    if os.path.exists(key_path):
+        cred = credentials.Certificate(key_path)
+    else:
+        cred = credentials.ApplicationDefault()
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        firebase_admin.initialize_app(cred)
+    db = firestore.client()
     FIREBASE_AVAILABLE = True
     print("Firebase Admin initialized.")
 except Exception as fe:

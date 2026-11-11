@@ -5,6 +5,7 @@ import { auth } from '../services/firebase';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { apiGetNotifications } from '../services/api';
+import { subscribeUnreadCount, getStoredUnreadCount, emitUnreadCount } from '../services/notificationSync';
 import UiIcon from './UiIcon';
 
 function NavIcon({ name }: { name: string }) {
@@ -83,7 +84,15 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const displayName = currentName || (currentEmail ? currentEmail.split('@')[0] : 'Người dùng');
   const hasAstro = Boolean(profile.sun && profile.moon);
 
-  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [unreadNotifs, setUnreadNotifs] = useState(() => getStoredUnreadCount());
+
+  // Lắng nghe cập nhật số thông báo chưa đọc theo thời gian thực (0ms)
+  useEffect(() => {
+    const unsub = subscribeUnreadCount((count) => {
+      setUnreadNotifs(count);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (!currentUid) return;
@@ -91,7 +100,9 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       try {
         const res = await apiGetNotifications(currentUid);
         const list = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
-        setUnreadNotifs(list.filter((n: any) => !n.read).length);
+        const unread = list.filter((n: any) => !n.read).length;
+        setUnreadNotifs(unread);
+        emitUnreadCount(unread);
       } catch {}
     };
     checkUnread();

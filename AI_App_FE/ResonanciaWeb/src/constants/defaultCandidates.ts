@@ -1,3 +1,6 @@
+import rawMockUsers from '../mocks/usersMockData.json';
+import { ELEMENT_MAP } from './astrologyMap';
+
 export interface CandidateProfile {
   uid: string;
   name: string;
@@ -24,7 +27,7 @@ export interface CandidateProfile {
   houses?: Record<string, string>;
 }
 
-export const DEFAULT_CANDIDATE_PROFILES: Record<string, CandidateProfile> = {
+const BASE_CANDIDATES: Record<string, CandidateProfile> = {
   cand_1_nghia: {
     uid: 'cand_1_nghia',
     name: 'Trần Đại Nghĩa',
@@ -709,4 +712,87 @@ export const DEFAULT_CANDIDATE_PROFILES: Record<string, CandidateProfile> = {
       house10: 'Song Ngư',
     },
   },
+};
+
+const COSMIC_COVERS = [
+  'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1538370965046-79c0d6907d47?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1516339901601-2e1562986307?auto=format&fit=crop&w=1200&q=80',
+];
+
+const ZODIAC_LIST = [
+  'Bạch Dương', 'Kim Ngưu', 'Song Tử', 'Cự Giải',
+  'Sư Tử', 'Xử Nữ', 'Thiên Bình', 'Bọ Cạp',
+  'Nhân Mã', 'Ma Kết', 'Bảo Bình', 'Song Ngư'
+];
+
+function getStandardElement(sign: string): string {
+  const raw = ELEMENT_MAP[sign] || 'Thổ';
+  if (raw === 'Hoả') return 'Lửa';
+  if (raw === 'Thổ') return 'Đất';
+  if (raw === 'Thuỷ') return 'Nước';
+  return 'Khí';
+}
+
+function buildMockCandidateProfiles(): Record<string, CandidateProfile> {
+  const result: Record<string, CandidateProfile> = {};
+  (rawMockUsers as any[]).forEach((u, idx) => {
+    const zSign = u.zodiacSign || 'Bảo Bình';
+    const birthYear = u.dateOfBirth ? parseInt(u.dateOfBirth.slice(0, 4), 10) : 1998;
+    const age = 2026 - birthYear;
+    const element = getStandardElement(zSign);
+    const cover = COSMIC_COVERS[idx % COSMIC_COVERS.length];
+
+    const sunIndex = ZODIAC_LIST.indexOf(zSign) >= 0 ? ZODIAC_LIST.indexOf(zSign) : 0;
+    const getSign = (offset: number) => ZODIAC_LIST[(sunIndex + offset + 12) % 12];
+    const moon = getSign(3);
+    const ascendant = getSign(5);
+
+    result[u.id] = {
+      uid: u.id,
+      name: u.fullName,
+      email: u.email,
+      age,
+      gender: u.gender,
+      job: u.occupation,
+      relationshipStatus: u.relationshipStatus,
+      avatar: u.avatar,
+      coverImage: cover,
+      zodiac: zSign,
+      sun: zSign,
+      moon,
+      ascendant,
+      element,
+      mainElement: element,
+      personality: u.bio || 'Chân thành, ấm áp và luôn hướng tới sự đồng điệu',
+      bio: u.bio,
+      fireRatio: element === 'Lửa' ? 45 : 15,
+      earthRatio: element === 'Đất' ? 45 : 15,
+      airRatio: element === 'Khí' ? 45 : 15,
+      waterRatio: element === 'Nước' ? 45 : 15,
+      planets: {
+        sun: zSign,
+        moon,
+        mercury: zSign,
+        venus: getSign(1),
+        mars: getSign(2),
+        jupiter: getSign(4),
+        saturn: getSign(6),
+      },
+      houses: {
+        house1: ascendant,
+      },
+    };
+  });
+  return result;
+}
+
+export const DEFAULT_CANDIDATE_PROFILES: Record<string, CandidateProfile> = {
+  ...BASE_CANDIDATES,
+  ...buildMockCandidateProfiles(),
 };

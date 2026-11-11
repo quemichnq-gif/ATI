@@ -87,6 +87,13 @@ export default function ReferenceHomeSections() {
   };
 
   useEffect(() => {
+    (window as any).__navigate = navigate;
+    return () => {
+      delete (window as any).__navigate;
+    };
+  }, [navigate]);
+
+  useEffect(() => {
     uidRef.current = uid;
     const doc = frameRef.current?.contentDocument;
     if (doc) {
@@ -674,8 +681,8 @@ export default function ReferenceHomeSections() {
     <section aria-label="Các phần giao diện tham khảo Astrica" className="reference-home-sections">
       <iframe
         ref={frameRef}
-        key="astrica-home-frame-v8"
-        src="/astrica/reference-home.html?v=20261109_08"
+        key="astrica-home-frame-v9"
+        src="/astrica/reference-home.html?v=20261111_01"
         title="Các section trang chủ tham khảo Astrica"
         loading="eager"
         scrolling="no"

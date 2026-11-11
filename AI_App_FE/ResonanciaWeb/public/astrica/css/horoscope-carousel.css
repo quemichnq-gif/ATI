@@ -99,3 +99,199 @@
   margin-top: 180px !important;
   padding-top: 0 !important;
 }
+
+/* Tắt hoàn toàn hiệu ứng mờ ảnh và ẩn thời gian cũ của cung hoàng đạo */
+.horoscope-item-bg,
+.horoscope-item-block:hover .horoscope-item-bg,
+.horoscope-item-block:focus .horoscope-item-bg,
+.horoscope-item-block.is-active .horoscope-item-bg {
+  filter: none !important;
+  -webkit-filter: none !important;
+  opacity: 1 !important;
+}
+
+.horoscope-overlay,
+.horoscope-date-text,
+.horoscope-item-block:hover .horoscope-overlay,
+.horoscope-item-block:focus .horoscope-overlay {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Ẩn hoàn toàn hai nút điều hướng Prev và Next */
+.horoscope-slider .slide-arrow,
+.horoscope-slider .horoscope-3-left,
+.horoscope-slider .horoscope-3-right {
+  display: none !important;
+}
+
+.horoscope-slider {
+  padding-bottom: 24px !important;
+}
+
+/* Con trỏ và hiệu ứng nhẹ khi hover vào thẻ cung hoàng đạo */
+.horoscope-item-block {
+  cursor: pointer !important;
+  transition: transform 220ms ease, box-shadow 220ms ease !important;
+}
+
+.horoscope-item-block:hover,
+.horoscope-item-block.is-pinned {
+  transform: translateY(-4px) scale(1.02) !important;
+}
+
+/* Cửa sổ nổi giải thích cung hoàng đạo (Cosmic Zodiac Popover) */
+.zodiac-popover-box {
+  position: absolute;
+  z-index: 99999;
+  width: min(360px, calc(100vw - 32px));
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(28, 16, 58, 0.96) 0%, rgba(16, 8, 38, 0.98) 100%);
+  border: 1px solid rgba(192, 132, 252, 0.45);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 35px rgba(168, 85, 247, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  padding: 18px 20px;
+  color: #ffffff;
+  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -6px) scale(0.96);
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1), transform 220ms cubic-bezier(0.16, 1, 0.3, 1), visibility 220ms;
+  box-sizing: border-box;
+}
+
+.zodiac-popover-box.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.zodiac-popover-box.is-pinned {
+  border-color: rgba(236, 72, 153, 0.7);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.92), 0 0 42px rgba(236, 72, 153, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+
+.zodiac-popover-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.zodiac-popover-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.zodiac-popover-symbol {
+  font-size: 26px;
+  line-height: 1;
+  background: linear-gradient(135deg, #f472b6 0%, #c084fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.zodiac-popover-name-vi {
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.zodiac-popover-name-en {
+  font-size: 13px;
+  color: rgba(216, 180, 254, 0.75);
+  font-weight: 500;
+}
+
+.zodiac-popover-close {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(216, 180, 254, 0.85);
+  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 180ms ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.zodiac-popover-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+.zodiac-popover-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.zodiac-popover-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2.5px 8px;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  color: #e9d5ff;
+}
+
+.zodiac-popover-tag.tag-element {
+  background: rgba(236, 72, 153, 0.18);
+  border-color: rgba(236, 72, 153, 0.35);
+  color: #fbcfe8;
+}
+
+.zodiac-popover-tag.tag-pin {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+
+.zodiac-popover-desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(226, 217, 248, 0.9);
+  margin-bottom: 14px;
+}
+
+.zodiac-popover-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 0;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.4);
+  transition: all 200ms ease;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.zodiac-popover-btn:hover {
+  background: linear-gradient(135deg, #9333ea 0%, #db2777 100%);
+  box-shadow: 0 6px 24px rgba(236, 72, 153, 0.6);
+  transform: translateY(-1px);
+}

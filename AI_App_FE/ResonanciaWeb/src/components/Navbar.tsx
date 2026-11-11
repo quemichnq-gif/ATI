@@ -5,6 +5,13 @@ import { auth } from '../services/firebase';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { apiGetNotifications } from '../services/api';
+import {
+  subscribeUnreadCount,
+  getStoredUnreadCount,
+  emitUnreadCount,
+  emitNewNotification
+} from '../services/notificationSync';
+import NotificationBanner from './NotificationBanner';
 
 interface NavItem {
   to: string;
@@ -172,7 +179,17 @@ export default function Navbar() {
   const currentName = profile.name?.trim() || auth.currentUser?.displayName?.trim() || '';
   const displayName = currentName || (currentEmail ? currentEmail.split('@')[0] : 'Người dùng');
   const currentUid = profile.uid || authUser.uid || auth.currentUser?.uid || '';
-  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [unreadNotifs, setUnreadNotifs] = useState(() => getStoredUnreadCount());
+  const knownNotifIdsRef = useRef<Set<string>>(new Set());
+  const initialCheckRef = useRef(true);
+
+  // Lắng nghe cập nhật số thông báo chưa đọc theo thời gian thực (0ms)
+  useEffect(() => {
+    const unsub = subscribeUnreadCount((count) => {
+      setUnreadNotifs(count);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (!currentUid) return;
@@ -180,11 +197,30 @@ export default function Navbar() {
       try {
         const res = await apiGetNotifications(currentUid);
         const list = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
-        setUnreadNotifs(list.filter((n: any) => !n.read).length);
+        const unread = list.filter((n: any) => !n.read).length;
+        setUnreadNotifs(unread);
+        emitUnreadCount(unread);
+
+        if (initialCheckRef.current) {
+          list.forEach((n: any) => {
+            if (n?.id) knownNotifIdsRef.current.add(n.id);
+          });
+          initialCheckRef.current = false;
+        } else {
+          // Bắt thông báo mới gửi đến để kích hoạt banner thông báo dưới thanh tìm kiếm
+          list.forEach((n: any) => {
+            if (n?.id && !knownNotifIdsRef.current.has(n.id)) {
+              knownNotifIdsRef.current.add(n.id);
+              if (!n.read) {
+                emitNewNotification(n);
+              }
+            }
+          });
+        }
       } catch {}
     };
     checkUnread();
-    const timer = setInterval(checkUnread, 6000);
+    const timer = setInterval(checkUnread, 10000);
     return () => clearInterval(timer);
   }, [currentUid]);
 
@@ -457,6 +493,9 @@ export default function Navbar() {
               </div>
             )}
           </div>
+
+          {/* Banner thông báo nổi bật trực tiếp dưới thanh tìm kiếm */}
+          <NotificationBanner menuOpen={menuOpen} />
         </div>
       </div>
     </header>

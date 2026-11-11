@@ -22,7 +22,8 @@ try:
     from app.services.astrology_insights import (
         generate_career_insight_text,
         generate_natal_depth_analysis,
-        generate_time_based_prediction
+        generate_time_based_prediction,
+        generate_synastry_fallback
     )
     from app.services.rag_service import generate_rag_chat_response
     from app.utils.intent_router import route_intent
@@ -30,7 +31,8 @@ except ImportError:
     from astrology_insights import (
         generate_career_insight_text,
         generate_natal_depth_analysis,
-        generate_time_based_prediction
+        generate_time_based_prediction,
+        generate_synastry_fallback
     )
     from rag_service import generate_rag_chat_response
     from intent_router import route_intent
@@ -150,7 +152,7 @@ def generate_prediction_content(data):
     moon = user_data.get("moon") or "Kim Ngưu"
     ascendant = user_data.get("ascendant") or data.get("extra", {}).get("ascendant", "")
 
-    cached_doc = get_cached_prediction(uid, name, sun, moon, category, day)
+    cached_doc = get_cached_prediction(uid, name, sun, moon, category, day) if category != "synastry" else None
     if cached_doc:
         safe_print(f"✅ Cache có sẵn cho {name} ({uid}) - {category} ({day})")
         if category == "love_metrics":
@@ -187,19 +189,67 @@ def generate_prediction_content(data):
     cat_label = category_map.get(category, "Dự đoán chiêm tinh")
 
     if category == "synastry":
-        p2_name = extra.get("person2_name", "Người kia")
-        p2_sun = extra.get("person2_sun", "Không rõ")
-        p2_moon = extra.get("person2_moon", "Không rõ")
-        p2_asc = extra.get("person2_ascendant", "")
-        p2_venus = extra.get("person2_venus", "")
-        p2_mars = extra.get("person2_mars", "")
+        p1_asc = user_data.get("ascendant") or extra.get("person1_ascendant", "") or ascendant
+        p1_venus = user_data.get("venus") or extra.get("person1_venus", "")
+        p1_mars = user_data.get("mars") or extra.get("person1_mars", "")
+        p1_mercury = user_data.get("mercury") or extra.get("person1_mercury", "")
+
+        p2_name = (extra.get("person2_name") or "Người thứ hai").strip() or "Người thứ hai"
+        p2_sun = (extra.get("person2_sun") or "Không rõ").strip()
+        p2_moon = (extra.get("person2_moon") or "Không rõ").strip()
+        p2_asc = (extra.get("person2_ascendant") or "").strip()
+        p2_venus = (extra.get("person2_venus") or "").strip()
+        p2_mars = (extra.get("person2_mars") or "").strip()
+
+        p1_details = f"Mặt Trời {sun}, Mặt Trăng {moon}"
+        if p1_asc:
+            p1_details += f", Cung Mọc {p1_asc}"
+        if p1_venus:
+            p1_details += f", Sao Kim {p1_venus}"
+        if p1_mars:
+            p1_details += f", Sao Hỏa {p1_mars}"
+        if p1_mercury:
+            p1_details += f", Sao Thủy {p1_mercury}"
+
+        p2_details = f"Mặt Trời {p2_sun}, Mặt Trăng {p2_moon}"
+        if p2_asc:
+            p2_details += f", Cung Mọc {p2_asc}"
+        if p2_venus:
+            p2_details += f", Sao Kim {p2_venus}"
+        if p2_mars:
+            p2_details += f", Sao Hỏa {p2_mars}"
+
         prompt = f"""
-        Phân tích tuyệt đối tương hợp cặp đôi theo chiêm tinh. Trả lời JSON với cấu trúc:
-        {{"overall": <số 0-100>, "love": <số 0-100>, "communication": <số 0-100>, "passion": <số 0-100>, "spiritual": <số 0-100>, "summary": "tóm tắt 2-3 câu", "strengths": "2-3 câu về điểm mạnh", "challenges": "2-3 câu về thách thức", "advice": "lời khuyên 2-3 câu"}}
-        Người 1: {name}, Mặt Trời {sun}, Mặt Trăng {moon}
-        Người 2: {p2_name}, Mặt Trời {p2_sun}, Mặt Trăng {p2_moon}, Cung Mọc {p2_asc}, Sao Kim {p2_venus}, Sao Hỏa {p2_mars}
-        Chỉ trả lời JSON thuần, không thêm giải thích ngoài.
-        """
+Bạn là bậc thầy Chiêm Tinh Học Tâm Lý Chiều Sâu (Psychological & Relational Synastry Master). Hãy phân tích bản đồ đôi tương hợp chuyên sâu (Synastry Chart Analysis) giữa hai cá nhân:
+- Người 1 ({name}): {p1_details}
+- Người 2 ({p2_name}): {p2_details}
+
+YÊU CẦU ĐẶC BIỆT VỀ ĐỘ DÀI VÀ ĐỘ SÂU (MỖI PHẦN VIẾT KHOẢNG 4 - 5 CÂU, DÀI HƠN BÌNH THƯỜNG 1-2 CÂU ĐỂ ĐẠT ĐỘ SÂU SẮC CAO NHẤT, TUYỆT ĐỐI DỰA TRÊN LÁ SỐ CỦA NGƯỜI DÙNG VÀ CÁC CHI TIẾT ĐÃ CHỌN TỪ NGƯỜI THỨ HAI):
+
+1. ĐÁNH GIÁ CHỈ SỐ CHUẨN XÁC (0-100):
+   - overall: Điểm hòa hợp tổng thể dựa trên tương quan nguyên tố và góc chiếu hành tinh.
+   - love: Độ hòa hợp tình cảm và sự gắn kết tâm hồn (tương tác Mặt Trăng và Sao Kim).
+   - communication: Độ ăn ý trong tư duy, giao tiếp và giải quyết bất đồng (tương tác Sao Thủy, Mặt Trời).
+   - passion: Sức hút ái tình, sự nồng nhiệt và hấp dẫn giới tính (tương tác Sao Kim và Sao Hỏa).
+   - spiritual: Mức độ tương thích tâm linh, giá trị sống cốt lõi và bài học nghiệp quả (Karmic lesson).
+
+2. BỐN PHẦN LUẬN GIẢI CHUYÊN SÂU (VIẾT BẰNG TIẾNG VIỆT TINH TẾ, GIÀU CHẤT TRIẾT LÝ, KHÔNG DÙNG EMOJI, KHÔNG DÙNG VĂN MẪU SÁO RỖNG):
+   - summary (Tổng Quan Động Lực Mối Quan Hệ, viết 4-5 câu sâu sắc):
+     Phân tích bản chất cốt lõi của mối liên kết giữa {name} ({sun}) và {p2_name} ({p2_sun}). Nêu rõ đây là mối duyên nuôi dưỡng an toàn, ngọn lửa thức tỉnh hay tấm gương phản chiếu để cùng tiến hóa tâm thức. Đi sâu vào sự giao thoa giữa bản ngã Mặt Trời và năng lượng nguyên tố của cả hai. Liên hệ thêm cách Cung Mọc hoặc năng lượng của hai người tạo nên lực hút ban đầu và mở lối cho sự gắn kết dài lâu.
+
+   - strengths (Điểm Tựa & Sức Mạnh Tương Hợp, viết 4-5 câu sâu sắc):
+     So sánh chi tiết thế giới cảm xúc nội tâm giữa Mặt Trăng của {name} ({moon}) và Mặt Trăng của {p2_name} ({p2_moon}), chỉ rõ cách hai người đem lại sự bình yên và thấu cảm cho nhau. Phân tích sự nâng đỡ giữa các vị trí hành tinh cá nhân (như Sao Kim, Sao Hỏa nếu có) tạo nên ngôn ngữ yêu thương và sức hút ái tình độc đáo. Chỉ ra cụ thể phẩm chất nào của {name} bù đắp cho điểm khuyết của {p2_name} và ngược lại để cùng kiến tạo cuộc sống hòa hợp.
+
+   - challenges (Điểm Mù Tâm Lý & Vùng Kích Hoạt Xung Đột, viết 4-5 câu sâu sắc):
+     Chỉ ra cội nguồn tâm lý sâu xa của những va chạm tiềm ẩn khi bước vào giai đoạn cam kết sâu hơn. Phân tích sự khác biệt về phản xạ vô thức khi gặp áp lực giữa Mặt Trăng {moon} và Mặt Trăng {p2_moon}, hoặc sự va đập cái tôi giữa {sun} và {p2_sun}. Nêu rõ cạm bẫy hiểu lầm lớn nhất và chỉ ra cách mà cơ chế phòng vệ của người này vô tình chạm vào vết thương nhạy cảm của người kia.
+
+   - advice (Kim Chỉ Nam Chuyển Hóa & Nghệ Thuật Đồng Hành, viết 4-5 câu sâu sắc):
+     Đưa ra chỉ dẫn tâm lý thực tế, thiết thực và giàu thấu cảm dành riêng cho cặp đôi {name} ({sun}, {moon}) và {p2_name} ({p2_sun}, {p2_moon}). Chỉ rõ {name} cần học cách buông bỏ điều gì (cái tôi, sự kiểm soát, hay sự ngờ vực) và {p2_name} cần chủ động mở lòng đón nhận điều gì. Đưa ra chiếc chìa khóa vàng trong giao tiếp và ứng xử hàng ngày để chuyển hóa các góc chiếu thách thức thành sự gắn kết bền chặt trọn đời.
+
+3. ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:
+   Trả về DUY NHẤT một chuỗi JSON hợp lệ, không bọc trong markdown code fence (không ```json), không có bất kỳ văn bản nào ngoài JSON:
+   {{"overall": <số>, "love": <số>, "communication": <số>, "passion": <số>, "spiritual": <số>, "summary": "...", "strengths": "...", "challenges": "...", "advice": "..."}}
+"""
     elif category == "career_chart":
         mc = extra.get("mc") or user_data.get("mc", "Ma Kết")
         house10 = extra.get("house10") or user_data.get("house10", "Ma Kết")
@@ -403,6 +453,12 @@ def generate_prediction_content(data):
                     "cached": False,
                     "status": 200
                 }
+            elif category == "synastry":
+                text = generate_synastry_fallback(
+                    sun, moon, p1_asc, p1_venus, p1_mars,
+                    p2_sun, p2_moon, p2_asc, p2_venus, p2_mars,
+                    name, p2_name
+                )
             elif category.startswith("tarot_"):
                 card_name = category.replace("tarot_", "").replace("_", " ").title()
                 card_vi = extra.get("card_vi", card_name)
@@ -412,6 +468,25 @@ def generate_prediction_content(data):
                 text = f"Lá bài {card_vi} ({orientation_str}) mang đến thông điệp nhắc nhở bạn hãy tĩnh tâm cảm nhận dòng chảy cuộc sống. {meaning_snippet}\n\nLời khuyên cho bạn hôm nay: Hãy tin tưởng vào lựa chọn nội tại và hành động với sự chân thành."
             else:
                 text = generate_time_based_prediction(sun, moon, category, day)
+
+        if category == "synastry":
+            import json
+            try:
+                cleaned_text = re.sub(r"^[\s\S]*?\{", "{", text)
+                cleaned_text = re.sub(r"\}[\s\S]*$", "}", cleaned_text)
+                syn_json = json.loads(cleaned_text)
+                required_keys = ["overall", "love", "communication", "passion", "spiritual", "summary", "strengths", "challenges", "advice"]
+                if all(k in syn_json for k in required_keys):
+                    text = json.dumps(syn_json, ensure_ascii=False)
+                else:
+                    raise ValueError("Missing keys in synastry JSON")
+            except Exception as parse_err:
+                safe_print("⚠️ Synastry parse error, using fallback:", parse_err)
+                text = generate_synastry_fallback(
+                    sun, moon, p1_asc, p1_venus, p1_mars,
+                    p2_sun, p2_moon, p2_asc, p2_venus, p2_mars,
+                    name, p2_name
+                )
 
         if category == "love_metrics":
             import json

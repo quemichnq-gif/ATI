@@ -6,7 +6,7 @@ export type IconName =
   | 'camera' | 'edit' | 'check' | 'hourglass' | 'send' | 'sparkles'
   | 'compass' | 'flame' | 'earth' | 'wind' | 'water' | 'arrow-up'
   | 'sun' | 'moon' | 'star' | 'rocket' | 'close' | 'cloud-rain' | 'mail'
-  | 'crystal-ball';
+  | 'crystal-ball' | 'trash' | 'plus' | 'history' | 'star-4';
 
 const paths: Record<IconName, ReactNode> = {
   home: <><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
@@ -43,6 +43,10 @@ const paths: Record<IconName, ReactNode> = {
   'cloud-rain': <><path d="M7 15a4 4 0 0 1 0-8 5 5 0 0 1 9-1 4 4 0 1 1 1 9H7Z"/><path d="m8 18-1 3m6-3-1 3m6-3-1 3"/></>,
   mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></>,
   'crystal-ball': <><circle cx="12" cy="9" r="6.5"/><path d="M7.5 18 6 21h12l-1.5-3"/><path d="M9 21h6"/></>,
+  trash: <><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></>,
+  plus: <path d="M5 12h14M12 5v14"/>,
+  history: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></>,
+  'star-4': <path d="M12 2C12 7.5 16.5 12 22 12C16.5 12 12 16.5 12 22C12 16.5 7.5 12 2 12C7.5 12 12 7.5 12 2Z" fill="currentColor" stroke="none" />,
 };
 
 export default function UiIcon({ name, label, className = '', style }: { name: IconName; label: string; className?: string; style?: CSSProperties }) {
