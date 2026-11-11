@@ -54,7 +54,9 @@ def authenticate_api_request():
         request.args.get("userId"),
         body.get("senderId"),
     )
-    if any(uid and uid != user_uid for uid in requested_uids):
+    from app.services.chat_service import uid_aliases
+    allowed_uids = set(uid_aliases(user_uid))
+    if any(uid and uid not in allowed_uids for uid in requested_uids):
         return jsonify({"error": "User does not have access to this resource"}), 403
 
     return None

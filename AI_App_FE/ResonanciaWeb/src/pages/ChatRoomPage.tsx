@@ -1,17 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { RootState } from '../store';
+import { setAuth } from '../store/authSlice';
+import { setProfile } from '../store/profileSlice';
 import { formatTimestamp } from '../utils/date';
 import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
-import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
+import { getTestProfileByEmailOrUid, TEST_ACCOUNT_DEFAULT_PASSWORD } from '../constants/testAccounts';
 import { MessengerLogo } from '../components/ChatFab';
 import ChatAccountSwitcher from '../components/ChatAccountSwitcher';
 import {
   getActiveChatIdentity,
   setActiveChatIdentity,
+  getAvailableChatAccounts,
   ChatAccountIdentity,
 } from '../services/chatAccountService';
 import {
@@ -27,6 +31,7 @@ export default function ChatRoomPage() {
   const { chatId } = useParams<{ chatId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const profile = useSelector((s: RootState) => s.profile);
 
   // Danh tính tài khoản đang chat
@@ -61,19 +66,37 @@ export default function ChatRoomPage() {
   }, [profile]);
 
   // ============================================================
-  // XÁC ĐỊNH ĐỐI PHƯƠNG CHÍNH XÁC
+  // XÁC ĐỊNH DANH TÍNH CỦA MÌNH & ĐỐI PHƯƠNG CHÍNH XÁC (ALIAS-AWARE)
   // ============================================================
+  const myTestAcc = getTestProfileByEmailOrUid(currentUid) || getTestProfileByEmailOrUid(profile.email || '') || getTestProfileByEmailOrUid(profile.uid || '');
+  const myAliases = new Set([
+    currentUid,
+    profile.uid || '',
+    auth.currentUser?.uid || '',
+    ...(myTestAcc?.aliasUids || []),
+  ].filter(Boolean));
+
   let otherUid = '';
-  if (chatId && currentUid) {
-    if (chatId.startsWith(currentUid + '_')) {
-      otherUid = chatId.slice(currentUid.length + 1);
-    } else if (chatId.endsWith('_' + currentUid)) {
-      otherUid = chatId.slice(0, chatId.length - currentUid.length - 1);
-    } else {
-      const matched = Object.keys(DEFAULT_CANDIDATE_PROFILES).find(
-        (k) => chatId.includes(k) && k !== currentUid
-      );
-      if (matched) otherUid = matched;
+  if (chatId) {
+    const parts = chatId.split('_');
+    if (parts.length === 2) {
+      if (myAliases.has(parts[0])) {
+        otherUid = parts[1];
+      } else if (myAliases.has(parts[1])) {
+        otherUid = parts[0];
+      }
+    }
+    if (!otherUid && currentUid) {
+      if (chatId.startsWith(currentUid + '_')) {
+        otherUid = chatId.slice(currentUid.length + 1);
+      } else if (chatId.endsWith('_' + currentUid)) {
+        otherUid = chatId.slice(0, chatId.length - currentUid.length - 1);
+      } else {
+        const matched = Object.keys(DEFAULT_CANDIDATE_PROFILES).find(
+          (k) => chatId.includes(k) && !myAliases.has(k)
+        );
+        if (matched) otherUid = matched;
+      }
     }
   }
 
@@ -283,14 +306,49 @@ export default function ChatRoomPage() {
     navigate(`/chat/${newChatId}`, { state: { chatName: candidate.name } });
   };
 
-  // Đổi tài khoản sang đối phương (Hỗ trợ đổi Firebase Auth thật 100%)
-  const handleSwitchToPartnerAuth = () => {
+  // Đổi tài khoản sang đối phương (1-click chuyển đổi auth thật tức thì)
+  const handleSwitchToPartnerAuth = async () => {
     const targetTestAcc = getTestProfileByEmailOrUid(partnerName) || getTestProfileByEmailOrUid(otherUid);
     if (!targetTestAcc) {
       setActiveChatIdentity(otherUid);
       return;
     }
-    navigate('/login', { state: { email: targetTestAcc.email } });
+
+    try {
+      setToastMsg(`Đang chuyển đăng nhập sang ${targetTestAcc.name}... ✨`);
+      const userCred = await signInWithEmailAndPassword(auth, targetTestAcc.email, TEST_ACCOUNT_DEFAULT_PASSWORD);
+      const user = userCred.user;
+      dispatch(setAuth({ uid: user.uid, email: targetTestAcc.email }));
+
+      const initialProfile = {
+        ...targetTestAcc,
+        uid: user.uid,
+      };
+      dispatch(setProfile(initialProfile as any));
+
+      try {
+        localStorage.setItem(`resonancia_profile_${user.uid}`, JSON.stringify(initialProfile));
+        localStorage.setItem('resonancia_last_profile', JSON.stringify(initialProfile));
+        localStorage.setItem('resonancia_active_chat_identity', user.uid);
+      } catch {}
+
+      setActiveIdentity({
+        uid: user.uid,
+        name: targetTestAcc.name,
+        avatar: targetTestAcc.avatar,
+        zodiac: targetTestAcc.zodiac || targetTestAcc.sun,
+        job: targetTestAcc.job,
+        isMainUser: true,
+      });
+
+      setToastMsg(`Đã đổi sang nick ${targetTestAcc.name}! 🎉`);
+      setTimeout(() => setToastMsg(''), 3000);
+    } catch (err: any) {
+      console.warn('Lỗi auto switch auth đối phương:', err);
+      setActiveChatIdentity(otherUid);
+      setToastMsg(`Đã chuyển danh tính chat sang ${targetTestAcc.name} ✨`);
+      setTimeout(() => setToastMsg(''), 3000);
+    }
   };
 
   const showCallFeatureNotice = (type: 'thoại' | 'video') => {
@@ -300,12 +358,15 @@ export default function ChatRoomPage() {
 
   // Lọc chat tìm kiếm
   const filteredChats = chats.filter((c) => {
-    const oUid = c.participants?.find((p: string) => p !== currentUid) || '';
-    const name = (oUid ? c.participantNames?.[oUid] : '') || '';
+    const oUid = c.participants?.find((p: string) => !myAliases.has(p)) || c.participants?.find((p: string) => p !== currentUid) || '';
+    const testAcc = oUid ? getTestProfileByEmailOrUid(oUid) : null;
+    const cand = oUid ? DEFAULT_CANDIDATE_PROFILES[oUid] : null;
+    const name = testAcc?.name || cand?.name || (oUid ? c.participantNames?.[oUid] : '') || '';
     return name.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const topCandidates = Object.values(DEFAULT_CANDIDATE_PROFILES).slice(0, 6);
+  const availableAccounts = getAvailableChatAccounts(profile).filter((a) => !a.isMainUser && !myAliases.has(a.uid));
+  const topCandidates = availableAccounts.length > 0 ? availableAccounts.slice(0, 7) : Object.values(DEFAULT_CANDIDATE_PROFILES).slice(0, 6);
 
   return (
     <div
@@ -415,7 +476,7 @@ export default function ChatRoomPage() {
         <div className="flex-1 overflow-y-auto px-2.5 py-2 space-y-1.5 resonancia-scrollbar">
           {filteredChats.length > 0 ? (
             filteredChats.map((chat) => {
-              const oUid = chat.participants?.find((p: string) => p !== currentUid) || '';
+              const oUid = chat.participants?.find((p: string) => !myAliases.has(p)) || chat.participants?.find((p: string) => p !== currentUid) || '';
               const oCand = oUid ? DEFAULT_CANDIDATE_PROFILES[oUid] : undefined;
               const testAcc = oUid ? getTestProfileByEmailOrUid(oUid) : null;
               const oName = testAcc?.name || oCand?.name || (oUid ? chat.participantNames?.[oUid] : '') || 'Người dùng';
@@ -458,7 +519,7 @@ export default function ChatRoomPage() {
                       )}
                     </div>
                     <p className={`text-[11px] truncate mt-0.5 ${isSelected ? 'text-purple-200 font-medium' : 'text-purple-200/60'}`}>
-                      {chat.lastSenderId === currentUid ? 'Bạn: ' : ''}
+                      {chat.lastSenderId === currentUid || myAliases.has(chat.lastSenderId || '') ? 'Bạn: ' : ''}
                       {chat.lastMessage || 'Bắt đầu cuộc trò chuyện...'}
                     </p>
                   </div>
@@ -645,7 +706,7 @@ export default function ChatRoomPage() {
           {/* Luồng tin nhắn thực tế 2 chiều */}
           <AnimatePresence>
             {messages.map((msg) => {
-              const isMine = msg.senderId === currentUid;
+              const isMine = msg.senderId === currentUid || myAliases.has(msg.senderId);
               return (
                 <motion.div
                   key={msg.id}

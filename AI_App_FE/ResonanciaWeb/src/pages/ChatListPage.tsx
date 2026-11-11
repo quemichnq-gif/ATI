@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { auth } from '../services/firebase';
 import { RootState } from '../store';
 import { formatTimestamp } from '../utils/date';
 import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
@@ -88,8 +89,16 @@ export default function ChatListPage() {
     navigate(`/chat/${chatId}`, { state: { chatName: candidate.name } });
   };
 
+  const myTestAcc = getTestProfileByEmailOrUid(currentUid) || getTestProfileByEmailOrUid(profile.email || '') || getTestProfileByEmailOrUid(profile.uid || '');
+  const myAliases = new Set([
+    currentUid,
+    profile.uid || '',
+    auth.currentUser?.uid || '',
+    ...(myTestAcc?.aliasUids || []),
+  ].filter(Boolean));
+
   const filteredChats = chats.filter((c) => {
-    const oUid = c.participants?.find((p: string) => p !== currentUid) || '';
+    const oUid = c.participants?.find((p: string) => !myAliases.has(p)) || c.participants?.find((p: string) => p !== currentUid) || '';
     const oCand = oUid ? DEFAULT_CANDIDATE_PROFILES[oUid] : undefined;
     const testAcc = oUid ? getTestProfileByEmailOrUid(oUid) : null;
     const name = testAcc?.name || oCand?.name || (oUid ? c.participantNames?.[oUid] : '') || '';
@@ -198,7 +207,7 @@ export default function ChatListPage() {
             </div>
           ) : filteredChats.length > 0 ? (
             filteredChats.map((chat) => {
-              const oUid = chat.participants?.find((p: string) => p !== currentUid) || '';
+              const oUid = chat.participants?.find((p: string) => !myAliases.has(p)) || chat.participants?.find((p: string) => p !== currentUid) || '';
               const oCand = oUid ? DEFAULT_CANDIDATE_PROFILES[oUid] : undefined;
               const testAcc = oUid ? getTestProfileByEmailOrUid(oUid) : null;
               const oName = testAcc?.name || oCand?.name || (oUid ? chat.participantNames?.[oUid] : '') || 'Người dùng';
@@ -236,7 +245,7 @@ export default function ChatListPage() {
                       )}
                     </div>
                     <p className="text-xs text-purple-200/60 truncate mt-0.5 group-hover:text-purple-200/90 transition-colors">
-                      {chat.lastSenderId === currentUid ? 'Bạn: ' : ''}
+                      {chat.lastSenderId === currentUid || myAliases.has(chat.lastSenderId || '') ? 'Bạn: ' : ''}
                       {chat.lastMessage || 'Bắt đầu cuộc trò chuyện...'}
                     </p>
                   </div>

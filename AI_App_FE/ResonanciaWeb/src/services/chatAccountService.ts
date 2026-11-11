@@ -1,4 +1,5 @@
 import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
+import { TEST_ACCOUNTS, getTestProfileByEmailOrUid } from '../constants/testAccounts';
 import { UserProfile } from '../types';
 
 export interface ChatAccountIdentity {
@@ -17,12 +18,15 @@ const MAIN_BACKUP_KEY = 'resonancia_main_user_backup';
  * Lấy danh sách các tài khoản có thể chuyển đổi trong hệ thống
  */
 export function getAvailableChatAccounts(mainProfile: UserProfile): ChatAccountIdentity[] {
-  // 1. Tài khoản chính của người dùng
-  const effectiveMainUid = mainProfile.uid || 'user_main_tuan';
+  // 1. Tài khoản chính của người dùng đang đăng nhập
+  const effectiveMainUid = mainProfile.uid || '37ttDQ1n6LbeJpNuieiYdSBtnal1';
   const effectiveMainName = mainProfile.name || 'Tuấn Nguyễn Chí';
   const effectiveMainAvatar =
     mainProfile.avatar ||
     'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80';
+
+  const myTestAcc = getTestProfileByEmailOrUid(effectiveMainUid) || getTestProfileByEmailOrUid(mainProfile.email || '');
+  const myAliases = new Set([effectiveMainUid, ...(myTestAcc?.aliasUids || [])]);
 
   const mainAccount: ChatAccountIdentity = {
     uid: effectiveMainUid,
@@ -33,25 +37,31 @@ export function getAvailableChatAccounts(mainProfile: UserProfile): ChatAccountI
     isMainUser: true,
   };
 
-  // Lưu backup tài khoản chính nếu chưa có
-  try {
-    const existing = localStorage.getItem(MAIN_BACKUP_KEY);
-    if (!existing || (mainProfile.uid && !existing.includes(mainProfile.uid))) {
-      localStorage.setItem(MAIN_BACKUP_KEY, JSON.stringify(mainAccount));
-    }
-  } catch {}
+  // 2. Danh sách các tài khoản test chuẩn khác (Hà My, Tuấn, Nghĩa)
+  const testAccountsList: ChatAccountIdentity[] = Object.values(TEST_ACCOUNTS)
+    .filter((acc) => !myAliases.has(acc.uid || '') && !myAliases.has(acc.email))
+    .map((acc) => ({
+      uid: acc.uid || acc.email,
+      name: acc.name,
+      avatar: acc.avatar,
+      zodiac: acc.zodiac || acc.sun,
+      job: acc.job,
+      isMainUser: false,
+    }));
 
-  // 2. Các ứng viên hệ thống
-  const candidateAccounts: ChatAccountIdentity[] = Object.values(DEFAULT_CANDIDATE_PROFILES).map((cand) => ({
-    uid: cand.uid,
-    name: cand.name,
-    avatar: cand.avatar,
-    zodiac: cand.zodiac || cand.sun,
-    job: cand.job,
-    isMainUser: false,
-  }));
+  // 3. Các ứng viên hệ thống
+  const candidateAccounts: ChatAccountIdentity[] = Object.values(DEFAULT_CANDIDATE_PROFILES)
+    .filter((cand) => !myAliases.has(cand.uid) && !testAccountsList.some((t) => t.name === cand.name))
+    .map((cand) => ({
+      uid: cand.uid,
+      name: cand.name,
+      avatar: cand.avatar,
+      zodiac: cand.zodiac || cand.sun,
+      job: cand.job,
+      isMainUser: false,
+    }));
 
-  return [mainAccount, ...candidateAccounts];
+  return [mainAccount, ...testAccountsList, ...candidateAccounts];
 }
 
 /**

@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../services/firebase';
+import { setAuth } from '../store/authSlice';
+import { setProfile } from '../store/profileSlice';
 import { RootState } from '../store';
 import {
   getAvailableChatAccounts,
@@ -7,7 +11,7 @@ import {
   setActiveChatIdentity,
   ChatAccountIdentity,
 } from '../services/chatAccountService';
-import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
+import { getTestProfileByEmailOrUid, TEST_ACCOUNT_DEFAULT_PASSWORD } from '../constants/testAccounts';
 
 interface ChatAccountSwitcherProps {
   onAccountSwitched?: (newIdentity: ChatAccountIdentity) => void;
@@ -15,6 +19,7 @@ interface ChatAccountSwitcherProps {
 }
 
 export default function ChatAccountSwitcher({ onAccountSwitched, className = '' }: ChatAccountSwitcherProps) {
+  const dispatch = useDispatch();
   const profile = useSelector((s: RootState) => s.profile);
   const [activeAccount, setActiveAccount] = useState<ChatAccountIdentity>(() => getActiveChatIdentity(profile));
   const [isOpen, setIsOpen] = useState(false);
@@ -37,11 +42,33 @@ export default function ChatAccountSwitcher({ onAccountSwitched, className = '' 
     return () => window.removeEventListener('resonancia_identity_changed', handleChanged);
   }, [profile, onAccountSwitched]);
 
-  // Chuyển danh tính trò chuyện
-  const handleSelectIdentity = (acc: ChatAccountIdentity) => {
+  // Chuyển danh tính trò chuyện (Nếu có tài khoản auth thật thì tự động chuyển Firebase Auth)
+  const handleSelectIdentity = async (acc: ChatAccountIdentity) => {
     setActiveChatIdentity(acc.uid);
     setActiveAccount(acc);
     setIsOpen(false);
+
+    const testAcc = getTestProfileByEmailOrUid(acc.name) || getTestProfileByEmailOrUid(acc.uid);
+    if (testAcc) {
+      try {
+        const userCred = await signInWithEmailAndPassword(auth, testAcc.email, TEST_ACCOUNT_DEFAULT_PASSWORD);
+        const user = userCred.user;
+        dispatch(setAuth({ uid: user.uid, email: testAcc.email }));
+        const newProf = {
+          ...testAcc,
+          uid: user.uid,
+        };
+        dispatch(setProfile(newProf as any));
+        try {
+          localStorage.setItem(`resonancia_profile_${user.uid}`, JSON.stringify(newProf));
+          localStorage.setItem('resonancia_last_profile', JSON.stringify(newProf));
+          localStorage.setItem('resonancia_active_chat_identity', user.uid);
+        } catch {}
+      } catch (e) {
+        console.warn('Auto auth switch fallback:', e);
+      }
+    }
+
     if (onAccountSwitched) onAccountSwitched(acc);
   };
 

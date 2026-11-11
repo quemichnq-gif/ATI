@@ -21,6 +21,8 @@ export interface TestAccountInfo {
   aliasUids?: string[];
 }
 
+export const TEST_ACCOUNT_DEFAULT_PASSWORD = '123456';
+
 export const TEST_ACCOUNTS: Record<string, TestAccountInfo> = {
   'hamy@resonancia.app': {
     email: 'hamy@resonancia.app',
@@ -36,8 +38,8 @@ export const TEST_ACCOUNTS: Record<string, TestAccountInfo> = {
     birthPlace: 'Hà Nội',
     job: 'Thành viên Resonancia',
     bio: 'Thích vẽ tranh, nghe podcast chiêm tinh và đi dạo ngắm hoàng hôn 🎨✨',
-    uid: '61kO1itQCOV3Nw9acgWUmQLduNT2',
-    aliasUids: ['cand_2_hamy', '61kO1itQCOV3Nw9acgWUmQLduNT2'],
+    uid: 'C6U7eytPpdQyw2YufISm4mNh6N72',
+    aliasUids: ['cand_2_hamy', '61kO1itQCOV3Nw9acgWUmQLduNT2', 'C6U7eytPpdQyw2YufISm4mNh6N72'],
   },
   'tuan@resonancia.app': {
     email: 'tuan@resonancia.app',
@@ -53,8 +55,8 @@ export const TEST_ACCOUNTS: Record<string, TestAccountInfo> = {
     birthPlace: 'Hà Nội',
     job: 'Thành viên Resonancia',
     bio: 'Người tìm kiếm sự hòa hợp giữa các vì sao và cuộc sống ✨',
-    uid: 'yEQyrTCQJwWedUyffYTqt5O01ih1',
-    aliasUids: ['user_main_tuan', 'yEQyrTCQJwWedUyffYTqt5O01ih1'],
+    uid: 'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    aliasUids: ['user_main_tuan', 'user_tuan', 'yEQyrTCQJwWedUyffYTqt5O01ih1', 'Rietkt4hguXJeAyjKv6Fqo5E7OK2', '37ttDQ1n6LbeJpNuieiYdSBtnal1', 'x5cEmtlghVYlrpyITC1FSaonIzt1'],
   },
   'dainghia@resonancia.app': {
     email: 'dainghia@resonancia.app',
@@ -70,8 +72,8 @@ export const TEST_ACCOUNTS: Record<string, TestAccountInfo> = {
     birthPlace: 'Đà Nẵng',
     job: 'Thành viên Resonancia',
     bio: 'Đam mê khám phá vũ trụ và công nghệ AI 🌌',
-    uid: 'YykBl98StbXVCKgqave6VMVC5Bx1',
-    aliasUids: ['cand_1_dainghia', 'YykBl98StbXVCKgqave6VMVC5Bx1'],
+    uid: 'PAKzF0JCu3Zh11N59MzxUlCG3pq2',
+    aliasUids: ['cand_1_dainghia', 'cand_1_nghia', 'YykBl98StbXVCKgqave6VMVC5Bx1', 'PAKzF0JCu3Zh11N59MzxUlCG3pq2'],
   },
 };
 

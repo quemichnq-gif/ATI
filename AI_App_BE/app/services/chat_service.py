@@ -8,31 +8,58 @@ import os
 BE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DB_PATH = os.getenv("CHAT_DB_PATH", os.path.join(BE_DIR, "chat_database.db"))
 
-UID_ALIASES = {
-    'cand_2_hamy': '61kO1itQCOV3Nw9acgWUmQLduNT2',
-    '61kO1itQCOV3Nw9acgWUmQLduNT2': 'cand_2_hamy',
-    'cand_1_dainghia': 'YykBl98StbXVCKgqave6VMVC5Bx1',
-    'YykBl98StbXVCKgqave6VMVC5Bx1': 'cand_1_dainghia',
-    'user_main_tuan': 'yEQyrTCQJwWedUyffYTqt5O01ih1',
-    'yEQyrTCQJwWedUyffYTqt5O01ih1': 'user_main_tuan',
-}
+UID_GROUPS = [
+    {
+        'cand_2_hamy',
+        '61kO1itQCOV3Nw9acgWUmQLduNT2',
+        'C6U7eytPpdQyw2YufISm4mNh6N72',
+    },
+    {
+        'cand_1_dainghia',
+        'cand_1_nghia',
+        'YykBl98StbXVCKgqave6VMVC5Bx1',
+        'PAKzF0JCu3Zh11N59MzxUlCG3pq2',
+    },
+    {
+        'user_main_tuan',
+        'user_tuan',
+        'yEQyrTCQJwWedUyffYTqt5O01ih1',
+        'Rietkt4hguXJeAyjKv6Fqo5E7OK2',
+        '37ttDQ1n6LbeJpNuieiYdSBtnal1',
+        'x5cEmtlghVYlrpyITC1FSaonIzt1',
+    },
+]
 
 def uid_aliases(uid):
-    aliases = [uid]
-    alias = UID_ALIASES.get(uid)
-    if alias:
-        aliases.append(alias)
-    return aliases
+    if not uid:
+        return []
+    aliases = {uid}
+    for group in UID_GROUPS:
+        if uid in group:
+            aliases.update(group)
+    return list(aliases)
 
 def chat_contains_user(participants, uid):
     allowed_ids = set(uid_aliases(uid))
     return any(participant in allowed_ids for participant in participants)
 
 def load_chat_for_user(cursor, chat_id, uid):
-    cursor.execute('SELECT * FROM chats WHERE chat_id = ?', (chat_id,))
-    row = cursor.fetchone()
-    if not row:
-        return None
+    possible_chat_ids = [chat_id]
+    parts = chat_id.split('_')
+    if len(parts) == 2:
+        possible_chat_ids.append(f"{parts[1]}_{parts[0]}")
+
+    placeholders = ','.join(['?'] * len(possible_chat_ids))
+    cursor.execute(f'SELECT * FROM chats WHERE chat_id IN ({placeholders})', possible_chat_ids)
+    rows = cursor.fetchall()
+    for row in rows:
+        try:
+            participants = json.loads(row['participants'] or '[]')
+        except (TypeError, ValueError):
+            continue
+        if chat_contains_user(participants, uid):
+            return row
+    return None
     try:
         participants = json.loads(row['participants'] or '[]')
     except (TypeError, ValueError):
@@ -204,7 +231,12 @@ def get_chat_messages(chat_id, since, uid):
     conn = get_db()
     cursor = conn.cursor()
 
-    if not load_chat_for_user(cursor, chat_id, uid):
+    chat_row = load_chat_for_user(cursor, chat_id, uid)
+    if not chat_row:
+        allowed_ids = set(uid_aliases(uid))
+        if any(p in allowed_ids for p in parts):
+            conn.close()
+            return {"success": True, "messages": [], "status": 200}
         conn.close()
         return {"error": "Chat not found or access denied", "status": 404}
 
