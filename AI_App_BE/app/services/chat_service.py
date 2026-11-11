@@ -344,6 +344,20 @@ def send_chat_message(chat_id, sender_id, sender_name, sender_avatar, text, msg_
         try:
             from app.repositories.storage_db import create_notification as db_create_notification
             db_create_notification(notif)
+            try:
+                from app.services.match_service import IN_MEMORY_NOTIFICATIONS, FIREBASE_AVAILABLE, db
+                if canonical_receiver not in IN_MEMORY_NOTIFICATIONS:
+                    IN_MEMORY_NOTIFICATIONS[canonical_receiver] = []
+                IN_MEMORY_NOTIFICATIONS[canonical_receiver].insert(0, notif)
+                if FIREBASE_AVAILABLE and db is not None:
+                    def sync_chat_notif():
+                        try:
+                            db.collection("notifications").document(notif_id).set(notif, merge=True, timeout=1.5)
+                        except Exception:
+                            pass
+                    threading.Thread(target=sync_chat_notif, daemon=True).start()
+            except Exception:
+                pass
         except Exception as e:
             print("Lỗi tạo thông báo tin nhắn đến:", e)
 

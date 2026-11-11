@@ -142,7 +142,19 @@ export default function ChatListPage() {
   // Hàng ngang bạn bè gợi ý: Tuyệt đối không hiển thị chính mình
   const candidates = Object.values(DEFAULT_CANDIDATE_PROFILES).filter(
     (c) => !myAliases.has(c.uid) && c.name !== profile.name
-  ).slice(0, 6);
+  ).slice(0, 18);
+
+  // Tìm kiếm ứng viên khi gõ vào ô tìm kiếm
+  const searchedCandidates = searchTerm.trim()
+    ? Object.values(DEFAULT_CANDIDATE_PROFILES).filter(
+        (c) =>
+          !myAliases.has(c.uid) &&
+          c.name !== profile.name &&
+          (c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (c.zodiac && c.zodiac.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (c.job && c.job.toLowerCase().includes(searchTerm.toLowerCase())))
+      ).slice(0, 8)
+    : [];
 
   return (
     <div
@@ -232,6 +244,39 @@ export default function ChatListPage() {
 
         {/* Danh sách các cuộc trò chuyện */}
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 resonancia-scrollbar">
+          {searchedCandidates.length > 0 && (
+            <div className="pt-1 pb-2 border-b border-purple-500/20 mb-2 space-y-1">
+              <p className="text-[10px] font-semibold text-purple-300/80 px-2 uppercase tracking-wider">
+                Thành viên gợi ý ({searchedCandidates.length})
+              </p>
+              {searchedCandidates.map((c) => (
+                <button
+                  key={c.uid}
+                  type="button"
+                  onClick={() => handleStartChatWith(c)}
+                  className="w-full p-2 rounded-xl flex items-center justify-between gap-2.5 hover:bg-white/[0.08] transition-all text-left group cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 flex-shrink-0">
+                      <img src={c.avatar} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-white truncate group-hover:text-cyan-300">
+                        {c.name}
+                      </p>
+                      <p className="text-[10px] text-purple-300/70 truncate">
+                        Cung {c.zodiac} · {c.job || 'Thành viên'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/30 flex-shrink-0">
+                    Nhắn tin
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <span className="w-7 h-7 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />

@@ -596,3 +596,148 @@ Hành trình tương lai mở ra một chương sách rực rỡ của sự th�
 - Cột mốc chuyển hóa lớn: Trong vòng nửa năm tới, bạn sẽ trải qua một bước ngoặt quan trọng liên quan đến môi trường sống, sự nghiệp hoặc một cam kết bền vững trong mối quan hệ. Đây là phần thưởng xứng đáng cho sự kiên trì và chân thành của bạn.
 - Bài học tiến hóa tâm hồn: Học cách đón nhận sự biến chuyển của cuộc đời với tâm thế điềm nhiên; biến nghịch cảnh thành chất liệu rèn luyện nội lực và lan tỏa nguồn năng lượng tích cực đến xung quanh.
 - Thông điệp vũ trụ: Bạn đang đứng trước ngưỡng cửa của phiên bản rạng rỡ và vững chãi nhất của chính mình; hãy tin tưởng tuyệt đối vào lộ trình thiêng liêng mà vũ trụ đang dẫn lối."""
+
+
+# -------------------------------------------------------------
+# 4. BẢN ĐỒ ĐÔI (SYNASTRY) - PHÂN TÍCH TƯƠNG HỢP CHIỀU SÂU
+# -------------------------------------------------------------
+def generate_synastry_fallback(
+    sun1: str, moon1: str, asc1: str, venus1: str, mars1: str,
+    sun2: str, moon2: str, asc2: str, venus2: str, mars2: str,
+    name1: str = "Bạn", name2: str = "Người ấy"
+) -> str:
+    """Tạo phân tích tương hợp bản đồ đôi (Synastry) chuyên sâu theo tâm lý học chiêm tinh, độ dài 4-5 câu mỗi mục."""
+    import json
+
+    ELEMENT_MAP = {
+        "Bạch Dương": "fire", "Sư Tử": "fire", "Nhân Mã": "fire",
+        "Kim Ngưu": "earth", "Xử Nữ": "earth", "Ma Kết": "earth",
+        "Song Tử": "air", "Thiên Bình": "air", "Bảo Bình": "air",
+        "Cự Giải": "water", "Bọ Cạp": "water", "Song Ngư": "water",
+    }
+
+    e1 = ELEMENT_MAP.get(sun1, "fire")
+    e2 = ELEMENT_MAP.get(sun2, "earth")
+    m_e1 = ELEMENT_MAP.get(moon1, e1)
+    m_e2 = ELEMENT_MAP.get(moon2, e2)
+
+    pair_key = f"{e1}-{e2}"
+    if pair_key not in [
+        "fire-fire", "fire-air", "fire-earth", "fire-water",
+        "earth-earth", "earth-water", "earth-air",
+        "air-air", "air-water", "water-water"
+    ]:
+        pair_key = f"{e2}-{e1}"
+
+    # Snippets for extra placements
+    asc_snippet_summary = ""
+    if asc1 and asc2:
+        asc_snippet_summary = f" Dưới góc chiếu Cung Mọc {asc1} của {name1} và Cung Mọc {asc2} của {name2}, hai bạn nhanh chóng tạo được ấn tượng ngoại cảnh đầy cuốn hút và phong thái đồng điệu khi xuất hiện cùng nhau."
+    elif asc2:
+        asc_snippet_summary = f" Cung Mọc {asc2} của {name2} tạo nên chiếc mặt nạ xã hội đầy thú vị, mở ra cánh cửa dẫn lối {name1} bước vào khám phá thế giới nội tâm sâu kín của đối phương."
+
+    venus_snippet_strength = ""
+    if venus1 and venus2:
+        venus_snippet_strength = f" Đặc biệt, ngôn ngữ tình yêu giữa Sao Kim {venus1} của {name1} và Sao Kim {venus2} của {name2} tạo nên nhịp điệu quyến rũ nồng nàn, giúp hai bạn luôn biết cách sưởi ấm trái tim nhau qua từng cử chỉ trân trọng tinh tế."
+    elif venus2:
+        venus_snippet_strength = f" Năng lượng Sao Kim {venus2} của {name2} mang đến phong cách bày tỏ tình cảm duyên dáng, dễ dàng xoa dịu những góc cạnh trong tính cách của {name1}."
+
+    ARCHETYPES = {
+        "fire-fire": {
+            "base_scores": {"overall": 85, "love": 83, "communication": 80, "passion": 96, "spiritual": 79},
+            "summary": f"Mối quan hệ giữa {name1} ({sun1}) và {name2} ({sun2}) là cuộc hội ngộ rực rỡ của hai ngọn đuốc cùng bừng sáng giữa bầu trời đêm. Cả hai mang trong mình bản năng tiên phong, sự nồng nhiệt và khát vọng sống không giới hạn, tạo nên một kết nối tràn ngập năng lượng hành động. Đây không chỉ là sự hấp dẫn thể xác thông thường mà là cuộc gặp gỡ định mệnh thức tỉnh ngọn lửa nhiệt huyết bên trong mỗi người. Hai bạn luôn truyền cho nhau nguồn sinh khí dồi dào để cùng dấn thân vào những thử thách lớn lao của cuộc đời.{asc_snippet_summary}",
+            "strengths": f"Điểm tựa vững chắc nhất của đôi bạn là sự thấu cảm tức thì về nhu cầu tự do và tính độc lập của đối phương. Tương tác cảm xúc giữa Mặt Trăng {moon1} của {name1} và Mặt Trăng {moon2} của {name2} giúp cả hai cổ vũ nhau phục hồi tinh thần nhanh chóng sau những vấp váp mà không bị mắc kẹt trong nỗi buồn phiền.{venus_snippet_strength} Sự chân thành, thẳng thắn và không toan tính giúp mối quan hệ luôn giữ được sự trong sáng, tươi trẻ và ngập tràn tiếng cười.",
+            "challenges": f"Vùng kích hoạt xung đột (triggers) xuất phát từ cái tôi quá lớn và tính hiếu thắng tự nhiên của hai cung Lửa. Khi xảy ra bất đồng quan điểm, cả {name1} và {name2} đều dễ bị cuốn vào cuộc chiến chứng minh mình đúng thay vì tĩnh tâm lắng nghe cảm nhận của người kia. Sự thiếu kiên nhẫn và phản ứng bộc phát có thể vô tình để lại những vết thương cảm xúc sâu sắc. Nếu không kiểm soát ngọn lửa giận dữ, hai bạn có thể thiêu rụi chiếc cầu nối tình cảm chỉ vì những chuyện vụn vặt.",
+            "advice": f"Chìa khóa chuyển hóa vàng cho đôi bạn là học nghệ thuật nhường bước và chuyển hóa năng lượng cạnh tranh thành sự nâng đỡ vô điều kiện. {name1} ({sun1}) cần học cách hạ bớt sự thống trị và lắng nghe nhịp thở cảm xúc của {name2}; trong khi {name2} ({sun2}) hãy chủ động chia sẻ những góc yếu đuối thay vì cố tỏ ra mạnh mẽ. Hãy cùng nhau kiến tạo những khoảng lặng tĩnh tại để lắng nghe chiều sâu tâm hồn, và luôn nhớ rằng sự dịu dàng không làm giảm đi bản lĩnh của ngọn lửa bên trong bạn."
+        },
+        "fire-air": {
+            "base_scores": {"overall": 90, "love": 88, "communication": 94, "passion": 91, "spiritual": 85},
+            "summary": f"Sự kết hợp giữa {name1} ({sun1}) và {name2} ({sun2}) giống như ngọn lửa bùng cháy rực rỡ khi được làn gió tri thức tiếp thêm dưỡng khí dồi dào. Lửa mang lại cảm hứng hành động quyết liệt và trái tim quả cảm; trong khi Khí mở rộng tầm nhìn, đưa ra những ý tưởng đột phá và kích thích trí tuệ. Đôi bạn sinh ra như một cặp bài trùng lý tưởng để truyền cảm hứng và nâng tầm thế giới quan của nhau. Cuộc sống chung của hai bạn sẽ luôn ngập tràn những chuyến phiêu lưu mới mẻ và sự khám phá không ngừng nghỉ.{asc_snippet_summary}",
+            "strengths": f"Giao tiếp là điểm sáng tuyệt đối khi các cuộc đối thoại giữa {name1} và {name2} dường như không bao giờ cạn kiệt đề tài. Thế giới cảm xúc nội tâm của Mặt Trăng {moon1} và Mặt Trăng {moon2} nâng đỡ nhau hài hòa, giúp cả hai vừa thấu hiểu lý trí vừa đồng điệu tâm hồn.{venus_snippet_strength} {name1} tìm thấy ở {name2} một người bạn tri kỷ thông thái luôn biết cách làm dịu bớt sự nóng nảy, trong khi {name2} bị cuốn hút bởi sự dũng cảm và tấm lòng hào sảng của {name1}.",
+            "challenges": f"Điểm mù tâm lý là xu hướng bay bổng trên tầng ý tưởng mà thiếu đi sự bám rễ (grounding) vào hiện thực đời sống thực tế. Đôi khi {name2} quá duy lý và khách quan, khiến ngọn lửa cảm xúc của {name1} cảm thấy bị hụt hẫng và lạnh lẽo. Ngược lại, sự đòi hỏi phản hồi tức thì và tính bộc phát của {name1} có thể khiến {name2} cảm thấy ngột ngạt và muốn lùi lại phòng thủ. Khoảng cách giữa kỳ vọng tinh thần và trách nhiệm đời thường có thể tạo ra những rạn nứt âm thầm nếu không được nhìn nhận thẳng thắn.",
+            "advice": f"Hai bạn cần xây dựng những nghi thức gắn kết cảm xúc hữu hình thay vì chỉ dừng lại ở các cuộc trò chuyện tri thức bay bổng. {name2} ({sun2}) hãy mở lòng bày tỏ tình cảm mộc mạc không qua bộ lọc phân tích, trao cho đối phương những cử chỉ ấm áp cụ thể; còn {name1} ({sun1}) hãy kiên nhẫn cho {name2} không gian tự do chiêm nghiệm mà không vội vàng phán xét. Học cách cùng nhau giải quyết những việc thực tế đời thường chính là chiếc neo giữ ngọn lửa tình yêu luôn bền vững."
+        },
+        "fire-earth": {
+            "base_scores": {"overall": 74, "love": 75, "communication": 70, "passion": 80, "spiritual": 72},
+            "summary": f"Cuộc hội ngộ giữa {name1} ({sun1}) và {name2} ({sun2}) là sự giao thoa sâu sắc giữa ngọn lửa đam mê và vùng đất vững chãi kiên định. Đây là mối liên kết mang tính kiến tạo phi thường: Lửa mang đến nhiệt huyết, sự táo bạo và tinh thần lạc quan; còn Đất cung cấp bệ phóng kiên cố, tính kỷ luật và sự bảo đảm thực tế. Cả hai tạo thành một liên minh có thể hiện thực hóa những hoài bão lớn nhất mà một người đơn độc không thể làm được. Mối duyên này dạy cho cả hai bài học về sự cân bằng giữa khát vọng và sự kiên trì.{asc_snippet_summary}",
+            "strengths": f"Sự bù trừ năng lượng hoàn hảo giúp đôi bạn tạo nên một cuộc sống vừa phong phú vừa vững bền. Mặt Trăng {moon1} của {name1} tìm thấy điểm tựa bình yên nơi Mặt Trăng {moon2} của {name2}, xua tan những bất an vô thức.{venus_snippet_strength} {name1} kéo {name2} bước ra khỏi vùng an toàn để nắm bắt cơ hội bứt phá; ngược lại, {name2} chính là mỏ neo định hình các nguồn năng lượng phân tán của {name1} thành những thành tựu cụ thể.",
+            "challenges": f"Xung đột nảy sinh từ sự lệch nhịp tự nhiên trong tốc độ sống: Lửa muốn hành động nhanh, ngẫu hứng và bộc phát; trong khi Đất đòi hỏi thời gian, kế hoạch bài bản và sự kiểm chứng thận trọng. {name1} dễ rơi vào cảm giác bị kiềm hãm và tẻ nhạt, trong khi {name2} cảm thấy kiệt sức trước sự bốc đồng và thiếu kiên định của đối phương. Khi cãi vã, tính bướng bỉnh của Đất gặp sự nóng nảy của Lửa có thể dẫn đến sự bế tắc kéo dài.",
+            "advice": f"Nghệ thuật đồng hành đòi hỏi cả hai phải tôn trọng sâu sắc nhịp điệu tự nhiên của nhau. {name1} ({sun1}) hãy học bài học về sự nhẫn nại và thấu hiểu giá trị của sự tích lũy âm thầm từ {name2}; trong khi {name2} ({sun2}) hãy mở rộng lòng đón nhận những trải nghiệm mới mẻ và khích lệ lòng nhiệt thành của {name1}. Hãy phân chia vai trò rõ ràng: để Lửa truyền cảm hứng dẫn đường và để Đất quản lý nền tảng thực thi bền vững."
+        },
+        "fire-water": {
+            "base_scores": {"overall": 70, "love": 78, "communication": 66, "passion": 89, "spiritual": 77},
+            "summary": f"Mối quan hệ giữa {name1} ({sun1}) và {name2} ({sun2}) là sự gặp gỡ kỳ diệu giữa biển lửa rực cháy và đại dương sâu thẳm. Lực hút vô thức giữa hai thái cực vô cùng mãnh liệt, tạo nên một tình yêu nồng nàn, bí ẩn và có khả năng chuyển hóa tâm thức mạnh mẽ. Lửa bị mê hoặc bởi chiều sâu nội tâm huyền bí của Nước, còn Nước khao khát hơi ấm và sức sống bừng sáng từ Lửa. Đây là mối liên kết nghiệp quả sâu sắc giúp cả hai soi chiếu những góc khuất tâm hồn của nhau.{asc_snippet_summary}",
+            "strengths": f"Khả năng khơi gợi những tầng cảm xúc sâu kín nhất mà hai bạn chưa từng bộc lộ với ai khác trong đời. Tương tác giữa Mặt Trăng {moon1} và Mặt Trăng {moon2} tạo ra sự cộng hưởng trực giác tinh tế khi cả hai thực sự tin tưởng nhau.{venus_snippet_strength} {name1} truyền sự tự tin giúp {name2} dũng cảm vượt qua nỗi sợ tổn thương; trong khi {name2} dạy {name1} chạm vào lòng trắc ẩn, sự mềm mại và chiều sâu tâm linh vi mô.",
+            "challenges": f"Vùng kích hoạt vết thương (triggers) rất nhạy cảm và dễ bùng nổ: Lối biểu đạt bộc trực, thẳng thắn của {name1} dễ vô tình làm tổn thương tâm hồn mỏng manh của {name2}. Ngược lại, sự im lặng thu mình hoặc phản ứng cảm xúc gián tiếp của {name2} có thể dập tắt ngọn lửa nhiệt huyết của {name1}, gây ra sự ức chế tột cùng. Sự hiểu lầm về cách yêu thương có thể khiến hai bạn tự làm khổ nhau dù trong lòng luôn hướng về đối phương.",
+            "advice": f"Cần thiết lập ranh giới cảm xúc an toàn và học ngôn ngữ thấu cảm của đối phương. {name1} ({sun1}) cần học cách hạ giọng, chậm lại một nhịp và lắng nghe với sự dịu dàng khi {name2} có tâm trạng nhạy cảm; còn {name2} ({sun2}) hãy dũng cảm nói thẳng cảm xúc và nhu cầu của mình thay vì kỳ vọng đối phương phải tự đoán qua sự im lặng. Khi Lửa biết dịu dàng và Nước biết cởi mở, tình yêu này sẽ trở thành nguồn sức mạnh chuyển hóa kỳ diệu."
+        },
+        "earth-earth": {
+            "base_scores": {"overall": 89, "love": 87, "communication": 85, "passion": 79, "spiritual": 91},
+            "summary": f"Sự kết hợp giữa {name1} ({sun1}) và {name2} ({sun2}) là sự gắn kết vững chắc của hai khối thạch bàn cùng dựng xây một vương quốc bền vững qua năm tháng. Mối quan hệ được nuôi dưỡng bởi lòng trung thành tuyệt đối, sự tin cậy, trách nhiệm và tính thực tế sâu sắc. Hai bạn tìm thấy ở nhau sự bình yên vững chãi, nơi mọi lời hứa đều mang giá trị vàng mười. Đây là hình mẫu lý tưởng của một mối quan hệ đồng hành dài hạn, kiên định trước mọi phong ba bão táp của cuộc đời.{asc_snippet_summary}",
+            "strengths": f"Sự đồng thuận cao độ về hệ giá trị sống, quan niệm tài chính và mục tiêu tương lai giúp đôi bạn hiếm khi gặp mâu thuẫn lớn về định hướng. Sự tương thích cảm xúc giữa Mặt Trăng {moon1} và Mặt Trăng {moon2} mang lại cảm giác an tâm tuyệt đối, không có chỗ cho sự hoài nghi hay ghen tuông vô cớ.{venus_snippet_strength} Cả hai đều có năng lực chăm sóc đối phương bằng những hành động thiết thực, chu đáo và xây dựng nền tảng vật chất ấm no.",
+            "challenges": f"Nguy cơ lớn nhất là mối quan hệ dễ bị cuốn vào vòng lặp thói quen khô khan, đơn điệu và thiếu vắng ngọn lửa lãng mạn bất ngờ. Khi xảy ra bất đồng ý kiến, tính bướng bỉnh và cố chấp đặc trưng của nguyên tố Đất có thể biến một mâu thuẫn nhỏ thành một cuộc chiến tranh lạnh kéo dài dai dẳng. Việc quá tập trung vào trách nhiệm và sự an toàn có thể khiến cảm xúc ái tình dần bị phai nhạt theo thời gian.",
+            "advice": f"Hãy chủ động đưa những sắc màu tươi mới và những rung động lãng mạn vào đời sống chung mỗi tuần. {name1} ({sun1}) và {name2} ({sun2}) cần tập thói quen bộc lộ tình cảm bằng những lời nói ngọt ngào, cùng nhau đi du lịch ngẫu hứng hay tham gia các hoạt động nghệ thuật. Hãy học cách mở rộng lòng mình để đón nhận sự đổi mới và linh hoạt hơn trong cách nhìn nhận vấn đề."
+        },
+        "earth-water": {
+            "base_scores": {"overall": 94, "love": 96, "communication": 89, "passion": 88, "spiritual": 95},
+            "summary": f"Mối quan hệ giữa {name1} ({sun1}) và {name2} ({sun2}) là hình mẫu kinh điển của sự nuôi dưỡng tự nhiên: Dòng suối mát lành tưới tắm cho mảnh đất màu mỡ đơm hoa kết trái. Đất mang lại cho Nước bờ bến an toàn, sự định hướng và che chở vững vàng; còn Nước mang đến cho Đất sự mềm mại, tình yêu thương vô điều kiện và chiều sâu cảm xúc màu nhiệm. Đây là mối liên kết hài hòa bẩm sinh, nơi hai tâm hồn tìm thấy sự bình yên và trọn vẹn nhất.{asc_snippet_summary}",
+            "strengths": f"Sự hòa hợp tâm hồn sâu sắc và khả năng thấu cảm không cần nhiều lời nói. Mặt Trăng {moon1} và Mặt Trăng {moon2} đan cài vào nhau như một dòng chảy tự nhiên, giúp cả hai dễ dàng xoa dịu những áp lực ngoại cảnh và chữa lành những tổn thương xưa cũ.{venus_snippet_strength} {name1} và {name2} cùng nhau kiến tạo nên một không gian gia đình ấm cúng, giàu tính gắn kết thiêng liêng và tình yêu đằm thắm theo năm tháng.",
+            "challenges": f"Đôi khi phía mang năng lượng Nước bị chìm đắm trong những con sóng cảm xúc mơ hồ, khiến phía mang năng lượng Đất cảm thấy bế tắc vì không thể dùng tư duy logic để giải quyết. Ngược lại, sự thực tế quá mức và tính nguyên tắc của Đất có thể vô tình làm Nước cảm thấy tâm hồn mình chưa được nâng niu trọn vẹn. Sự bảo bọc quá mức cũng có thể khiến mối quan hệ trở nên khép kín với thế giới bên ngoài.",
+            "advice": f"Phía Đất hãy học cách ôm ấp cảm xúc của người kia bằng sự hiện diện tĩnh lặng và cái ôm ấm áp thay vì vội vàng đưa ra lời khuyên logic; còn phía Nước hãy trân quý những nỗ lực thực tế và sự chung thủy thầm lặng mà đối phương đang dành trọn cho bạn. Hãy cùng nhau bước ra ngoài giao lưu xã hội để nguồn năng lượng của cặp đôi luôn tươi mới và tràn ngập sinh khí."
+        },
+        "earth-air": {
+            "base_scores": {"overall": 75, "love": 72, "communication": 80, "passion": 71, "spiritual": 75},
+            "summary": f"Sự gặp gỡ giữa {name1} ({sun1}) và {name2} ({sun2}) là sự kết hợp giữa mặt đất hiện thực và tầng trời tư tưởng rộng lớn. Đây là mối liên kết giàu tiềm năng phát triển trí tuệ và sự nghiệp: Khí mang đến những tầm nhìn chiến lược, sự linh hoạt và cách tiếp cận tiến bộ; còn Đất kiểm chứng tính khả thi, hiện thực hóa các ý tưởng trừu tượng thành những giá trị cụ thể. Đôi bạn có thể trở thành đối tác cuộc đời xuất sắc cùng nhau xây dựng cơ đồ bền vững.{asc_snippet_summary}",
+            "strengths": f"Khả năng phân tích sắc sảo kết hợp với sự bền bỉ giúp cả hai đạt được nhiều mục tiêu lớn trong xã hội. Mặt Trăng {moon1} và Mặt Trăng {moon2} giúp duy trì sự tôn trọng lẫn nhau và tinh thần bình đẳng, văn minh trong mối quan hệ.{venus_snippet_strength} {name1} học được cách tư duy đa chiều từ {name2}, trong khi {name2} tìm thấy ở {name1} sự tin cậy và điểm tựa thực tế không thể lay chuyển.",
+            "challenges": f"Khoảng cách cảm xúc là thử thách hàng đầu: Khí có xu hướng sống trên lý trí và ưa thích tự do ngôn luận, trong khi Đất cần những biểu hiện tình cảm hữu hình và sự cam kết kiên định. Nếu không chú trọng vun đắp cảm xúc, mối quan hệ dễ chuyển thành quan hệ đối tác công việc khô khan, thiếu vắng sự lãng mạn. Sự hoài nghi của Đất trước những ý tưởng viển vông của Khí cũng có thể làm tổn thương lòng tự hào của đối phương.",
+            "advice": f"Hãy dành không gian riêng cho những rung động trái tim, tách bạch công việc và những khoảnh khắc riêng tư ấm áp. {name2} (hoặc phía Khí) cần học cách thể hiện tình cảm bằng hành động cụ thể và sự quan tâm chu đáo; còn {name1} (hoặc phía Đất) hãy lắng nghe những ý tưởng bay bổng của đối phương với nụ cười bao dung thay vì vội vàng phán xét tính thực tế."
+        },
+        "air-air": {
+            "base_scores": {"overall": 86, "love": 82, "communication": 98, "passion": 81, "spiritual": 83},
+            "summary": f"Mối quan hệ giữa {name1} ({sun1}) và {name2} ({sun2}) như hai làn gió tự do cùng khiêu vũ giữa không gian tri thức bao la vô tận. Đây là một kết nối tâm giao đích thực, nơi hai trí tuệ hòa quyện trong những cuộc trò chuyện bất tận về cuộc sống, triết học và tương lai. Cả hai tìm thấy ở nhau người bạn đồng hành hiểu mình nhất, luôn tôn trọng tự do và khát vọng khám phá của đối phương. Tình yêu của đôi bạn luôn tươi mới, văn minh và tràn đầy cảm hứng sáng tạo.{asc_snippet_summary}",
+            "strengths": f"Giao tiếp là điểm sáng tuyệt đối của đôi bạn: không có chủ đề nào là cấm kỵ, sự hài hước thông minh và tinh tế giúp hai người luôn cảm thấy cuộc sống tràn ngập niềm vui. Mặt Trăng {moon1} và Mặt Trăng {moon2} tạo điều kiện cho một tình yêu hiện đại, không ràng buộc ngột ngạt mà cùng nâng đỡ nhau phát triển trên con đường cá nhân.{venus_snippet_strength} Hai bạn luôn là nguồn cổ vũ tinh thần số một của nhau trước mọi dự định lớn.",
+            "challenges": f"Sự thiếu hụt yếu tố neo giữ (grounding) và chiều sâu cảm xúc gắn kết ruột thịt. Cả hai đều có xu hướng 'lý trí hóa' cảm xúc khi gặp tổn thương, phân tích nỗi đau bằng tư duy thay vì thực sự cảm nhận và chữa lành từ trái tim. Mối quan hệ có thể rơi vào trạng thái hời hợt hoặc né tránh những cam kết ràng buộc sâu xa khi đối diện với thử thách đời thường.",
+            "advice": f"Hãy học cách bước xuống khỏi tầng trí óc để chạm vào nhịp đập mộc mạc và chân thành của trái tim. {name1} ({sun1}) và {name2} ({sun2}) hãy dám bộc lộ những góc yếu đuối, những nỗi sợ thầm kín và cùng nhau tạo dựng những thói quen đời thường gắn bó. Đưa những cam kết cụ thể vào mối quan hệ chính là chiếc chìa khóa giúp đôi bạn giữ được hạnh phúc bền lâu."
+        },
+        "air-water": {
+            "base_scores": {"overall": 72, "love": 78, "communication": 74, "passion": 77, "spiritual": 82},
+            "summary": f"Cuộc hội ngộ giữa {name1} ({sun1}) và {name2} ({sun2}) như sự giao hòa kỳ ảo đầy chất thơ giữa mây trời lãng đãng và đại dương bao la. Đây là mối liên kết giàu chất nghệ thuật nhưng cũng chứa đựng nhiều điều bí ẩn cần giải mã. Khí mở rộng tầm nhận thức của Nước bằng tư duy khách quan và góc nhìn mới mẻ; còn Nước dẫn lối Khí thâm nhập vào chiều sâu huyền nhiệm của trực giác và thế giới tâm linh. Hai bạn mang đến cho nhau những bài học tiến hóa tâm hồn sâu sắc.{asc_snippet_summary}",
+            "strengths": f"Sự kích thích trí tưởng tượng và khả năng thấu cảm tinh thần ở mức độ vi mô. {name1} và {name2} có thể truyền cảm hứng sáng tạo nghệ thuật và nâng đỡ nhau vượt qua những giới hạn suy nghĩ thông thường. Tương tác Mặt Trăng {moon1} và {moon2} giúp đôi bạn nhìn thấy những góc khuất tâm hồn mà người ngoài không thể chạm tới.{venus_snippet_strength} Sự nhạy bén của cả hai giúp mối quan hệ luôn giữ được nét thi vị độc đáo.",
+            "challenges": f"Sự xung đột cố hữu giữa 'Lý trí logic' và 'Trực giác cảm xúc': Khí phân tích mọi chuyện bằng lập luận sắc bén khiến Nước cảm thấy bị ngắt kết nối và thiếu sự đồng cảm sâu xa. Ngược lại, những cơn sóng tâm trạng thất thường của Nước khiến Khí cảm thấy bối rối, ngột ngạt và có xu hướng lùi lại phòng thủ. Khoảng cách giao tiếp cảm xúc có thể dẫn đến những hiểu lầm không đáng có.",
+            "advice": f"Khí cần học bài học về sự thấu cảm không phán xét, chấp nhận rằng có những cảm xúc thiêng liêng không thể giải thích bằng logic thuần túy; còn Nước hãy nỗ lực diễn đạt cảm xúc thành lời nói rõ ràng để đối phương có thể hiểu và cùng sẻ chia thấu đáo. Hãy tạo dựng không gian an toàn để cả hai cùng bày tỏ lòng mình mà không sợ bị tổn thương."
+        },
+        "water-water": {
+            "base_scores": {"overall": 92, "love": 98, "communication": 83, "passion": 90, "spiritual": 98},
+            "summary": f"Mối quan hệ giữa {name1} ({sun1}) và {name2} ({sun2}) là cuộc hội lưu của hai dòng sông thiêng hòa vào biển lớn đại dương bao la. Đây là một kết nối tâm linh vô cùng sâu sắc, nơi hai tâm hồn có thể đọc thấu cảm xúc của nhau qua từng ánh mắt và nhịp thở. Tình yêu của đôi bạn mang màu sắc thiêng liêng, lãng mạn tột cùng và sự gắn bó định mệnh vượt qua mọi giới hạn trần tục. Hai bạn tạo nên một thế giới riêng đầy sự thấu hiểu và che chở lẫn nhau.{asc_snippet_summary}",
+            "strengths": f"Lòng trắc ẩn vô bờ bến và sự chở che tâm hồn tuyệt đối. Cả hai tạo ra một không gian thiền định, an yên, nơi mọi tổn thương trong quá khứ đều được xoa dịu và chữa lành kỳ diệu. Tương tác kỳ diệu giữa Mặt Trăng {moon1} và Mặt Trăng {moon2} tạo nên một sợi dây thần giao cách cảm bền chặt, giúp hai người gắn kết sâu sắc như thể sinh ra là dành riêng cho nhau.{venus_snippet_strength}",
+            "challenges": f"Nguy cơ lớn nhất là sự quá tải cảm xúc (emotional overwhelm) và hiện tượng cộng hưởng tiêu cực: Khi một người buồn rầu, người kia dễ bị cuốn theo vào xoáy nước lo âu đó. Sự thiếu vắng nguyên tố Lửa và Đất có thể khiến đôi bạn né tránh đối diện với những áp lực thực tế của đời sống vật chất. Sự nhạy cảm quá mức cũng có thể biến những chuyện nhỏ thành nỗi ám ảnh tâm lý kéo dài.",
+            "advice": f"Cần thiết lập ranh giới cá nhân lành mạnh và học cách phân định đâu là cảm xúc của mình, đâu là cảm xúc của người kia. {name1} ({sun1}) và {name2} ({sun2}) hãy cùng nhau thiết lập những mục tiêu đời sống cụ thể, rèn luyện thể chất và cùng nhau bám rễ vững vàng vào thực tại để tình yêu luôn giữ được sự tươi sáng, tích cực và cân bằng."
+        }
+    }
+
+    arch = ARCHETYPES.get(pair_key, ARCHETYPES["fire-air"])
+    scores = dict(arch["base_scores"])
+
+    # Fine-tune based on Moon elemental compatibility
+    if m_e1 == m_e2 or (m_e1 in ["water", "earth"] and m_e2 in ["water", "earth"]) or (m_e1 in ["fire", "air"] and m_e2 in ["fire", "air"]):
+        scores["love"] = min(99, scores["love"] + 3)
+        scores["spiritual"] = min(99, scores["spiritual"] + 3)
+        scores["overall"] = min(98, scores["overall"] + 2)
+
+    # Fine-tune passion if Venus/Mars available
+    if venus1 or mars1 or venus2 or mars2:
+        scores["passion"] = min(99, scores["passion"] + 2)
+
+    result_payload = {
+        "overall": scores["overall"],
+        "love": scores["love"],
+        "communication": scores["communication"],
+        "passion": scores["passion"],
+        "spiritual": scores["spiritual"],
+        "summary": arch["summary"],
+        "strengths": arch["strengths"],
+        "challenges": arch["challenges"],
+        "advice": arch["advice"]
+    }
+
+    return json.dumps(result_payload, ensure_ascii=False)

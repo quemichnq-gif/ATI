@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
-import { auth } from '../services/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../services/firebase';
 import { RootState } from '../store';
 import { formatTimestamp } from '../utils/date';
 import { DEFAULT_CANDIDATE_PROFILES } from '../constants/defaultCandidates';
@@ -84,24 +85,58 @@ export default function ChatRoomPage() {
   // Thử tìm trong alias test accounts
   const testPartner = getTestProfileByEmailOrUid(otherUid);
   const defaultCand = DEFAULT_CANDIDATE_PROFILES[otherUid];
+  const [firestorePartner, setFirestorePartner] = useState<any>(null);
+
+  useEffect(() => {
+    if (!otherUid || testPartner || defaultCand) return;
+    getDoc(doc(db, 'users', otherUid))
+      .then((snap) => {
+        if (snap.exists()) {
+          setFirestorePartner(snap.data());
+        }
+      })
+      .catch(() => {});
+  }, [otherUid]);
 
   const partnerName =
     testPartner?.name ||
     defaultCand?.name ||
+    firestorePartner?.name ||
+    firestorePartner?.fullName ||
     (location.state as any)?.chatName ||
     'Người dùng';
 
   const partnerAvatar =
     testPartner?.avatar ||
     defaultCand?.avatar ||
+    firestorePartner?.avatar ||
     (otherUid === (profile.uid || auth.currentUser?.uid)
       ? profile.avatar || auth.currentUser?.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
       : 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80');
 
-  const partnerZodiac = testPartner?.zodiac || defaultCand?.zodiac || defaultCand?.sun || 'Song Ngư';
-  const partnerElement = testPartner?.sun === 'Song Ngư' ? 'Nước' : defaultCand?.element || 'Nước';
-  const partnerJob = testPartner?.job || defaultCand?.job || 'Thành viên Resonancia';
-  const partnerBio = testPartner?.bio || defaultCand?.bio || 'Tâm hồn chiêm tinh đồng điệu, cùng bạn khám phá vũ trụ nội tâm ✨';
+  const partnerZodiac =
+    testPartner?.zodiac ||
+    defaultCand?.zodiac ||
+    defaultCand?.sun ||
+    firestorePartner?.zodiac ||
+    firestorePartner?.zodiacSign ||
+    firestorePartner?.sun ||
+    'Song Ngư';
+  const partnerElement =
+    testPartner?.sun === 'Song Ngư'
+      ? 'Nước'
+      : defaultCand?.element || firestorePartner?.element || 'Nước';
+  const partnerJob =
+    testPartner?.job ||
+    defaultCand?.job ||
+    firestorePartner?.job ||
+    firestorePartner?.occupation ||
+    'Thành viên Resonancia';
+  const partnerBio =
+    testPartner?.bio ||
+    defaultCand?.bio ||
+    firestorePartner?.bio ||
+    'Tâm hồn chiêm tinh đồng điệu, cùng bạn khám phá vũ trụ nội tâm ✨';
 
   // 1. Lắng nghe danh sách đoạn chat bên cột trái (Realtime Hybrid)
   useEffect(() => {

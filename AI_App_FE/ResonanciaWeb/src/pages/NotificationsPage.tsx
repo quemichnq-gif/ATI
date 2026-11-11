@@ -3,9 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { onAuthStateChanged } from 'firebase/auth';
+import { collection, query, where, getDocs, setDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { RootState } from '../store';
-import { auth } from '../services/firebase';
-import { apiGetNotifications, apiMarkNotificationRead, apiDeleteNotification } from '../services/api';
+import { auth, db } from '../services/firebase';
+import {
+  apiGetNotifications,
+  apiMarkNotificationRead,
+  apiDeleteNotification,
+  apiAcceptMatch,
+  apiRejectMatch
+} from '../services/api';
+import { emitUnreadCount, emitNewNotification } from '../services/notificationSync';
 import { formatTimestamp } from '../utils/date';
 import { Notification } from '../types';
 import UiIcon from '../components/UiIcon';
@@ -38,8 +46,48 @@ export default function NotificationsPage() {
     setIsRefreshing(true);
     try {
       const res = await apiGetNotifications(uidToUse);
-      const list = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
-      setNotifications(list);
+      const list: Notification[] = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
+
+      // Đồng bộ bổ sung từ Firestore để bắt ngay lập tức các sự kiện kết đôi thành công realtime
+      try {
+        const q = query(
+          collection(db, 'notifications'),
+          where('userId', '==', uidToUse)
+        );
+        const snap = await getDocs(q);
+        const fsList: Notification[] = [];
+        snap.forEach(d => {
+          fsList.push({ id: d.id, ...d.data() } as Notification);
+        });
+
+        const mergedMap = new Map<string, Notification>();
+        list.forEach((n: Notification) => { if (n?.id) mergedMap.set(n.id, n); });
+        fsList.forEach((n: Notification) => {
+          if (n?.id) {
+            const existing = mergedMap.get(n.id);
+            if (existing) {
+              // Bảo toàn trạng thái đã đọc: nếu 1 trong 2 nguồn đã đọc thì giữ read: true
+              mergedMap.set(n.id, {
+                ...existing,
+                ...n,
+                read: Boolean(existing.read || n.read),
+              });
+            } else {
+              mergedMap.set(n.id, n);
+            }
+          }
+        });
+
+        const merged = Array.from(mergedMap.values());
+        merged.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setNotifications(merged);
+        const unreadCount = merged.filter(n => !n.read).length;
+        emitUnreadCount(unreadCount);
+      } catch {
+        setNotifications(list);
+        const unreadCount = list.filter(n => !n.read).length;
+        emitUnreadCount(unreadCount);
+      }
     } catch (err) {
       console.warn('Lỗi tải thông báo:', err);
     } finally {
@@ -72,8 +120,19 @@ export default function NotificationsPage() {
 
   const markRead = async (id: string) => {
     try {
+      // 1. Cập nhật state local ngay lập tức và phát sự kiện realtime (0ms)
+      setNotifications(prev => {
+        const updated = prev.map(n => n.id === id ? { ...n, read: true } : n);
+        const unread = updated.filter(n => !n.read).length;
+        emitUnreadCount(unread);
+        return updated;
+      });
+
+      // 2. Cập nhật trạng thái Firestore
+      updateDoc(doc(db, 'notifications', id), { read: true }).catch(() => {});
+
+      // 3. Cập nhật Backend SQLite
       await apiMarkNotificationRead({ notificationId: id, userId: currentUid });
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     } catch (e) {
       console.warn('Lỗi đánh dấu đã đọc:', e);
     }
@@ -83,8 +142,17 @@ export default function NotificationsPage() {
     const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
     if (!unreadIds.length) return;
     try {
-      await apiMarkNotificationRead({ notificationIds: unreadIds, userId: currentUid });
+      // 1. Cập nhật state local ngay lập tức và reset badge = 0 (0ms)
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      emitUnreadCount(0);
+
+      // 2. Cập nhật trạng thái Firestore
+      unreadIds.forEach(id => {
+        updateDoc(doc(db, 'notifications', id), { read: true }).catch(() => {});
+      });
+
+      // 3. Cập nhật Backend SQLite
+      await apiMarkNotificationRead({ notificationIds: unreadIds, userId: currentUid });
     } catch (e) {
       console.warn('Lỗi đánh dấu tất cả đã đọc:', e);
     }
@@ -92,8 +160,19 @@ export default function NotificationsPage() {
 
   const deleteNotif = async (id: string) => {
     try {
+      // 1. Cập nhật state local ngay lập tức và phát sự kiện realtime
+      setNotifications(prev => {
+        const updated = prev.filter(n => n.id !== id);
+        const unread = updated.filter(n => !n.read).length;
+        emitUnreadCount(unread);
+        return updated;
+      });
+
+      // 2. Xóa tài liệu Firestore
+      deleteDoc(doc(db, 'notifications', id)).catch(() => {});
+
+      // 3. Xóa Backend SQLite
       await apiDeleteNotification({ notificationId: id, userId: currentUid });
-      setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (e) {
       console.warn('Lỗi xóa thông báo:', e);
     }
@@ -113,9 +192,94 @@ export default function NotificationsPage() {
         navigate('/chat');
       }
     } else if (n.type === 'match_request') {
-      navigate('/match');
+      const senderId = (n as any).senderId;
+      navigate('/match', {
+        state: {
+          highlightedSenderId: senderId,
+          matchRequestNotification: n,
+          openSenderProfile: true,
+        }
+      });
     } else if (n.type === 'match_accepted') {
-      navigate('/chat');
+      const partnerId = (n as any).senderId;
+      if (partnerId && currentUid) {
+        const chatId = [currentUid, partnerId].sort().join('_');
+        navigate(`/chat/${chatId}`, { state: { chatName: (n as any).senderName } });
+      } else {
+        navigate('/chat');
+      }
+    }
+  };
+
+  const handleAcceptMatchFromNotification = async (n: Notification, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const myUid = currentUid || auth.currentUser?.uid;
+    const partnerId = (n as any).senderId;
+    if (!myUid || !partnerId) return;
+
+    try {
+      await apiAcceptMatch({
+        receiverId: myUid,
+        senderId: partnerId,
+        uid: myUid,
+        targetUid: partnerId,
+        requestId: n.requestId || `${partnerId}_${myUid}`,
+        responseMessage: 'Đã đồng ý kết nối cùng bạn!',
+      });
+
+      // Tạo ngay thông báo kết đôi thành công hiển thị trực tiếp
+      const successNotif: Notification = {
+        id: `notif_match_${myUid}_${partnerId}_${Date.now()}`,
+        userId: myUid,
+        type: 'match_accepted',
+        title: 'Kết đôi thành công! ✨',
+        message: `Bạn và ${(n as any).senderName || 'đối phương'} đã kết đôi thành công! Hãy gửi tin nhắn đầu tiên để cùng kết nối vũ trụ.`,
+        body: `Bạn và ${(n as any).senderName || 'đối phương'} đã kết đôi thành công! Hãy gửi tin nhắn đầu tiên để cùng kết nối vũ trụ.`,
+        senderId: partnerId,
+        senderName: (n as any).senderName || 'Người dùng',
+        senderAvatar: (n as any).senderAvatar || '',
+        requestId: n.requestId || `${partnerId}_${myUid}`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Đánh dấu yêu cầu cũ đã đọc và cập nhật danh sách
+      markRead(n.id);
+      setNotifications(prev => [successNotif, ...prev.filter(item => item.id !== n.id)]);
+      emitNewNotification(successNotif);
+
+      // Đồng bộ Firestore
+      try {
+        await Promise.all([
+          setDoc(doc(db, 'notifications', successNotif.id), successNotif, { merge: true }),
+          setDoc(doc(db, 'match_requests', n.requestId || `${partnerId}_${myUid}`), {
+            status: 'accepted',
+            acceptedAt: new Date().toISOString(),
+          }, { merge: true }),
+        ]);
+      } catch {}
+    } catch (err) {
+      console.error('Lỗi khi chấp nhận kết đôi từ thông báo:', err);
+    }
+  };
+
+  const handleRejectMatchFromNotification = async (n: Notification, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const myUid = currentUid || auth.currentUser?.uid;
+    const partnerId = (n as any).senderId;
+    if (!myUid || !partnerId) return;
+
+    try {
+      await apiRejectMatch({
+        receiverId: myUid,
+        senderId: partnerId,
+        uid: myUid,
+        targetUid: partnerId,
+        requestId: n.requestId || `${partnerId}_${myUid}`,
+      });
+      deleteNotif(n.id);
+    } catch (err) {
+      console.error('Lỗi khi từ chối kết đôi từ thông báo:', err);
     }
   };
 
@@ -318,8 +482,8 @@ export default function NotificationsPage() {
                         </p>
                       )}
 
-                      {/* Gợi ý hành động nhanh */}
-                      <div className="mt-2 flex items-center gap-2">
+                      {/* Gợi ý hành động nhanh & thao tác kết đôi */}
+                      <div className="mt-2.5 flex items-center gap-2 flex-wrap">
                         {n?.type === 'message' && (
                           <span className="text-[11px] text-cyan-300 hover:text-cyan-200 font-medium inline-flex items-center gap-1">
                             Bấm để mở cuộc trò chuyện
@@ -327,8 +491,43 @@ export default function NotificationsPage() {
                           </span>
                         )}
                         {n?.type === 'match_request' && (
-                          <span className="text-[11px] text-pink-300 hover:text-pink-200 font-medium inline-flex items-center gap-1">
-                            Bấm để xem và kết nối
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!n?.read && n?.id) {
+                                  markRead(n.id);
+                                }
+                                const senderId = (n as any).senderId;
+                                navigate('/match', {
+                                  state: {
+                                    highlightedSenderId: senderId,
+                                    matchRequestNotification: n,
+                                    openSenderProfile: true,
+                                  }
+                                });
+                              }}
+                              className="btn-cosmic px-3.5 py-1.5 text-xs flex items-center gap-1.5 shadow cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                            >
+                              <UiIcon name="heart" label="Xem lời mời" className="inline text-xs text-pink-300" />
+                              <span>Xem Lời Mời Kết Đôi</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                if (!n?.read && n?.id) markRead(n.id);
+                                handleRejectMatchFromNotification(n, e);
+                              }}
+                              className="glass px-2.5 py-1.5 text-xs text-purple-300 hover:text-red-400 rounded-xl cursor-pointer transition-all"
+                            >
+                              Từ Chối
+                            </button>
+                          </div>
+                        )}
+                        {n?.type === 'match_accepted' && (
+                          <span className="text-[11px] text-emerald-300 hover:text-emerald-200 font-medium inline-flex items-center gap-1">
+                            Bấm để bắt đầu cuộc trò chuyện ngay ✨
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
                           </span>
                         )}

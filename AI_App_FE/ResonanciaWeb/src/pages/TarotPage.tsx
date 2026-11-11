@@ -27,8 +27,8 @@ export default function TarotPage() {
   const profile = useSelector((s: RootState) => s.profile);
   const navigate = useNavigate();
 
-  // Mode: 'daily' | 'draw1' | 'draw3' | 'deck'
-  const [spreadMode, setSpreadMode] = useState<'daily' | 'draw1' | 'draw3' | 'deck'>('daily');
+  // Mode: 'daily' | 'draw3' | 'deck'
+  const [spreadMode, setSpreadMode] = useState<'daily' | 'draw3' | 'deck'>('daily');
 
   // Daily Card state
   const initialDaily = getDailyCard(profile.uid || 'guest');
@@ -55,15 +55,15 @@ export default function TarotPage() {
   const element = ELEMENT_MAP[profile.sun || ''] || 'Không xác định';
   const colors = ELEMENT_COLORS[element] || ELEMENT_COLORS['Không xác định'];
 
-  // Bắt đầu rút bài cho chế độ 1 lá hoặc 3 lá
-  const handleStartDraw = (count: 1 | 3) => {
+  // Bắt đầu rút bài cho trải 3 lá
+  const handleStartDraw = (count: number = 3) => {
     const rawCards = drawRandomCards(count);
-    const labels = count === 1 ? ['Thông Điệp Vũ Trụ'] : ['Quá Khứ', 'Hiện Tại', 'Tương Lai'];
+    const labels = ['Quá Khứ', 'Hiện Tại', 'Tương Lai'];
     const newCards: DrawnCardState[] = rawCards.map((rc, idx) => ({
       card: rc.card,
       isReversed: rc.isReversed,
       isRevealed: false,
-      positionLabel: labels[idx],
+      positionLabel: labels[idx] || `Lá ${idx + 1}`,
     }));
     setDrawnCards(newCards);
     setInterpretation('');
@@ -81,7 +81,7 @@ export default function TarotPage() {
     fetchAIInterpretation([dailyCardState]);
   };
 
-  // Lật một lá trong trải bài (1 lá hoặc 3 lá)
+  // Lật một lá trong trải bài (3 lá)
   const handleRevealCard = async (index: number) => {
     if (drawnCards[index].isRevealed || flippingIndex !== null) return;
     setFlippingIndex(index);
@@ -117,8 +117,6 @@ export default function TarotPage() {
         positionLabel: 'Lá Bài Ngày',
       });
       setInterpretation('');
-    } else if (spreadMode === 'draw1') {
-      handleStartDraw(1);
     } else if (spreadMode === 'draw3') {
       handleStartDraw(3);
     }
@@ -236,19 +234,6 @@ export default function TarotPage() {
           }`}
         >
           Tarot Hôm Nay (1 Lá)
-        </button>
-        <button
-          onClick={() => {
-            setSpreadMode('draw1');
-            handleStartDraw(1);
-          }}
-          className={`flex-1 min-w-[120px] py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 ${
-            spreadMode === 'draw1'
-              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-              : 'text-purple-300/80 hover:text-white hover:bg-purple-900/40'
-          }`}
-        >
-          Rút 1 Lá Tự Do
         </button>
         <button
           onClick={() => {
@@ -375,14 +360,12 @@ export default function TarotPage() {
         </div>
       )}
 
-      {/* CHẾ ĐỘ 2 & 3: RÚT 1 LÁ HOẶC 3 LÁ TỰ DO */}
-      {(spreadMode === 'draw1' || spreadMode === 'draw3') && (
+      {/* CHẾ ĐỘ 2: TRẢI 3 LÁ */}
+      {spreadMode === 'draw3' && (
         <div className="space-y-6 mt-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-purple-300">
-              {spreadMode === 'draw1'
-                ? 'Rút ngẫu nhiên 1 lá bài từ 78 lá Rider-Waite-Smith.'
-                : 'Trải bài 3 lá: Quá Khứ — Hiện Tại — Tương Lai.'}
+              Trải bài 3 lá: Quá Khứ — Hiện Tại — Tương Lai.
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -401,11 +384,7 @@ export default function TarotPage() {
           </div>
 
           {/* Danh sách lá bài được rút */}
-          <div
-            className={`grid gap-6 justify-center ${
-              spreadMode === 'draw1' ? 'grid-cols-1 justify-items-center' : 'grid-cols-1 lg:grid-cols-3'
-            }`}
-          >
+          <div className="grid gap-6 justify-center grid-cols-1 lg:grid-cols-3">
             {drawnCards.map((item, idx) => (
               <div key={idx} className="flex flex-col items-center">
                 <span className="text-xs uppercase tracking-wider text-purple-300/80 mb-2 font-medium">
@@ -417,7 +396,7 @@ export default function TarotPage() {
                   isReversed={item.isReversed}
                   isFlipping={flippingIndex === idx}
                   onClick={() => handleRevealCard(idx)}
-                  size={spreadMode === 'draw1' ? 'lg' : 'md'}
+                  size="md"
                 />
               </div>
             ))}

@@ -73,6 +73,21 @@ def get_user_match_info(uid):
             "partnerId": rel.get("partnerId"),
             "relationshipStatus": rel.get("relationshipStatus", "Độc thân")
         }
+    if FIREBASE_AVAILABLE and db is not None:
+        try:
+            doc = db.collection("users").document(uid).get()
+            if doc.exists:
+                d = doc.to_dict()
+                return {
+                    "name": d.get("name") or d.get("fullName", "Người dùng"),
+                    "avatar": d.get("avatar", ""),
+                    "age": d.get("age", 24),
+                    "job": d.get("job") or d.get("occupation", "Thành viên Resonancia"),
+                    "partnerId": rel.get("partnerId"),
+                    "relationshipStatus": rel.get("relationshipStatus", "Độc thân")
+                }
+        except Exception:
+            pass
     return {
         "name": "Người dùng",
         "avatar": "",
@@ -155,14 +170,18 @@ def accept_match_request_service(request_id, receiver_id, sender_id, response_me
     req = get_match_request_by_id(request_id) if request_id else None
     if not req and sender_id and receiver_id:
         req = find_pending_match_request(sender_id, receiver_id)
+        if not req:
+            req = find_pending_match_request(receiver_id, sender_id)
 
     if not req and request_id:
         req = IN_MEMORY_MATCH_REQUESTS.get(request_id)
     if not req and sender_id and receiver_id:
         for r in IN_MEMORY_MATCH_REQUESTS.values():
-            if r.get("senderId") == sender_id and r.get("receiverId") == receiver_id and r.get("status") == "pending":
-                req = r
-                break
+            if (r.get("senderId") == sender_id and r.get("receiverId") == receiver_id) or \
+               (r.get("senderId") == receiver_id and r.get("receiverId") == sender_id):
+                if r.get("status") == "pending":
+                    req = r
+                    break
 
     actual_req_id = req.get("requestId") if req else (request_id or f"{sender_id}_{receiver_id}")
     actual_sender = req.get("senderId") if req else sender_id
@@ -187,37 +206,78 @@ def accept_match_request_service(request_id, receiver_id, sender_id, response_me
         IN_MEMORY_USER_RELATIONSHIPS[uid]["matchId"] = actual_req_id
         IN_MEMORY_USER_RELATIONSHIPS[uid]["relationshipStatus"] = "Đã có đôi"
 
+    sender_info = get_user_match_info(actual_sender)
+    s_name = sender_info.get("name") or "Người ấy"
+    s_avatar = sender_info.get("avatar") or ""
+
     receiver_info = get_user_match_info(actual_receiver)
     r_name = receiver_info.get("name") or "Người ấy"
     r_avatar = receiver_info.get("avatar") or ""
 
-    notif_id = str(uuid.uuid4())
-    notification = {
-        "id": notif_id,
+    now_iso = datetime.now().isoformat()
+
+    # 1. Thông báo cho người gửi lời mời (Sender): được chấp nhận
+    notif_sender_id = f"notif_match_{actual_sender}_{actual_receiver}_{int(datetime.now().timestamp())}"
+    notif_sender = {
+        "id": notif_sender_id,
         "userId": actual_sender,
         "type": "match_accepted",
-        "title": "Lời mời kết đôi đã được chấp nhận! ✨",
-        "message": f"{r_name} đã đồng ý lời mời kết đôi của bạn!",
+        "title": "Kết đôi thành công! ✨",
+        "message": f"{r_name} đã chấp nhận lời mời kết đôi của bạn! Hai bạn đã chính thức kết đôi thành công.",
+        "body": f"{r_name} đã chấp nhận lời mời kết đôi của bạn! Hai bạn đã chính thức kết đôi thành công.",
         "senderId": actual_receiver,
         "senderName": r_name,
         "senderAvatar": r_avatar,
         "requestId": actual_req_id,
         "read": False,
-        "createdAt": datetime.now().isoformat(),
+        "createdAt": now_iso,
     }
-    db_create_notification(notification)
+    db_create_notification(notif_sender)
     if actual_sender not in IN_MEMORY_NOTIFICATIONS:
         IN_MEMORY_NOTIFICATIONS[actual_sender] = []
-    IN_MEMORY_NOTIFICATIONS[actual_sender].insert(0, notification)
+    IN_MEMORY_NOTIFICATIONS[actual_sender].insert(0, notif_sender)
+
+    # 2. Thông báo cho người chấp nhận lời mời (Receiver): xác nhận kết đôi
+    notif_receiver_id = f"notif_match_{actual_receiver}_{actual_sender}_{int(datetime.now().timestamp())}"
+    notif_receiver = {
+        "id": notif_receiver_id,
+        "userId": actual_receiver,
+        "type": "match_accepted",
+        "title": "Kết đôi thành công! ✨",
+        "message": f"Bạn và {s_name} đã kết đôi thành công! Hãy gửi tin nhắn đầu tiên để cùng kết nối vũ trụ.",
+        "body": f"Bạn và {s_name} đã kết đôi thành công! Hãy gửi tin nhắn đầu tiên để cùng kết nối vũ trụ.",
+        "senderId": actual_sender,
+        "senderName": s_name,
+        "senderAvatar": s_avatar,
+        "requestId": actual_req_id,
+        "read": False,
+        "createdAt": now_iso,
+    }
+    db_create_notification(notif_receiver)
+    if actual_receiver not in IN_MEMORY_NOTIFICATIONS:
+        IN_MEMORY_NOTIFICATIONS[actual_receiver] = []
+    IN_MEMORY_NOTIFICATIONS[actual_receiver].insert(0, notif_receiver)
 
     if FIREBASE_AVAILABLE and db is not None:
         def sync_fs():
             try:
-                db.collection("match_requests").document(actual_req_id).update({
+                db.collection("match_requests").document(actual_req_id).set({
+                    "requestId": actual_req_id,
+                    "senderId": actual_sender,
+                    "receiverId": actual_receiver,
                     "status": "accepted",
                     "responseMessage": resp_msg,
                     "acceptedAt": firestore.SERVER_TIMESTAMP,
-                }, timeout=1.5)
+                }, merge=True, timeout=2.0)
+
+                db.collection("notifications").document(notif_sender_id).set({
+                    **notif_sender,
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                }, merge=True, timeout=2.0)
+                db.collection("notifications").document(notif_receiver_id).set({
+                    **notif_receiver,
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                }, merge=True, timeout=2.0)
             except Exception as fe:
                 safe_print("⚠️ Firestore sync accept warning:", fe)
         threading.Thread(target=sync_fs, daemon=True).start()
@@ -292,6 +352,35 @@ def check_match_status_service(user_id, target_id):
                 "response_status": 200
             }
 
+    if FIREBASE_AVAILABLE and db is not None:
+        try:
+            req_id_1 = f"{user_id}_{target_id}"
+            req_id_2 = f"{target_id}_{user_id}"
+            doc1 = db.collection("match_requests").document(req_id_1).get(timeout=1.5)
+            if doc1.exists:
+                d = doc1.to_dict()
+                st = d.get("status", "none")
+                return {
+                    "status": st,
+                    "requestId": req_id_1,
+                    "role": "sender",
+                    "message": d.get("message", ""),
+                    "response_status": 200
+                }
+            doc2 = db.collection("match_requests").document(req_id_2).get(timeout=1.5)
+            if doc2.exists:
+                d = doc2.to_dict()
+                st = d.get("status", "none")
+                return {
+                    "status": st,
+                    "requestId": req_id_2,
+                    "role": "receiver",
+                    "message": d.get("message", ""),
+                    "response_status": 200
+                }
+        except Exception:
+            pass
+
     return {"status": "none", "requestId": None, "response_status": 200}
 
 
@@ -299,16 +388,41 @@ def get_notifications_service(user_id):
     if not user_id:
         return {"success": True, "notifications": [], "status": 200}
 
-    notifs = get_user_notifications(user_id)
-    if not notifs:
-        from app.repositories.storage_db import uid_aliases
-        aliases = uid_aliases(user_id) if user_id else [user_id]
-        for a in aliases:
-            if a in IN_MEMORY_NOTIFICATIONS and IN_MEMORY_NOTIFICATIONS[a]:
-                notifs = IN_MEMORY_NOTIFICATIONS[a]
-                break
+    notifs = get_user_notifications(user_id) or []
+    from app.repositories.storage_db import uid_aliases
+    aliases = uid_aliases(user_id) if user_id else [user_id]
+    existing_ids = {n.get("id") for n in notifs if n.get("id")}
 
-    return {"success": True, "notifications": notifs or [], "status": 200}
+    for a in aliases:
+        if a in IN_MEMORY_NOTIFICATIONS and IN_MEMORY_NOTIFICATIONS[a]:
+            for mem_notif in IN_MEMORY_NOTIFICATIONS[a]:
+                mid = mem_notif.get("id")
+                if mid and mid not in existing_ids:
+                    notifs.append(mem_notif)
+                    existing_ids.add(mid)
+
+    if FIREBASE_AVAILABLE and db is not None:
+        try:
+            fs_stream = db.collection("notifications").where("userId", "in", aliases[:10]).limit(30).stream(timeout=1.5)
+            for doc in fs_stream:
+                d = doc.to_dict()
+                d["id"] = doc.id
+                if d["id"] not in existing_ids:
+                    notifs.append(d)
+                    existing_ids.add(d["id"])
+                else:
+                    # Giữ nguyên read: True nếu một trong hai nguồn đã đánh dấu đã đọc
+                    for ex in notifs:
+                        if ex.get("id") == d["id"]:
+                            if ex.get("read") or d.get("read"):
+                                ex["read"] = True
+                                d["read"] = True
+                            break
+        except Exception:
+            pass
+
+    notifs.sort(key=lambda x: str(x.get("createdAt") or x.get("created_at") or ""), reverse=True)
+    return {"success": True, "notifications": notifs, "status": 200}
 
 
 def mark_notifications_read_service(user_id, notif_ids, notif_id):
@@ -325,6 +439,15 @@ def mark_notifications_read_service(user_id, notif_ids, notif_id):
                 if n.get("id") in ids_to_mark:
                     n["read"] = True
 
+        if FIREBASE_AVAILABLE and db is not None:
+            def sync_fs():
+                try:
+                    for nid in ids_to_mark:
+                        db.collection("notifications").document(nid).set({"read": True}, merge=True, timeout=1.5)
+                except Exception as fe:
+                    safe_print("⚠️ Firestore sync mark read warning:", fe)
+            threading.Thread(target=sync_fs, daemon=True).start()
+
     return {"success": True, "message": "Đã đánh dấu đã đọc", "status": 200}
 
 
@@ -337,6 +460,14 @@ def delete_notification_service(user_id, notification_id):
         IN_MEMORY_NOTIFICATIONS[user_id] = [
             n for n in IN_MEMORY_NOTIFICATIONS[user_id] if n.get("id") != notification_id
         ]
+
+    if FIREBASE_AVAILABLE and db is not None:
+        def sync_fs():
+            try:
+                db.collection("notifications").document(notification_id).delete(timeout=1.5)
+            except Exception as fe:
+                safe_print("⚠️ Firestore sync delete notif warning:", fe)
+        threading.Thread(target=sync_fs, daemon=True).start()
 
     return {"success": True, "message": "Đã xóa thông báo", "status": 200}
 
@@ -524,52 +655,108 @@ def calculate_love_matching_service(match_type, data):
         "Nhân Mã", "Ma Kết", "Bảo Bình", "Song Ngư"
     ]
 
-    def calculate_synastry(s1, s2, target_tag):
+    ELEMENT_MAP = {
+        "Bạch Dương": "Lửa", "Sư Tử": "Lửa", "Nhân Mã": "Lửa",
+        "Kim Ngưu": "Đất", "Xử Nữ": "Đất", "Ma Kết": "Đất",
+        "Song Tử": "Khí", "Thiên Bình": "Khí", "Bảo Bình": "Khí",
+        "Cự Giải": "Nước", "Bọ Cạp": "Nước", "Song Ngư": "Nước"
+    }
+
+    def get_element_synergy(e1, e2):
+        if e1 == "Nước" and e2 == "Đất":
+            return "Nước × Đất · Tương Sinh Màu Mỡ", "Đất tạo bến đỗ an toàn, Nước tưới mát nuôi dưỡng tâm hồn."
+        if e1 == "Đất" and e2 == "Nước":
+            return "Đất × Nước · Tương Sinh Nuôi Dưỡng", "Nước mang đến sự dịu dàng, Đất là điểm tựa thực tế vững vàng."
+        if e1 == "Lửa" and e2 == "Khí":
+            return "Lửa × Khí · Thổi Bùng Đam Mê", "Khí tiếp thêm cảm hứng cho Lửa, Lửa sưởi ấm hoài bão của Khí."
+        if e1 == "Khí" and e2 == "Lửa":
+            return "Khí × Lửa · Cảm Hứng Vô Tận", "Lửa thắp sáng nhiệt huyết, Khí chắp cánh cho đam mê bay xa."
+        if e1 == "Nước" and e2 == "Nước":
+            return "Nước × Nước · Đại Dương Thấu Cảm", "Đồng điệu cảm xúc tuyệt đối, trực giác hòa quyện không cần lời nói."
+        if e1 == "Đất" and e2 == "Đất":
+            return "Đất × Đất · Thành Trì Vững Chãi", "Chung thủy, kiên định và luôn cùng nhìn về một tương lai bền chặt."
+        if e1 == "Lửa" and e2 == "Lửa":
+            return "Lửa × Lửa · Ngọn Lửa Cuồng Nhiệt", "Nhiệt huyết và đam mê bùng nổ, luôn cùng nhau tiến về phía trước."
+        if e1 == "Khí" and e2 == "Khí":
+            return "Khí × Khí · Bầu Trời Tự Do", "Đôi tri kỷ trí tuệ, những cuộc trò chuyện bất tận không bao giờ cạn."
+        if (e1 == "Lửa" and e2 == "Nước") or (e1 == "Nước" and e2 == "Lửa"):
+            return "Lửa × Nước · Sóng Lửa Mãnh Liệt", "Sức hút đối lập cuốn hút nhưng cần sự dịu dàng để hóa giải va chạm."
+        if (e1 == "Đất" and e2 == "Khí") or (e1 == "Khí" and e2 == "Đất"):
+            return "Đất × Khí · Cánh Diều & Bến Đỗ", "Khí mang đến ý tưởng mới, Đất giúp tiếp đất thực tế; cần kiên nhẫn dung hòa."
+        return f"{e1} × {e2} · Bù Trừ Năng Lượng", "Sự khác biệt nguyên tố là mảnh ghép mở rộng thế giới quan cho cả hai."
+
+    def calculate_synastry(s1, s2, target_tag, cand_moon=""):
         if s1 not in ZODIAC_ORDER or s2 not in ZODIAC_ORDER:
-            return 75, "Năng lượng hai cung hoàng đạo mang lại cơ hội gắn kết.", 75, 75, 75, 75
+            return 75, "Năng lượng hai cung hoàng đạo mang lại cơ hội gắn kết.", 75, 75, 75, 75, "Lục Hợp 60° (Sextile)", "Góc chiếu hòa ái", "Tương Sinh", "Hòa hợp tự nhiên", "Cởi mở và tôn trọng", "Hãy cùng nhau trải nghiệm"
         i1 = ZODIAC_ORDER.index(s1)
         i2 = ZODIAC_ORDER.index(s2)
         diff = abs(i1 - i2)
         dist = min(diff, 12 - diff)
 
+        elem1 = ELEMENT_MAP.get(s1, "Đất")
+        elem2 = ELEMENT_MAP.get(s2, "Đất")
+        elem_synergy, elem_detail = get_element_synergy(elem1, elem2)
+
         if dist == 4:
-            base = 95
-            reason = f"Góc tam hợp 120° giữa {s1} và {s2} mang lại sự đồng điệu tâm hồn sâu sắc và bình yên tự nhiên."
-            love, trust, comm, marr = 96, 95, 93, 94
-            suitability = {"greenflag": 100, "twinflame": 95, "destiny": 90, "karmic": 70, "redflag": 40}
+            base = 96
+            aspect_name = "Tam Hợp 120° (Trine)"
+            aspect_detail = f"Cùng mang nguyên tố {elem1}, hai bạn có sự đồng điệu tâm hồn sâu sắc và bình yên tự nhiên."
+            love, trust, comm, marr = 97, 96, 94, 95
+            suitability = {"greenflag": 98, "twinflame": 95, "destiny": 91, "karmic": 72, "redflag": 38}
+            highlight = "Sự đồng điệu sâu sắc trong nhân sinh quan và cảm xúc."
+            advice = "Hãy trân trọng dòng chảy hòa hợp tự nhiên và tạo dựng mái ấm vững vàng."
         elif dist == 2:
             base = 90
-            reason = f"Góc lục hợp 60° giữa {s1} và {s2} kích thích cảm hứng sáng tạo và sự tôn trọng lẫn nhau."
-            love, trust, comm, marr = 89, 91, 93, 88
-            suitability = {"greenflag": 95, "destiny": 88, "twinflame": 85, "karmic": 75, "redflag": 45}
+            aspect_name = "Lục Hợp 60° (Sextile)"
+            aspect_detail = f"Nguyên tố {elem1} và {elem2} tương sinh kích thích cảm hứng sáng tạo và sự tôn trọng lẫn nhau."
+            love, trust, comm, marr = 91, 93, 94, 89
+            suitability = {"greenflag": 95, "destiny": 90, "twinflame": 88, "karmic": 75, "redflag": 44}
+            highlight = "Khả năng chia sẻ mọi điều trong cuộc sống một cách thoải mái."
+            advice = "Duy trì các buổi trò chuyện sâu sắc và các chuyến đi ngắn cùng nhau."
         elif dist == 6:
-            base = 88
-            reason = f"Trục đối đỉnh 180° giữa {s1} và {s2} tạo lực hút nam châm mãnh liệt, vừa bù trừ vừa định mệnh."
-            love, trust, comm, marr = 93, 82, 85, 90
-            suitability = {"destiny": 98, "twinflame": 92, "greenflag": 80, "karmic": 85, "redflag": 65}
+            base = 89
+            aspect_name = "Đối Đỉnh 180° (Opposition)"
+            aspect_detail = f"Trục đối xứng 180° giữa {s1} và {s2} tạo lực hút nam châm mãnh liệt, vừa bù trừ vừa định mệnh."
+            love, trust, comm, marr = 95, 84, 86, 92
+            suitability = {"destiny": 99, "twinflame": 93, "greenflag": 82, "karmic": 86, "redflag": 68}
+            highlight = "Sức hút đối lập khó cưỡng và sự bù trừ phẩm chất hoàn hảo."
+            advice = "Học cách nhìn nhận góc nhìn của đối phương như một món quà bổ khuyết."
         elif dist == 0:
-            base = 92
-            reason = f"Cùng mang cung {s1}, hai bạn như hai mảnh gương phản chiếu chính xác cảm xúc và suy nghĩ của nhau."
-            love, trust, comm, marr = 92, 90, 94, 89
-            suitability = {"twinflame": 100, "greenflag": 88, "destiny": 85, "karmic": 78, "redflag": 50}
+            base = 93
+            aspect_name = "Trùng Tụ 0° (Conjunction)"
+            aspect_detail = f"Cùng mang cung {s1}, hai bạn như hai mảnh gương phản chiếu chính xác cảm xúc và suy nghĩ của nhau."
+            love, trust, comm, marr = 93, 92, 96, 90
+            suitability = {"twinflame": 100, "greenflag": 90, "destiny": 87, "karmic": 80, "redflag": 50}
+            highlight = "Trực giác thấu suốt tâm can, không cần lời nói cũng hiểu ý đối phương."
+            advice = "Dành cho nhau không gian riêng để không bị cuốn vào sự phản chiếu quá mức."
         elif dist == 3:
-            base = 62
-            reason = f"Góc vuông 90° giữa {s1} và {s2} tạo ra lực hút bốc đồng ban đầu nhưng đòi hỏi rất nhiều bao dung để hóa giải bất đồng."
-            love, trust, comm, marr = 68, 58, 60, 56
-            suitability = {"redflag": 100, "karmic": 82, "destiny": 60, "greenflag": 50, "twinflame": 45}
+            base = 65
+            aspect_name = "Vuông Góc 90° (Square)"
+            aspect_detail = f"Góc vuông 90° giữa {s1} và {s2} tạo ra lực hút bốc đồng ban đầu nhưng đòi hỏi rất nhiều bao dung để hóa giải bất đồng."
+            love, trust, comm, marr = 75, 62, 64, 60
+            suitability = {"redflag": 98, "karmic": 86, "destiny": 64, "greenflag": 52, "twinflame": 46}
+            highlight = "Lực hút mãnh liệt từ những khác biệt sâu sắc trong tính cách."
+            advice = "Hạ cái tôi xuống và lắng nghe mà không phán xét trong những lúc bất đồng."
         elif dist == 5:
-            base = 78
-            reason = f"Góc 150° báo hiệu mối liên kết nghiệp duyên sâu sắc, giúp cả hai đối diện và chữa lành tổn thương nội tâm."
-            love, trust, comm, marr = 79, 76, 75, 80
-            suitability = {"karmic": 100, "destiny": 82, "redflag": 78, "greenflag": 65, "twinflame": 60}
+            base = 79
+            aspect_name = "Bất Tương Hợp 150° (Quincunx)"
+            aspect_detail = f"Góc 150° báo hiệu mối liên kết nghiệp duyên sâu sắc, giúp cả hai đối diện và chữa lành tổn thương nội tâm."
+            love, trust, comm, marr = 82, 78, 77, 83
+            suitability = {"karmic": 99, "destiny": 85, "redflag": 76, "greenflag": 68, "twinflame": 64}
+            highlight = "Mối liên kết tâm hồn kỳ lạ, như đã từng gắn bó từ tiền kiếp."
+            advice = "Kiên nhẫn điều chỉnh thói quen và đón nhận những thay đổi tích cực."
         else:
-            base = 74
-            reason = f"Hai cung kề cận mang năng lượng kế thừa bài học cuộc sống, cần thời gian để thấu hiểu sự khác biệt."
-            love, trust, comm, marr = 75, 76, 78, 73
-            suitability = {"karmic": 88, "greenflag": 72, "redflag": 70, "destiny": 68, "twinflame": 65}
+            base = 75
+            aspect_name = "Bán Lục Hợp 30° (Semi-sextile)"
+            aspect_detail = f"Hai cung kề cận mang năng lượng kế thừa bài học cuộc sống, cần thời gian để thấu hiểu sự khác biệt."
+            love, trust, comm, marr = 77, 78, 80, 75
+            suitability = {"karmic": 88, "greenflag": 75, "redflag": 70, "destiny": 70, "twinflame": 65}
+            highlight = "Sự tò mò lành mạnh về thế giới quan mới mẻ của đối phương."
+            advice = "Tôn trọng nhịp điệu sinh hoạt và cách bộc lộ cảm xúc riêng của mỗi người."
 
         rank_score = suitability.get(target_tag, base)
-        return rank_score, reason, love, trust, comm, marr
+        reason = f"{aspect_name} mang lại sự gắn kết đặc biệt giữa {s1} và {s2}. Mối liên kết {elem_synergy} giúp cả hai tìm thấy sự thấu hiểu và hòa hợp."
+        return rank_score, reason, love, trust, comm, marr, aspect_name, aspect_detail, elem_synergy, elem_detail, highlight, advice
 
     all_candidates_pool = list(DEFAULT_MATCH_CANDIDATES)
     for act_uid, act_user in REGISTERED_ACTIVE_USERS.items():
@@ -587,7 +774,7 @@ def calculate_love_matching_service(match_type, data):
     scored_candidates = []
     for c in pool:
         cand_sign = c.get("zodiac") or c.get("sun") or "Bạch Dương"
-        score, reason, love, trust, comm, marr = calculate_synastry(my_sign, cand_sign, match_type)
+        score, reason, love, trust, comm, marr, asp_name, asp_detail, el_syn, el_det, hl, adv = calculate_synastry(my_sign, cand_sign, match_type, c.get("moon", ""))
         scored_candidates.append({
             "candidate": c,
             "score": score,
@@ -595,7 +782,13 @@ def calculate_love_matching_service(match_type, data):
             "love": love,
             "trust": trust,
             "comm": comm,
-            "marr": marr
+            "marr": marr,
+            "aspect_name": asp_name,
+            "aspect_detail": asp_detail,
+            "element_synergy": el_syn,
+            "element_detail": el_det,
+            "highlight": hl,
+            "advice": adv
         })
 
     scored_candidates.sort(key=lambda x: x["score"], reverse=True)
@@ -611,6 +804,9 @@ def calculate_love_matching_service(match_type, data):
             "uid": c.get("uid", ""),
             "name": c.get("name", "Người dùng"),
             "zodiac": c.get("zodiac", ""),
+            "sun": c.get("sun") or c.get("zodiac", ""),
+            "moon": c.get("moon", "Kim Ngưu"),
+            "ascendant": c.get("ascendant", ""),
             "age": c.get("age", 22),
             "gender": c.get("gender", ""),
             "element": c.get("element", "Đất"),
@@ -620,10 +816,22 @@ def calculate_love_matching_service(match_type, data):
             "compatibility_score": score,
             "match_level": level,
             "match_level_text": level_text,
+            "aspect_name": p["aspect_name"],
+            "aspect_detail": p["aspect_detail"],
+            "element_synergy": p["element_synergy"],
+            "element_detail": p["element_detail"],
+            "breakdown": {
+                "love": p["love"],
+                "trust": p["trust"],
+                "communication": p["comm"],
+                "commitment": p["marr"]
+            },
             "love": p["love"],
             "trust": p["trust"],
             "communication": p["comm"],
             "marriage": p["marr"],
+            "highlight": p["highlight"],
+            "advice": p["advice"],
             "avatar": c.get("avatar", ""),
             "isRealUser": c.get("isRealUser", False)
         })

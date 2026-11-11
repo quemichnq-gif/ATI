@@ -52,6 +52,7 @@ export function getAvailableChatAccounts(mainProfile: UserProfile): ChatAccountI
   // 3. Các ứng viên hệ thống
   const candidateAccounts: ChatAccountIdentity[] = Object.values(DEFAULT_CANDIDATE_PROFILES)
     .filter((cand) => !myAliases.has(cand.uid) && !testAccountsList.some((t) => t.name === cand.name))
+    .slice(0, 20)
     .map((cand) => ({
       uid: cand.uid,
       name: cand.name,

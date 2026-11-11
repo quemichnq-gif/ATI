@@ -303,3 +303,48 @@ DEFAULT_MATCH_CANDIDATES = [
         "elements": {"fire": 20, "earth": 15, "air": 50, "water": 15}
     }
 ]
+
+# Tải và đồng bộ 100 ứng viên từ usersMockData.json
+try:
+    import os
+    import json
+    _be_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    _mock_path = os.path.abspath(os.path.join(_be_dir, "..", "AI_App_FE", "ResonanciaWeb", "src", "mocks", "usersMockData.json"))
+    if os.path.exists(_mock_path):
+        with open(_mock_path, "r", encoding="utf-8") as _f:
+            _mock_data = json.load(_f)
+        _elem_map = {
+            'Bạch Dương': 'Lửa', 'Sư Tử': 'Lửa', 'Nhân Mã': 'Lửa',
+            'Kim Ngưu': 'Đất', 'Xử Nữ': 'Đất', 'Ma Kết': 'Đất',
+            'Song Tử': 'Khí', 'Thiên Bình': 'Khí', 'Bảo Bình': 'Khí',
+            'Cự Giải': 'Nước', 'Bọ Cạp': 'Nước', 'Song Ngư': 'Nước'
+        }
+        for _u in _mock_data:
+            _z = _u.get("zodiacSign", "Bảo Bình")
+            _elem = _elem_map.get(_z, "Đất")
+            _birth_year = int(_u["dateOfBirth"][:4]) if _u.get("dateOfBirth") else 1998
+            DEFAULT_MATCH_CANDIDATES.append({
+                "uid": _u["id"],
+                "name": _u.get("fullName", "Thành viên Resonancia"),
+                "email": _u.get("email"),
+                "zodiac": _z,
+                "sun": _z,
+                "moon": _u.get("moon", "Xử Nữ"),
+                "age": 2026 - _birth_year,
+                "gender": _u.get("gender", ""),
+                "element": _elem,
+                "job": _u.get("occupation", "Thành viên Resonancia"),
+                "avatar": _u.get("avatar", ""),
+                "bio": _u.get("bio", ""),
+                "personality": _u.get("bio", "Chân thành, ấm áp"),
+                "planets": {"sun": _z, "moon": "Xử Nữ", "mercury": _z, "venus": "Kim Ngưu", "mars": "Bạch Dương"},
+                "houses": {},
+                "elements": {
+                    "fire": 45 if _elem == "Lửa" else 15,
+                    "earth": 45 if _elem == "Đất" else 15,
+                    "air": 45 if _elem == "Khí" else 15,
+                    "water": 45 if _elem == "Nước" else 15
+                }
+            })
+except Exception:
+    pass

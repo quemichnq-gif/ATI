@@ -9,7 +9,7 @@ import { setAuth } from '../store/authSlice';
 import { setProfile } from '../store/profileSlice';
 import StarField from '../components/StarField';
 import UiIcon from '../components/UiIcon';
-import { TEST_ACCOUNTS, TEST_ACCOUNT_DEFAULT_PASSWORD, getTestProfileByEmailOrUid } from '../constants/testAccounts';
+import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
 
 const hasCompleteBirthProfile = (profile: any) =>
   Boolean(profile?.birthDate && profile?.birthTime && profile?.birthPlace);
@@ -42,8 +42,6 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
-  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
-  const [quickLoadingEmail, setQuickLoadingEmail] = useState<string | null>(null);
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -168,52 +166,6 @@ export default function LoginPage() {
       replace: true,
       state: { uid: user.uid, email: cleanEmail },
     });
-  };
-
-  // Bấm vào là đăng nhập ngay lập tức không cần nhập mật khẩu
-  const handleQuickLogin = async (targetEmail: string) => {
-    if (quickLoadingEmail || loading) return;
-    setError('');
-    setInfoMessage('');
-    setQuickLoadingEmail(targetEmail);
-    setEmail(targetEmail);
-    setPassword(TEST_ACCOUNT_DEFAULT_PASSWORD);
-
-    try {
-      const userCred = await signInWithEmailAndPassword(auth, targetEmail, TEST_ACCOUNT_DEFAULT_PASSWORD);
-      const user = userCred.user;
-      const testAcc = getTestProfileByEmailOrUid(targetEmail) || getTestProfileByEmailOrUid(user.uid);
-      dispatch(setAuth({ uid: user.uid, email: targetEmail }));
-
-      const initialProfile = {
-        ...(testAcc || {}),
-        uid: user.uid,
-        email: targetEmail,
-        name: testAcc?.name || user.displayName?.trim() || targetEmail.split('@')[0],
-      };
-      dispatch(setProfile(initialProfile as any));
-
-      try {
-        localStorage.setItem(`resonancia_profile_${user.uid}`, JSON.stringify(initialProfile));
-        localStorage.setItem('resonancia_last_profile', JSON.stringify(initialProfile));
-        localStorage.setItem('resonancia_active_chat_identity', user.uid);
-      } catch {}
-
-      navigate(hasCompleteBirthProfile(initialProfile) ? '/home' : '/register/step2', {
-        replace: true,
-        state: { uid: user.uid, email: targetEmail },
-      });
-    } catch (err: any) {
-      console.error('Lỗi đăng nhập tài khoản thử nghiệm:', err);
-      setError(getAuthErrorMessage(err?.code || ''));
-      setQuickLoadingEmail(null);
-    }
-  };
-
-  const handleCopyTestEmail = (accountEmail: string) => {
-    navigator.clipboard.writeText(accountEmail);
-    setCopiedEmail(accountEmail);
-    setTimeout(() => setCopiedEmail(null), 2500);
   };
 
   const handleForgotPassword = async () => {
@@ -397,95 +349,8 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* ============================================================ */}
-          {/* KHỐI TÀI KHOẢN MẪU TEST CHAT 2 CHIỀU THỰC TẾ (1-CLICK LOGIN) */}
-          {/* ============================================================ */}
-          <div className="mt-6 pt-5 border-t border-purple-500/20">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-purple-300/90 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Tài khoản thử nghiệm Chat Messenger
-              </span>
-              <span className="text-[11px] text-pink-300/80">Test 2 chiều</span>
-            </div>
-
-            <p className="text-xs text-purple-200/70 mb-3.5 leading-relaxed">
-              Bấm vào nick hoặc nút <strong>&ldquo;Vào ngay&rdquo;</strong> để đăng nhập tức thì không cần mật khẩu. Dùng <strong>Tab ẩn danh (Incognito)</strong> để đăng nhập tài khoản đối diện và thử nhắn tin hai chiều:
-            </p>
-
-            <div className="space-y-2">
-              {Object.values(TEST_ACCOUNTS).map((acc) => (
-                <div
-                  key={acc.email}
-                  onClick={() => handleQuickLogin(acc.email)}
-                  className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-500/25 flex items-center justify-between gap-2.5 hover:border-purple-400/50 hover:bg-purple-900/25 transition-all cursor-pointer"
-                  title={`Bấm để vào ngay tài khoản ${acc.name}`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={acc.avatar}
-                      alt={acc.name}
-                      className="w-9 h-9 rounded-full object-cover border border-purple-400/40 flex-shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white flex items-center gap-1.5 truncate">
-                        <span>{acc.name}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/30 text-purple-200 font-normal">
-                          {acc.zodiac}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-purple-300/60 truncate font-mono">
-                        {acc.email}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopyTestEmail(acc.email);
-                      }}
-                      className="px-2 py-1 rounded-lg text-[11px] bg-white/5 hover:bg-white/10 text-purple-200 border border-purple-400/20 transition-all cursor-pointer"
-                      title="Sao chép email tài khoản thử nghiệm"
-                    >
-                      {copiedEmail === acc.email ? '✓ Đã chép' : 'Chép email'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleQuickLogin(acc.email);
-                      }}
-                      disabled={quickLoadingEmail === acc.email}
-                      className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-white transition-all cursor-pointer"
-                      style={{
-                        background: 'linear-gradient(135deg, #0084ff 0%, #a033ff 100%)',
-                      }}
-                      title={`Bấm để đăng nhập ngay tài khoản ${acc.name}`}
-                    >
-                      {quickLoadingEmail === acc.email ? (
-                        <span className="flex items-center gap-1">
-                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Đang vào...
-                        </span>
-                      ) : (
-                        'Vào ngay'
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-3 p-2 rounded-lg bg-white/5 border border-purple-500/15 text-[11px] text-purple-300/80 text-center">
-              Mật khẩu tài khoản thử nghiệm: <strong className="font-mono text-pink-300">123456</strong> · Bấm vào nick để vào ngay không cần mật khẩu.
-            </div>
-          </div>
-
           {/* Footer */}
-          <div className="text-center mt-5">
+          <div className="text-center mt-6">
             <p className="text-purple-300 text-sm">
               Chưa có tài khoản?{' '}
               <Link to="/register" className="text-pink-400 hover:text-pink-300 font-semibold transition-colors">
