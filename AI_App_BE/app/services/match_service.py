@@ -31,7 +31,8 @@ try:
         delete_notification as db_delete_notification,
         get_user_relationship,
         set_user_relationship,
-        break_relationship
+        break_relationship,
+        uid_aliases
     )
 except ImportError:
     from storage_db import (
@@ -49,7 +50,8 @@ except ImportError:
         delete_notification as db_delete_notification,
         get_user_relationship,
         set_user_relationship,
-        break_relationship
+        break_relationship,
+        uid_aliases
     )
 
 
@@ -59,6 +61,21 @@ def get_user_match_info(uid):
     rel = get_user_relationship(uid)
     if uid in IN_MEMORY_USER_RELATIONSHIPS:
         rel.update(IN_MEMORY_USER_RELATIONSHIPS[uid])
+
+    try:
+        from app.services.chat_service import KNOWN_USER_INFO, CANONICAL_UID_MAP
+        canonical = CANONICAL_UID_MAP.get(uid, uid)
+        k_info = KNOWN_USER_INFO.get(canonical) or KNOWN_USER_INFO.get(uid)
+        if k_info:
+            return {
+                "name": k_info.get("name", "Người dùng"),
+                "avatar": k_info.get("avatar", ""),
+                "partnerId": rel.get("partnerId"),
+                "relationshipStatus": rel.get("relationshipStatus", "Độc thân")
+            }
+    except Exception:
+        pass
+
     if uid in REGISTERED_ACTIVE_USERS:
         u = dict(REGISTERED_ACTIVE_USERS[uid])
         u.update(rel)
@@ -159,8 +176,11 @@ def accept_match_request_service(request_id, receiver_id, sender_id, response_me
     if not req and request_id:
         req = IN_MEMORY_MATCH_REQUESTS.get(request_id)
     if not req and sender_id and receiver_id:
+        s_aliases = uid_aliases(sender_id) if sender_id else [sender_id]
+        r_aliases = uid_aliases(receiver_id) if receiver_id else [receiver_id]
         for r in IN_MEMORY_MATCH_REQUESTS.values():
-            if r.get("senderId") == sender_id and r.get("receiverId") == receiver_id and r.get("status") == "pending":
+            if ((r.get("senderId") in s_aliases and r.get("receiverId") in r_aliases) or
+                (r.get("senderId") in r_aliases and r.get("receiverId") in s_aliases)) and r.get("status") == "pending":
                 req = r
                 break
 
@@ -229,17 +249,20 @@ def accept_match_request_service(request_id, receiver_id, sender_id, response_me
     }
 
 
-def reject_match_request_service(request_id, receiver_id, response_message):
+def reject_match_request_service(request_id, receiver_id, sender_id=None, response_message=""):
     req = get_match_request_by_id(request_id) if request_id else None
+    if not req and sender_id and receiver_id:
+        req = find_pending_match_request(sender_id, receiver_id)
     if not req and request_id in IN_MEMORY_MATCH_REQUESTS:
         req = IN_MEMORY_MATCH_REQUESTS[request_id]
 
-    if req:
+    actual_req_id = req.get("requestId") if req else request_id
+    if actual_req_id:
         resp_msg = response_message or "Đã từ chối lời mời"
-        update_match_request_status(request_id, "rejected", resp_msg)
-        if request_id in IN_MEMORY_MATCH_REQUESTS:
-            IN_MEMORY_MATCH_REQUESTS[request_id]["status"] = "rejected"
-            IN_MEMORY_MATCH_REQUESTS[request_id]["responseMessage"] = resp_msg
+        update_match_request_status(actual_req_id, "rejected", resp_msg)
+        if actual_req_id in IN_MEMORY_MATCH_REQUESTS:
+            IN_MEMORY_MATCH_REQUESTS[actual_req_id]["status"] = "rejected"
+            IN_MEMORY_MATCH_REQUESTS[actual_req_id]["responseMessage"] = resp_msg
 
     return {"success": True, "message": "Đã từ chối lời mời ghép đôi", "status": 200}
 
@@ -269,25 +292,33 @@ def check_match_status_service(user_id, target_id):
     if not user_id or not target_id:
         return {"status": "none", "requestId": None, "response_status": 200}
 
+    u_aliases = uid_aliases(user_id) if user_id else [user_id]
+    t_aliases = uid_aliases(target_id) if target_id else [target_id]
+
     req = get_latest_match_request_between(user_id, target_id)
     if req:
         status = req.get("status", "none")
-        role = "sender" if req.get("senderId") == user_id else "receiver"
+        role = "sender" if req.get("senderId") in u_aliases else "receiver"
         return {
             "status": status,
             "requestId": req.get("requestId"),
             "role": role,
+            "senderId": req.get("senderId"),
+            "receiverId": req.get("receiverId"),
             "message": req.get("message", ""),
             "response_status": 200
         }
 
     for r in IN_MEMORY_MATCH_REQUESTS.values():
-        if (r.get("senderId") == user_id and r.get("receiverId") == target_id) or \
-           (r.get("senderId") == target_id and r.get("receiverId") == user_id):
+        s_id = r.get("senderId")
+        r_id = r.get("receiverId")
+        if (s_id in u_aliases and r_id in t_aliases) or (s_id in t_aliases and r_id in u_aliases):
             return {
                 "status": r.get("status", "none"),
                 "requestId": r.get("requestId"),
-                "role": "sender" if r.get("senderId") == user_id else "receiver",
+                "role": "sender" if s_id in u_aliases else "receiver",
+                "senderId": s_id,
+                "receiverId": r_id,
                 "message": r.get("message", ""),
                 "response_status": 200
             }
@@ -348,12 +379,13 @@ def get_match_requests_service(user_id, req_type):
     results = get_user_match_requests(user_id, req_type)
     if not results:
         results = []
+        u_aliases = uid_aliases(user_id) if user_id else [user_id]
         for r in IN_MEMORY_MATCH_REQUESTS.values():
-            if req_type == "sent" and r.get("senderId") == user_id:
+            if req_type == "sent" and r.get("senderId") in u_aliases:
                 results.append(r)
-            elif req_type == "received" and r.get("receiverId") == user_id:
+            elif req_type == "received" and r.get("receiverId") in u_aliases:
                 results.append(r)
-            elif not req_type and (r.get("senderId") == user_id or r.get("receiverId") == user_id):
+            elif not req_type and (r.get("senderId") in u_aliases or r.get("receiverId") in u_aliases):
                 results.append(r)
 
     return {"success": True, "requests": results, "status": 200}
@@ -571,13 +603,94 @@ def calculate_love_matching_service(match_type, data):
         rank_score = suitability.get(target_tag, base)
         return rank_score, reason, love, trust, comm, marr
 
+    def get_connection_type(s1, s2):
+        if s1 not in ZODIAC_ORDER or s2 not in ZODIAC_ORDER:
+            return "greenflag"
+        i1 = ZODIAC_ORDER.index(s1)
+        i2 = ZODIAC_ORDER.index(s2)
+        diff = abs(i1 - i2)
+        dist = min(diff, 12 - diff)
+        if dist in [4, 2]:
+            return "greenflag"
+        elif dist == 6:
+            return "destiny"
+        elif dist == 0:
+            return "twinflame"
+        elif dist == 3:
+            return "redflag"
+        else:
+            return "karmic"
+
+    # Lấy danh sách partner đã kết bạn (accepted) của người dùng hiện tại
+    user_aliases = set(uid_aliases(uid) or [uid])
+    accepted_partner_map = {}
+    try:
+        db_reqs = get_user_match_requests(uid, request_type="all")
+        for r in db_reqs:
+            if r.get("status") == "accepted":
+                s_id = r.get("senderId")
+                r_id = r.get("receiverId")
+                p_id = r_id if s_id in user_aliases else s_id
+                if p_id and p_id not in user_aliases:
+                    p_name = r.get("receiverName") if s_id in user_aliases else r.get("senderName")
+                    p_avt = r.get("senderAvatar") if r_id in user_aliases else ""
+                    accepted_partner_map[p_id] = {"name": p_name, "avatar": p_avt}
+                    for a in uid_aliases(p_id):
+                        accepted_partner_map[a] = {"name": p_name, "avatar": p_avt}
+    except Exception as e:
+        safe_print(f"[MatchService] Error reading accepted partner requests: {e}")
+
+    try:
+        for r in IN_MEMORY_MATCH_REQUESTS.values():
+            if r.get("status") == "accepted":
+                s_id = r.get("senderId")
+                r_id = r.get("receiverId")
+                p_id = r_id if s_id in user_aliases else (s_id if r_id in user_aliases else None)
+                if p_id and p_id not in user_aliases:
+                    p_name = r.get("receiverName") if s_id in user_aliases else r.get("senderName")
+                    p_avt = r.get("senderAvatar") if r_id in user_aliases else ""
+                    accepted_partner_map[p_id] = {"name": p_name, "avatar": p_avt}
+                    for a in uid_aliases(p_id):
+                        accepted_partner_map[a] = {"name": p_name, "avatar": p_avt}
+    except Exception:
+        pass
+
     all_candidates_pool = list(DEFAULT_MATCH_CANDIDATES)
     for act_uid, act_user in REGISTERED_ACTIVE_USERS.items():
-        if act_uid != uid and act_user.get("name") != me["name"]:
+        if act_uid not in user_aliases and act_user.get("name") != me["name"]:
             if not any(c.get("uid") == act_uid for c in all_candidates_pool):
                 all_candidates_pool.append(act_user)
 
-    pool = [c for c in all_candidates_pool if c.get("uid") != uid and c.get("name") != me["name"]]
+    # Đảm bảo các đối tác đã kết bạn nằm trong all_candidates_pool
+    for p_uid, p_data in accepted_partner_map.items():
+        if p_uid in user_aliases:
+            continue
+        in_pool = any(c.get("uid") == p_uid or p_uid in uid_aliases(c.get("uid", "")) for c in all_candidates_pool)
+        if not in_pool:
+            try:
+                from app.services.chat_service import KNOWN_USER_INFO, CANONICAL_UID_MAP
+                canon = CANONICAL_UID_MAP.get(p_uid, p_uid)
+                k_info = KNOWN_USER_INFO.get(canon) or KNOWN_USER_INFO.get(p_uid) or {}
+            except Exception:
+                k_info = {}
+            z_sign = k_info.get("zodiac") or k_info.get("sun") or "Bọ Cạp"
+            all_candidates_pool.append({
+                "uid": p_uid,
+                "name": p_data.get("name") or k_info.get("name", "Người dùng"),
+                "zodiac": z_sign,
+                "sun": z_sign,
+                "moon": "Kim Ngưu",
+                "ascendant": "Song Tử",
+                "age": 24,
+                "gender": "Nam",
+                "element": "Nước",
+                "job": "Thành viên Resonancia",
+                "avatar": p_data.get("avatar") or k_info.get("avatar", ""),
+                "personality": "Chân thành, ấm áp, sâu sắc",
+                "isRealUser": True
+            })
+
+    pool = [c for c in all_candidates_pool if c.get("uid") not in user_aliases and c.get("name") != me["name"]]
     if my_gender in ["Nam", "Nữ"]:
         target_gender = "Nữ" if my_gender == "Nam" else "Nam"
         gender_matches = [c for c in pool if c.get("gender") == target_gender]
@@ -585,9 +698,28 @@ def calculate_love_matching_service(match_type, data):
         pool = gender_matches + other_matches
 
     scored_candidates = []
+    seen_cand_uids = set()
     for c in pool:
+        cand_uid = c.get("uid", "")
+        if cand_uid in seen_cand_uids:
+            continue
+        for a in uid_aliases(cand_uid):
+            seen_cand_uids.add(a)
+        seen_cand_uids.add(cand_uid)
+
         cand_sign = c.get("zodiac") or c.get("sun") or "Bạch Dương"
         score, reason, love, trust, comm, marr = calculate_synastry(my_sign, cand_sign, match_type)
+
+        # Kiểm tra trạng thái đã kết bạn
+        is_accepted_friend = cand_uid in accepted_partner_map or any(a in accepted_partner_map for a in uid_aliases(cand_uid))
+        primary_type = get_connection_type(my_sign, cand_sign)
+
+        # Nếu đã kết bạn và đúng phân loại kết nối này -> ưu tiên đẩy lên hàng đầu
+        is_priority_partner = is_accepted_friend and (primary_type == match_type)
+        if is_priority_partner:
+            score = 100
+            reason = f"Đã kết bạn & ghép đôi thành công! Hai bạn có sự kết nối {match_type.upper()} tự nhiên và đồng điệu."
+
         scored_candidates.append({
             "candidate": c,
             "score": score,
@@ -595,10 +727,13 @@ def calculate_love_matching_service(match_type, data):
             "love": love,
             "trust": trust,
             "comm": comm,
-            "marr": marr
+            "marr": marr,
+            "isMatched": is_accepted_friend,
+            "is_priority_partner": is_priority_partner
         })
 
-    scored_candidates.sort(key=lambda x: x["score"], reverse=True)
+    # Ưu tiên đẩy partner đã kết bạn thuộc nhóm này lên đầu tiên (index 0)
+    scored_candidates.sort(key=lambda x: (1 if x.get("is_priority_partner") else 0, x["score"]), reverse=True)
     selected_pairs = scored_candidates[:12] if len(scored_candidates) >= 12 else scored_candidates
 
     result = []
@@ -625,7 +760,9 @@ def calculate_love_matching_service(match_type, data):
             "communication": p["comm"],
             "marriage": p["marr"],
             "avatar": c.get("avatar", ""),
-            "isRealUser": c.get("isRealUser", False)
+            "isRealUser": c.get("isRealUser", False),
+            "isMatched": p.get("isMatched", False),
+            "isFriend": p.get("isMatched", False),
         })
 
     return {

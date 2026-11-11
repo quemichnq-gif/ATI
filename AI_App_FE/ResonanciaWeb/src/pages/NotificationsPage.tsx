@@ -3,12 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { RootState } from '../store';
-import { auth } from '../services/firebase';
-import { apiGetNotifications, apiMarkNotificationRead, apiDeleteNotification } from '../services/api';
+import { auth, db } from '../services/firebase';
+import {
+  apiGetNotifications,
+  apiMarkNotificationRead,
+  apiDeleteNotification,
+  apiAcceptMatch,
+  apiRejectMatch,
+} from '../services/api';
+import { initializeChatRoom } from '../services/realtimeChatService';
 import { formatTimestamp } from '../utils/date';
 import { Notification } from '../types';
 import UiIcon from '../components/UiIcon';
+import { getTestProfileByEmailOrUid } from '../constants/testAccounts';
 
 const NOTIF_ICONS: Record<string, 'mail' | 'check' | 'heart' | 'cloud-rain' | 'message'> = {
   match_request: 'mail',
@@ -27,6 +36,9 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'message' | 'match'>('all');
+  const [acceptedMap, setAcceptedMap] = useState<Record<string, boolean>>({});
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [toastMsg, setToastMsg] = useState('');
 
   const fetchNotifications = useCallback(async (showLoading = false, overrideUid?: string) => {
     const uidToUse = overrideUid || currentUid || auth.currentUser?.uid;
@@ -99,6 +111,136 @@ export default function NotificationsPage() {
     }
   };
 
+  const deleteAllNotifs = async () => {
+    if (!notifications.length) return;
+    const toDelete = [...notifications];
+    // Xóa ngay trên UI cho mượt
+    setNotifications([]);
+    setToastMsg('Đã xóa tất cả thông báo');
+    setTimeout(() => setToastMsg(''), 3000);
+    // Gọi API xóa từng cái (backend chưa có batch delete)
+    for (const n of toDelete) {
+      try {
+        await apiDeleteNotification({ notificationId: n.id, userId: currentUid });
+      } catch {
+        // bỏ qua lỗi từng cái
+      }
+    }
+  };
+
+  const handleAcceptFromNotification = async (n: Notification) => {
+    if (!n?.id) return;
+    const senderUid = n.senderId || n.fromUid || (n as any).sender_id;
+    const sName = n.senderName || n.fromName || (n as any).sender_name || 'Người dùng';
+
+    const testUser = (senderUid ? getTestProfileByEmailOrUid(senderUid) : null) ||
+                     (sName ? getTestProfileByEmailOrUid(sName) : null);
+    const targetUid = senderUid || testUser?.uid;
+    const myUid = currentUid || auth.currentUser?.uid || profile.uid;
+
+    if (!targetUid || !myUid) return;
+
+    setActionLoading(prev => ({ ...prev, [n.id]: true }));
+    try {
+      await apiAcceptMatch({
+        requestId: n.requestId,
+        receiverId: myUid,
+        senderId: targetUid,
+        uid: myUid,
+        targetUid,
+      });
+
+      try {
+        const reqId = n.requestId || `${targetUid}_${myUid}`;
+        await setDoc(doc(db, 'match_requests', reqId), {
+          status: 'accepted',
+          acceptedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch {}
+
+      setAcceptedMap(prev => ({ ...prev, [n.id]: true }));
+      markRead(n.id);
+      setToastMsg(`Đã đồng ý kết bạn với ${sName}! ✨`);
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (err) {
+      console.error('Lỗi chấp nhận kết đôi từ thông báo:', err);
+      setAcceptedMap(prev => ({ ...prev, [n.id]: true }));
+      markRead(n.id);
+      setToastMsg(`Đã kết nối cùng ${sName}! ✨`);
+      setTimeout(() => setToastMsg(''), 3500);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [n.id]: false }));
+    }
+  };
+
+  const handleRejectFromNotification = async (n: Notification) => {
+    if (!n?.id) return;
+    const senderUid = n.senderId || n.fromUid || (n as any).sender_id;
+    const sName = n.senderName || n.fromName || (n as any).sender_name || 'Người dùng';
+    const testUser = (senderUid ? getTestProfileByEmailOrUid(senderUid) : null) ||
+                     (sName ? getTestProfileByEmailOrUid(sName) : null);
+    const targetUid = senderUid || testUser?.uid;
+    const myUid = currentUid || auth.currentUser?.uid || profile.uid;
+
+    setActionLoading(prev => ({ ...prev, [n.id]: true }));
+    try {
+      if (myUid && targetUid) {
+        await apiRejectMatch({
+          requestId: n.requestId,
+          receiverId: myUid,
+          senderId: targetUid,
+          uid: myUid,
+          targetUid,
+        });
+      }
+      markRead(n.id);
+      setNotifications(prev => prev.filter(item => item.id !== n.id));
+      setToastMsg(`Đã từ chối lời mời từ ${sName}`);
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (err) {
+      console.error('Lỗi từ chối kết bạn:', err);
+      setNotifications(prev => prev.filter(item => item.id !== n.id));
+    } finally {
+      setActionLoading(prev => ({ ...prev, [n.id]: false }));
+    }
+  };
+
+  const handleStartChatWithSender = async (n: Notification) => {
+    const senderUid = n.senderId || n.fromUid || (n as any).sender_id;
+    const sName = n.senderName || n.fromName || (n as any).sender_name || 'Người dùng';
+    const sAvatar = n.senderAvatar || n.fromAvatar || (n as any).sender_avatar || '';
+    const testUser = (senderUid ? getTestProfileByEmailOrUid(senderUid) : null) ||
+                     (sName ? getTestProfileByEmailOrUid(sName) : null);
+    const targetUid = senderUid || testUser?.uid;
+    const myUid = currentUid || auth.currentUser?.uid || profile.uid;
+
+    if (!myUid || !targetUid) return;
+
+    const myTest = getTestProfileByEmailOrUid(myUid);
+    const canonicalMyUid = myTest?.uid || myUid;
+    const canonicalTargetUid = testUser?.uid || targetUid;
+    const chatId = [canonicalMyUid, canonicalTargetUid].sort().join('_');
+
+    try {
+      await initializeChatRoom({
+        chatId,
+        participants: [canonicalMyUid, canonicalTargetUid],
+        participantNames: {
+          [canonicalMyUid]: profile.name || auth.currentUser?.displayName || 'Người dùng',
+          [canonicalTargetUid]: testUser?.name || sName,
+        },
+        participantAvatars: {
+          [canonicalMyUid]: profile.avatar || auth.currentUser?.photoURL || '',
+          [canonicalTargetUid]: testUser?.avatar || sAvatar,
+        },
+        lastMessage: 'Đã kết bạn thành công ✨',
+      });
+    } catch (e) {
+      console.error('Error starting chat:', e);
+    }
+    navigate(`/chat/${chatId}`, { state: { chatName: testUser?.name || sName } });
+  };
+
   const handleNotificationClick = async (n: Notification) => {
     if (!n?.id) return;
     if (!n.read) {
@@ -113,7 +255,35 @@ export default function NotificationsPage() {
         navigate('/chat');
       }
     } else if (n.type === 'match_request') {
-      navigate('/match');
+      const senderUid = n.senderId || n.fromUid || (n as any).sender_id;
+      const sName = n.senderName || n.fromName || (n as any).sender_name;
+      const sAvatar = n.senderAvatar || n.fromAvatar || (n as any).sender_avatar;
+
+      // Tìm test account nếu có
+      const testUser = (senderUid ? getTestProfileByEmailOrUid(senderUid) : null) ||
+                       (sName ? getTestProfileByEmailOrUid(sName) : null);
+      const targetUid = senderUid || testUser?.uid;
+
+      if (targetUid) {
+        navigate(`/user/${targetUid}`, {
+          state: {
+            candidate: {
+              uid: targetUid,
+              name: testUser?.name || sName || 'Người dùng Resonancia',
+              avatar: testUser?.avatar || sAvatar || '',
+              sun: testUser?.sun || 'Bọ Cạp',
+              moon: testUser?.moon || 'Kim Ngưu',
+              ascendant: testUser?.ascendant || 'Nhân Mã',
+              bio: testUser?.bio || '',
+              job: testUser?.job || 'Thành viên Resonancia',
+            },
+            isReceivedRequest: true,
+            requestId: n.requestId,
+          }
+        });
+      } else {
+        navigate('/match');
+      }
     } else if (n.type === 'match_accepted') {
       navigate('/chat');
     }
@@ -183,6 +353,23 @@ export default function NotificationsPage() {
               className="px-3 py-1.5 rounded-xl text-xs font-medium text-purple-200 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] transition-colors cursor-pointer"
             >
               Đánh dấu tất cả đã đọc
+            </button>
+          )}
+          {notifications.length > 0 && (
+            <button
+              type="button"
+              onClick={deleteAllNotifs}
+              className="px-3 py-1.5 rounded-xl text-xs font-medium text-red-300 hover:text-white bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-400/40 transition-all cursor-pointer flex items-center gap-1.5"
+              title="Xóa hết thông báo"
+              aria-label="Xóa hết thông báo"
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4h6v2" />
+              </svg>
+              Xóa hết
             </button>
           )}
           <button
@@ -319,7 +506,7 @@ export default function NotificationsPage() {
                       )}
 
                       {/* Gợi ý hành động nhanh */}
-                      <div className="mt-2 flex items-center gap-2">
+                      <div className="mt-2.5">
                         {n?.type === 'message' && (
                           <span className="text-[11px] text-cyan-300 hover:text-cyan-200 font-medium inline-flex items-center gap-1">
                             Bấm để mở cuộc trò chuyện
@@ -327,8 +514,76 @@ export default function NotificationsPage() {
                           </span>
                         )}
                         {n?.type === 'match_request' && (
-                          <span className="text-[11px] text-pink-300 hover:text-pink-200 font-medium inline-flex items-center gap-1">
-                            Bấm để xem và kết nối
+                          acceptedMap[n.id] ? (
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <span className="text-xs text-emerald-300 font-semibold inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+                                <UiIcon name="check" label="Đã đồng ý" className="inline text-emerald-400" />
+                                Đã đồng ý kết bạn! ✨
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartChatWithSender(n);
+                                }}
+                                className="btn-cosmic px-3 py-1 rounded-xl text-xs font-semibold flex items-center gap-1 text-white shadow-sm cursor-pointer"
+                                style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
+                              >
+                                <UiIcon name="message" label="Nhắn tin" className="inline" />
+                                Nhắn Tin Ngay
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                disabled={actionLoading[n.id]}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAcceptFromNotification(n);
+                                }}
+                                className="btn-cosmic px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white flex items-center gap-1.5 shadow-sm hover:opacity-95 active:scale-95 cursor-pointer"
+                                style={{ background: 'linear-gradient(135deg, #ec4899, #a855f7)' }}
+                              >
+                                {actionLoading[n.id] ? (
+                                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                  <>
+                                    <UiIcon name="check" label="Đồng ý" className="inline text-green-300" />
+                                    <span>Đồng Ý Kết Bạn</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={actionLoading[n.id]}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRejectFromNotification(n);
+                                }}
+                                className="px-3 py-1.5 rounded-xl text-xs font-medium text-purple-300/80 hover:text-rose-300 glass hover:bg-rose-500/10 transition-colors cursor-pointer"
+                              >
+                                Từ Chối
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleNotificationClick(n);
+                                }}
+                                className="px-3 py-1.5 rounded-xl text-xs font-medium text-purple-200 hover:text-white glass hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center gap-1"
+                              >
+                                <span>Xem hồ sơ</span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                              </button>
+                            </div>
+                          )
+                        )}
+                        {n?.type === 'match_accepted' && (
+                          <span className="text-[11px] text-emerald-300 hover:text-emerald-200 font-medium inline-flex items-center gap-1">
+                            Bấm để mở cuộc trò chuyện
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
                           </span>
                         )}
@@ -359,6 +614,21 @@ export default function NotificationsPage() {
           </AnimatePresence>
         </div>
       )}
+      {/* Floating Toast Feedback */}
+      <AnimatePresence>
+        {toastMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 right-6 z-50 glass-card px-4 py-3 border border-purple-500/40 shadow-2xl flex items-center gap-2 text-sm text-white"
+            style={{ background: 'rgba(26, 0, 48, 0.95)' }}
+          >
+            <UiIcon name="sparkles" label="Thông báo" className="text-yellow-400" />
+            <span>{toastMsg}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

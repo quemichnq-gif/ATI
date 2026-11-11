@@ -37,8 +37,8 @@ def send_match_request():
 def accept_match_request():
     data = request.get_json(silent=True) or {}
     request_id = data.get("requestId")
-    receiver_id = data.get("receiverId") or getattr(g, "firebase_user", {}).get("uid")
-    sender_id = data.get("senderId")
+    receiver_id = data.get("receiverId") or data.get("uid") or getattr(g, "firebase_user", {}).get("uid")
+    sender_id = data.get("senderId") or data.get("targetUid")
     response_message = data.get("responseMessage", "")
 
     res = accept_match_request_service(request_id, receiver_id, sender_id, response_message)
@@ -50,10 +50,11 @@ def accept_match_request():
 def reject_match_request():
     data = request.get_json(silent=True) or {}
     request_id = data.get("requestId")
-    receiver_id = data.get("receiverId") or getattr(g, "firebase_user", {}).get("uid")
+    receiver_id = data.get("receiverId") or data.get("uid") or getattr(g, "firebase_user", {}).get("uid")
+    sender_id = data.get("senderId") or data.get("targetUid")
     response_message = data.get("responseMessage", "")
 
-    res = reject_match_request_service(request_id, receiver_id, response_message)
+    res = reject_match_request_service(request_id, receiver_id, sender_id, response_message)
     status_code = res.pop("status", 200)
     return jsonify(res), status_code
 

@@ -17,11 +17,32 @@ const TAG_ICONS: Record<MatchTagType, 'heart' | 'flame' | 'sparkles' | 'star'> =
   greenflag: 'heart', redflag: 'flame', karmic: 'sparkles', destiny: 'star', twinflame: 'flame',
 };
 
+const ZODIAC_SIGNS_ORDER = [
+  'Bạch Dương', 'Kim Ngưu', 'Song Tử', 'Cự Giải',
+  'Sư Tử', 'Xử Nữ', 'Thiên Bình', 'Bọ Cạp',
+  'Nhân Mã', 'Ma Kết', 'Bảo Bình', 'Song Ngư'
+];
+
+function getZodiacConnectionType(sign1?: string, sign2?: string): MatchTagType {
+  if (!sign1 || !sign2) return 'greenflag';
+  const i1 = ZODIAC_SIGNS_ORDER.indexOf(sign1);
+  const i2 = ZODIAC_SIGNS_ORDER.indexOf(sign2);
+  if (i1 === -1 || i2 === -1) return 'greenflag';
+  const diff = Math.abs(i1 - i2);
+  const dist = Math.min(diff, 12 - diff);
+  if (dist === 4 || dist === 2) return 'greenflag';
+  if (dist === 6) return 'destiny';
+  if (dist === 0) return 'twinflame';
+  if (dist === 3) return 'redflag';
+  return 'karmic';
+}
+
 export default function MatchPage() {
   const profile = useSelector((s: RootState) => s.profile);
   const navigate = useNavigate();
   const [selectedTag, setSelectedTag] = useState<MatchTagType>('greenflag');
   const [candidates, setCandidates] = useState<any[]>([]);
+  const [acceptedPartners, setAcceptedPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedTag, setLoadedTag] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -30,22 +51,87 @@ export default function MatchPage() {
   const [toastMsg, setToastMsg] = useState('');
   const [filterLevel, setFilterLevel] = useState<'all' | 'high' | 'medium' | 'challenge'>('all');
 
+  const applyAcceptedPartnerPriority = (rawList: any[], tag: MatchTagType, acceptedList: any[]) => {
+    if (!acceptedList || acceptedList.length === 0) return rawList;
+    const mySign = profile.sun || '';
+    let result = [...rawList];
+
+    acceptedList.forEach(partner => {
+      const test = getTestProfileByEmailOrUid(partner.uid) || getTestProfileByEmailOrUid(partner.name);
+      const testAny = test as any;
+      const candSign = testAny?.sun || testAny?.zodiac || 'Bọ Cạp';
+      const connType = getZodiacConnectionType(mySign, candSign);
+
+      // Nếu partner này thuộc nhóm phân loại của tab đang xem -> Đẩy lên hàng đầu (vị trí đầu tiên #1)
+      if (connType === tag) {
+        result = result.filter(c => c.uid !== partner.uid && (!test || c.uid !== test.uid) && c.name !== partner.name);
+        const partnerCandidate = {
+          uid: partner.uid,
+          name: partner.name || testAny?.name || 'Người dùng',
+          zodiac: candSign,
+          sun: candSign,
+          avatar: partner.avatar || testAny?.avatar || '',
+          age: testAny?.age || 24,
+          gender: testAny?.gender || 'Nam',
+          element: testAny?.element || 'Nước',
+          job: testAny?.job || 'Thành viên Resonancia',
+          personality: testAny?.bio || 'Chân thành, ấm áp, sâu sắc',
+          reason: `Đã kết bạn & ghép đôi thành công! Hai bạn có sự liên kết ${MATCH_TAGS[tag]?.label || tag} tự nhiên và đồng điệu.`,
+          compatibility_score: 100,
+          score: 100,
+          match_level: 'high',
+          match_level_text: 'Tương hợp cao',
+          isRealUser: true,
+          isMatched: true,
+          isFriend: true,
+        };
+        result.unshift(partnerCandidate);
+      }
+    });
+
+    return result;
+  };
+
   useEffect(() => {
     const myUid = profile.uid || auth.currentUser?.uid;
     if (!myUid) return;
-    apiGetMatchRequests(myUid, 'sent')
+    // Lấy toàn bộ match requests (cả gửi đi và nhận về) để xác định các bạn bè đã đồng ý kết bạn
+    apiGetMatchRequests(myUid)
       .then(res => {
         const list = res.data?.requests || [];
         const map: Record<string, boolean> = {};
+        const accepted: any[] = [];
         list.forEach((r: any) => {
           if (r.receiverId && (r.status === 'pending' || r.status === 'accepted')) {
             map[r.receiverId] = true;
           }
+          if (r.status === 'accepted') {
+            const isMeSender = r.senderId === myUid || (profile.name && r.senderName === profile.name);
+            const pUid = isMeSender ? r.receiverId : r.senderId;
+            const pName = isMeSender ? r.receiverName : r.senderName;
+            const pAvatar = isMeSender ? (r.receiverAvatar || '') : (r.senderAvatar || '');
+            if (pUid && pUid !== myUid) {
+              accepted.push({
+                uid: pUid,
+                name: pName,
+                avatar: pAvatar,
+                requestId: r.requestId,
+                status: r.status,
+              });
+            }
+          }
         });
         setSentStatusMap(prev => ({ ...prev, ...map }));
+        setAcceptedPartners(accepted);
       })
       .catch(() => {});
-  }, [profile.uid, candidates]);
+  }, [profile.uid]);
+
+  useEffect(() => {
+    if (acceptedPartners.length > 0 && candidates.length > 0) {
+      setCandidates(prev => applyAcceptedPartnerPriority(prev, selectedTag, acceptedPartners));
+    }
+  }, [acceptedPartners, selectedTag]);
 
   const handleQuickMatch = async (c: any, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -149,8 +235,8 @@ export default function MatchPage() {
     setLoading(true);
     setError('');
     try {
-      // 1. Kiểm tra cache từ Client Firestore nếu không yêu cầu forceRefresh
-      if (!forceRefresh) {
+      // 1. Kiểm tra cache từ Client Firestore nếu không yêu cầu forceRefresh và chưa có accepted partners
+      if (!forceRefresh && acceptedPartners.length === 0) {
         try {
           const cacheSnap = await getDoc(doc(db, 'love_matching_results', profile.uid, 'types', tag));
           if (cacheSnap.exists()) {
@@ -185,7 +271,8 @@ export default function MatchPage() {
         },
       });
 
-      const users = res.data?.users || [];
+      const rawUsers = res.data?.users || [];
+      const users = applyAcceptedPartnerPriority(rawUsers, tag, acceptedPartners);
       setCandidates(users);
       setLoadedTag(tag);
 
@@ -195,7 +282,7 @@ export default function MatchPage() {
           await setDoc(doc(db, 'love_matching_results', profile.uid, 'types', tag), {
             type: tag,
             uid: profile.uid,
-            users,
+            users: rawUsers,  // lưu cache dữ liệu gốc (không có override priority)
             updatedAt: Date.now(),
           }, { merge: true });
         } catch (saveErr) {
@@ -386,12 +473,35 @@ export default function MatchPage() {
                     onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) navigate(`/user/${c.uid}`, { state: { candidate: c } }); }}
                     className="glass-card p-5 cursor-pointer card-hover"
                     onClick={() => navigate(`/user/${c.uid}`, { state: { candidate: c } })}
-                    style={{ border: `1px solid ${tagInfo.color}33` }}
+                    style={{
+                      border: c.isMatched
+                        ? `1px solid ${tagInfo.color}88`
+                        : `1px solid ${tagInfo.color}33`,
+                      boxShadow: c.isMatched ? `0 0 16px ${tagInfo.color}22` : undefined,
+                    }}
                   >
+                    {/* Badge Đã Kết Đôi */}
+                    {c.isMatched && (
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <span
+                          className="text-[10px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1"
+                          style={{
+                            background: `linear-gradient(135deg, ${tagInfo.color}33, ${tagInfo.color}18)`,
+                            border: `1px solid ${tagInfo.color}66`,
+                            color: tagInfo.color,
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" className="w-3 h-3 inline" fill="currentColor">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                          </svg>
+                          Đã Kết Đôi &amp; Bạn Bè
+                        </span>
+                      </div>
+                    )}
                     {/* Avatar */}
                     <div className="flex items-start gap-4 mb-3">
                       <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 relative"
-                        style={{ border: `2px solid ${tagInfo.color}66` }}>
+                        style={{ border: `2px solid ${c.isMatched ? tagInfo.color : tagInfo.color + '66'}` }}>
                         {c.avatar ? (
                           <img
                             src={c.avatar}
@@ -448,45 +558,84 @@ export default function MatchPage() {
                     <p className="text-purple-200 text-xs leading-relaxed opacity-80 italic">"{c.reason}"</p>
                   )}
                   <div className="space-y-2 mt-3">
-                    <button
-                      onClick={(e) => handleQuickMatch(c, e)}
-                      disabled={requestLoading[c.uid]}
-                      className="w-full py-2 rounded-xl text-xs font-semibold text-white transition-all flex items-center justify-center gap-1.5 shadow-sm hover:opacity-95 active:scale-95"
-                      style={{
-                        background: sentStatusMap[c.uid]
-                          ? 'linear-gradient(135deg, rgba(76, 201, 240, 0.4), rgba(76, 201, 240, 0.2))'
-                          : `linear-gradient(135deg, ${tagInfo.color}, ${tagInfo.color}cc)`,
-                        border: `1px solid ${sentStatusMap[c.uid] ? 'rgba(76, 201, 240, 0.5)' : tagInfo.color + '66'}`,
-                      }}>
-                      {requestLoading[c.uid] ? (
-                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : sentStatusMap[c.uid] ? (
-                        <>
-                          <UiIcon name="check" label="Đã gửi" className="inline text-green-300" />
-                          <span>Đã gửi (Bấm để gửi lại)</span>
-                        </>
-                      ) : (
-                        <>
-                          <UiIcon name="heart" label="Kết bạn" className="inline" />
-                          <span>Kết Bạn & Ghép Đôi</span>
-                        </>
-                      )}
-                    </button>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(e) => handleStartChat(c, e)}
-                        className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
-                        <UiIcon name="message" label="Nhắn tin" className="inline" />Nhắn Tin
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/user/${c.uid}`, { state: { candidate: c } });
-                        }}
-                        className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
-                        <UiIcon name="user" label="Xem hồ sơ" className="inline" />Xem Hồ Sơ
-                      </button>
-                    </div>
+                    {c.isMatched ? (
+                      <>
+                        {/* Trạng thái đã kết đôi — thay nút gửi lời mời */}
+                        <div
+                          className="w-full py-2 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1.5"
+                          style={{
+                            background: `linear-gradient(135deg, ${tagInfo.color}33, ${tagInfo.color}18)`,
+                            border: `1px solid ${tagInfo.color}55`,
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 inline" fill="currentColor">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                          </svg>
+                          <span>Đã kết đôi cùng bạn ✨</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => handleStartChat(c, e)}
+                            className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white transition-all hover:bg-white/15 flex items-center justify-center gap-1"
+                            style={{
+                              background: `linear-gradient(135deg, ${tagInfo.color}55, ${tagInfo.color}33)`,
+                              border: `1px solid ${tagInfo.color}44`,
+                            }}>
+                            <UiIcon name="message" label="Nhắn tin" className="inline" />Nhắn Tin
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/user/${c.uid}`, { state: { candidate: c } });
+                            }}
+                            className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
+                            <UiIcon name="user" label="Xem hồ sơ" className="inline" />Xem Hồ Sơ
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => handleQuickMatch(c, e)}
+                          disabled={requestLoading[c.uid]}
+                          className="w-full py-2 rounded-xl text-xs font-semibold text-white transition-all flex items-center justify-center gap-1.5 shadow-sm hover:opacity-95 active:scale-95"
+                          style={{
+                            background: sentStatusMap[c.uid]
+                              ? 'linear-gradient(135deg, rgba(76, 201, 240, 0.4), rgba(76, 201, 240, 0.2))'
+                              : `linear-gradient(135deg, ${tagInfo.color}, ${tagInfo.color}cc)`,
+                            border: `1px solid ${sentStatusMap[c.uid] ? 'rgba(76, 201, 240, 0.5)' : tagInfo.color + '66'}`,
+                          }}>
+                          {requestLoading[c.uid] ? (
+                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : sentStatusMap[c.uid] ? (
+                            <>
+                              <UiIcon name="check" label="Đã gửi" className="inline text-green-300" />
+                              <span>Đã gửi (Bấm để gửi lại)</span>
+                            </>
+                          ) : (
+                            <>
+                              <UiIcon name="heart" label="Kết bạn" className="inline" />
+                              <span>Kết Bạn &amp; Ghép Đôi</span>
+                            </>
+                          )}
+                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => handleStartChat(c, e)}
+                            className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
+                            <UiIcon name="message" label="Nhắn tin" className="inline" />Nhắn Tin
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/user/${c.uid}`, { state: { candidate: c } });
+                            }}
+                            className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white glass transition-all hover:bg-white/15 flex items-center justify-center gap-1">
+                            <UiIcon name="user" label="Xem hồ sơ" className="inline" />Xem Hồ Sơ
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </motion.div>
               );

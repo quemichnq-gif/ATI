@@ -46,6 +46,41 @@ export default function UserProfilePage() {
       return;
     }
 
+    // 2. Kiểm tra test accounts chuẩn (Tuấn Nguyễn Chí, Trần Đại Nghĩa, Hà My...)
+    const stateName = (location.state as any)?.candidate?.name || (location.state as any)?.user?.name;
+    const testAccount = getTestProfileByEmailOrUid(targetUid) || (stateName ? getTestProfileByEmailOrUid(stateName) : null);
+    if (testAccount) {
+      const candidateData = {
+        uid: targetUid,
+        name: testAccount.name,
+        avatar: testAccount.avatar,
+        sun: testAccount.sun,
+        moon: testAccount.moon,
+        ascendant: testAccount.ascendant,
+        age: 26,
+        job: testAccount.job,
+        bio: testAccount.bio,
+        personality: 'Người tìm kiếm sự hòa hợp giữa các vì sao và cuộc sống ✨',
+        zodiac: testAccount.zodiac,
+        element: ELEMENT_MAP[testAccount.sun] || 'Nước',
+        fireRatio: 20,
+        earthRatio: 25,
+        airRatio: 15,
+        waterRatio: 40,
+        planets: {
+          sun: testAccount.sun,
+          moon: testAccount.moon,
+          mercury: testAccount.sun,
+          venus: 'Ma Kết',
+          mars: testAccount.sun,
+        },
+      };
+      setTargetProfile(candidateData);
+      setLoading(false);
+      setDoc(doc(db, 'users', targetUid), candidateData, { merge: true }).catch(() => {});
+      return;
+    }
+
     // 2. Nếu có dữ liệu truyền qua router state (từ MatchPage hoặc HomePage)
     const stateCandidate = (location.state as any)?.candidate || (location.state as any)?.user;
     if (stateCandidate && (stateCandidate.uid === targetUid || stateCandidate.id === targetUid)) {
@@ -136,9 +171,27 @@ export default function UserProfilePage() {
         setLoading(false);
       });
 
+    if ((location.state as any)?.isReceivedRequest) {
+      setMatchStatus('pending_received');
+    }
+
     if (profile.uid && targetUid !== profile.uid) {
       apiCheckMatchStatus(profile.uid, targetUid)
-        .then(res => setMatchStatus(res.data?.status || 'none'))
+        .then(res => {
+          const rawStatus = res.data?.status || 'none';
+          const role = res.data?.role;
+          if (rawStatus === 'pending') {
+            if (role === 'receiver') {
+              setMatchStatus('pending_received');
+            } else {
+              setMatchStatus('pending_sent');
+            }
+          } else if (rawStatus === 'accepted') {
+            setMatchStatus('matched');
+          } else if (!(location.state as any)?.isReceivedRequest) {
+            setMatchStatus(rawStatus);
+          }
+        })
         .catch(() => {});
     }
   }, [targetUid, profile.uid, location.state]);
@@ -251,8 +304,20 @@ export default function UserProfilePage() {
     if (!profile.uid || !targetUid) return;
     setSending(true);
     try {
-      await apiAcceptMatch({ uid: profile.uid, targetUid });
+      await apiAcceptMatch({
+        receiverId: profile.uid,
+        senderId: targetUid,
+        uid: profile.uid,
+        targetUid,
+      });
       setMatchStatus('matched');
+      try {
+        const requestId = `${targetUid}_${profile.uid}`;
+        await setDoc(doc(db, 'match_requests', requestId), {
+          status: 'accepted',
+          acceptedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch {}
     } catch (e) {
       console.error('Lỗi chấp nhận kết đôi:', e);
     } finally {
@@ -264,8 +329,20 @@ export default function UserProfilePage() {
     if (!profile.uid || !targetUid) return;
     setSending(true);
     try {
-      await apiRejectMatch({ uid: profile.uid, targetUid });
+      await apiRejectMatch({
+        receiverId: profile.uid,
+        senderId: targetUid,
+        uid: profile.uid,
+        targetUid,
+      });
       setMatchStatus('none');
+      try {
+        const requestId = `${targetUid}_${profile.uid}`;
+        await setDoc(doc(db, 'match_requests', requestId), {
+          status: 'rejected',
+          rejectedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch {}
     } catch (e) {
       console.error('Lỗi từ chối kết đôi:', e);
     } finally {
