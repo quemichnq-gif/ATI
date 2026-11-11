@@ -4,6 +4,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
+import { apiGetNotifications } from '../services/api';
 
 interface NavItem {
   to: string;
@@ -170,6 +171,22 @@ export default function Navbar() {
   const currentEmail = profile.email || authUser.email || auth.currentUser?.email || '';
   const currentName = profile.name?.trim() || auth.currentUser?.displayName?.trim() || '';
   const displayName = currentName || (currentEmail ? currentEmail.split('@')[0] : 'Người dùng');
+  const currentUid = profile.uid || authUser.uid || auth.currentUser?.uid || '';
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  useEffect(() => {
+    if (!currentUid) return;
+    const checkUnread = async () => {
+      try {
+        const res = await apiGetNotifications(currentUid);
+        const list = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
+        setUnreadNotifs(list.filter((n: any) => !n.read).length);
+      } catch {}
+    };
+    checkUnread();
+    const timer = setInterval(checkUnread, 6000);
+    return () => clearInterval(timer);
+  }, [currentUid]);
 
   useEffect(() => {
     const closeMenuOnOutsideClick = (event: MouseEvent) => {
@@ -240,6 +257,46 @@ export default function Navbar() {
             <span className="astrica-search-label">Tìm kiếm hoặc hỏi Resonancia AI...</span>
             <span className="astrica-search-caret" aria-hidden="true">|</span>
           </button>
+
+          {/* Nút Chuông Thông Báo nổi bật trực tiếp trên Header */}
+          <Link
+            to="/notifications"
+            className={`astrica-ai-trigger relative flex items-center justify-center transition-all ${
+              location.pathname === '/notifications' ? 'is-active' : ''
+            }`}
+            aria-label="Xem thông báo"
+            title={unreadNotifs > 0 ? `Có ${unreadNotifs} thông báo mới` : 'Thông báo'}
+            style={{ width: '38px', height: '38px', position: 'relative' }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-purple-200 hover:text-white transition-colors"
+              aria-hidden="true"
+            >
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+            {unreadNotifs > 0 && (
+              <span
+                className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center animate-pulse"
+                style={{
+                  background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
+                  boxShadow: '0 0 10px rgba(244,63,94,0.85)',
+                  lineHeight: 1,
+                  zIndex: 10,
+                }}
+              >
+                {unreadNotifs > 99 ? '99+' : unreadNotifs}
+              </span>
+            )}
+          </Link>
 
           {/* Nút Chatbot mở Menu theo phong cách Resonancia AI */}
           <button
@@ -319,7 +376,13 @@ export default function Navbar() {
                   <div className="astrica-menu-card-content">
                     <div className="astrica-menu-card-title-row">
                       <span className="astrica-menu-card-title">{item.label}</span>
-                      {item.badge && <span className="astrica-menu-card-badge">{item.badge}</span>}
+                      {item.to === '/notifications' && unreadNotifs > 0 ? (
+                        <span className="astrica-menu-card-badge" style={{ background: '#f43f5e', color: '#fff', fontWeight: 'bold' }}>
+                          {unreadNotifs} mới
+                        </span>
+                      ) : (
+                        item.badge && <span className="astrica-menu-card-badge">{item.badge}</span>
+                      )}
                     </div>
                     <span className="astrica-menu-card-desc">{item.desc}</span>
                   </div>

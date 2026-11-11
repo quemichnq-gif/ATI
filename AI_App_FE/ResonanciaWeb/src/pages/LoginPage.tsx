@@ -186,10 +186,10 @@ export default function LoginPage() {
       dispatch(setAuth({ uid: user.uid, email: targetEmail }));
 
       const initialProfile = {
+        ...(testAcc || {}),
         uid: user.uid,
         email: targetEmail,
         name: testAcc?.name || user.displayName?.trim() || targetEmail.split('@')[0],
-        ...(testAcc || {}),
       };
       dispatch(setProfile(initialProfile as any));
 

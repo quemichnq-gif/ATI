@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
+import { onAuthStateChanged } from 'firebase/auth';
 import { RootState } from '../store';
 import { auth } from '../services/firebase';
 import { apiGetNotifications, apiMarkNotificationRead, apiDeleteNotification } from '../services/api';
@@ -27,15 +28,16 @@ export default function NotificationsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'message' | 'match'>('all');
 
-  const fetchNotifications = useCallback(async (showLoading = false) => {
-    if (!currentUid) {
+  const fetchNotifications = useCallback(async (showLoading = false, overrideUid?: string) => {
+    const uidToUse = overrideUid || currentUid || auth.currentUser?.uid;
+    if (!uidToUse) {
       setLoading(false);
       return;
     }
     if (showLoading) setLoading(true);
     setIsRefreshing(true);
     try {
-      const res = await apiGetNotifications(currentUid);
+      const res = await apiGetNotifications(uidToUse);
       const list = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
       setNotifications(list);
     } catch (err) {
@@ -48,14 +50,21 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     fetchNotifications(true);
-    // Tự động kiểm tra thông báo mới định kỳ mỗi 6 giây
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (user?.uid) {
+        fetchNotifications(false, user.uid);
+      }
+    });
+
+    // Tự động kiểm tra thông báo mới định kỳ mỗi 5 giây
     const timer = setInterval(() => {
       fetchNotifications(false);
-    }, 6000);
+    }, 5000);
     const handleFocus = () => fetchNotifications(false);
     window.addEventListener('focus', handleFocus);
 
     return () => {
+      unsubAuth();
       clearInterval(timer);
       window.removeEventListener('focus', handleFocus);
     };

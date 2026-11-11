@@ -3,6 +3,8 @@ import sqlite3
 import json
 import time
 import os
+import threading
+import random
 from datetime import datetime
 
 # Cố định đường dẫn tuyệt đối tới file chat_database.db chuẩn của AI_App_BE
@@ -301,7 +303,7 @@ def send_chat_message(chat_id, sender_id, sender_name, sender_avatar, text, msg_
     if row and row['participants']:
         try:
             participants = json.loads(row['participants'] or '[]')
-            sender_aliases = set(uid_aliases(sender_id))
+            sender_aliases = set(uid_aliases(sender_id)) | set(uid_aliases(uid))
             for p in participants:
                 if p not in sender_aliases:
                     receiver_id = p
@@ -310,21 +312,24 @@ def send_chat_message(chat_id, sender_id, sender_name, sender_avatar, text, msg_
             pass
 
     if not receiver_id:
-        parts = actual_chat_id.split('_')
-        sender_aliases = set(uid_aliases(sender_id))
-        for p in parts:
-            if p != sender_id and p not in sender_aliases:
-                receiver_id = p
+        sender_aliases = set(uid_aliases(sender_id)) | set(uid_aliases(uid))
+        for alias in sender_aliases:
+            if actual_chat_id.startswith(alias + '_'):
+                receiver_id = actual_chat_id[len(alias) + 1:]
+                break
+            elif actual_chat_id.endswith('_' + alias):
+                receiver_id = actual_chat_id[:len(actual_chat_id) - len(alias) - 1]
                 break
 
     if receiver_id:
+        canonical_receiver = canonical_uid(receiver_id)
         notif_id = f"notif_{now}_{os.urandom(4).hex()}"
         preview_text = text if msg_type == 'text' else ('[Hình ảnh]' if msg_type == 'image' else f'[Tệp: {file_name or "tài liệu"}]')
         if len(preview_text) > 80:
             preview_text = preview_text[:77] + '...'
         notif = {
             "id": notif_id,
-            "userId": receiver_id,
+            "userId": canonical_receiver,
             "type": "message",
             "title": f"Tin nhắn mới từ {sender_name} 💬",
             "message": preview_text,

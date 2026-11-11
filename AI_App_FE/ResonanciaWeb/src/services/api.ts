@@ -7,10 +7,22 @@ export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5
 const api = axios.create({ baseURL: BASE_URL, timeout: 15000 });
 
 api.interceptors.request.use(async (config) => {
-  const user = auth.currentUser;
+  let user = auth.currentUser;
+  if (!user) {
+    try {
+      if (typeof (auth as any).authStateReady === 'function') {
+        await (auth as any).authStateReady();
+        user = auth.currentUser;
+      }
+    } catch {}
+  }
   if (user) {
-    const token = await user.getIdToken();
-    config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const token = await user.getIdToken();
+      config.headers.Authorization = `Bearer ${token}`;
+    } catch (e) {
+      console.warn('Get auth token error:', e);
+    }
   }
   return config;
 });
