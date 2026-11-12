@@ -18,7 +18,10 @@ export default function MainLayout() {
     if (prevPathnameRef.current !== pathname) {
       prevPathnameRef.current = pathname;
       setNavigating(true);
-      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      // Đưa trang lên đỉnh đầu ngay lập tức, tránh hiện tượng trang mới bị load từ dưới cuộn lên
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
 
       const timer = setTimeout(() => {
         setNavigating(false);

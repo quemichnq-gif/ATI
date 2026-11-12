@@ -23,6 +23,151 @@ const caseTargets: Record<string, string> = {
   'định hướng sự nghiệp qua lăng kính chiêm tinh': '/natal',
 };
 
+const ZODIAC_CAROUSEL_DATA: Record<string, {
+  nameVi: string;
+  nameEn: string;
+  icon: string;
+  dateRange: string;
+  element: string;
+  ruler: string;
+  quality: string;
+  shortDesc: string;
+  aiPrompt: string;
+}> = {
+  aries: {
+    nameVi: 'Bạch Dương',
+    nameEn: 'Aries',
+    icon: '♈',
+    dateRange: '21/03 – 19/04',
+    element: 'Lửa',
+    ruler: 'Sao Hỏa',
+    quality: 'Thống lĩnh',
+    shortDesc: 'Tiên phong, dũng cảm, quyết đoán và luôn tràn đầy năng lượng bứt phá dẫn đầu.',
+    aiPrompt: 'Hãy phân tích chi tiết tính cách, tiềm năng sự nghiệp và vận mệnh tình duyên của cung Bạch Dương (Aries).'
+  },
+  taurus: {
+    nameVi: 'Kim Ngưu',
+    nameEn: 'Taurus',
+    icon: '♉',
+    dateRange: '20/04 – 20/05',
+    element: 'Đất',
+    ruler: 'Sao Kim',
+    quality: 'Kiên định',
+    shortDesc: 'Vững chãi, kiên nhẫn, yêu chuộng cái đẹp và tìm kiếm sự an toàn, thịnh vượng bền vững.',
+    aiPrompt: 'Hãy phân tích chi tiết tính cách, sở trường tài chính và cách yêu của cung Kim Ngưu (Taurus).'
+  },
+  gemini: {
+    nameVi: 'Song Tử',
+    nameEn: 'Gemini',
+    icon: '♊',
+    dateRange: '21/05 – 20/06',
+    element: 'Khí',
+    ruler: 'Sao Thủy',
+    quality: 'Biến đổi',
+    shortDesc: 'Thông minh, linh hoạt, khả năng giao tiếp sắc bén và luôn tò mò khám phá tri thức mới.',
+    aiPrompt: 'Hãy phân tích chiều sâu tâm lý, tư duy trí tuệ và sự tương hợp của cung Song Tử (Gemini).'
+  },
+  cancer: {
+    nameVi: 'Cự Giải',
+    nameEn: 'Cancer',
+    icon: '♋',
+    dateRange: '21/06 – 22/07',
+    element: 'Nước',
+    ruler: 'Mặt Trăng',
+    quality: 'Thống lĩnh',
+    shortDesc: 'Trực giác sâu sắc, giàu lòng trắc ẩn, hướng về gia đình và nuôi dưỡng cảm xúc an yên.',
+    aiPrompt: 'Hãy phân tích thế giới cảm xúc, khả năng chữa lành và tình duyên của cung Cự Giải (Cancer).'
+  },
+  leo: {
+    nameVi: 'Sư Tử',
+    nameEn: 'Leo',
+    icon: '♌',
+    dateRange: '23/07 – 22/08',
+    element: 'Lửa',
+    ruler: 'Mặt Trời',
+    quality: 'Kiên định',
+    shortDesc: 'Tỏa sáng, hào phóng, mang khí chất lãnh đạo bẩm sinh cùng trái tim nồng hậu, ấm áp.',
+    aiPrompt: 'Hãy phân tích phẩm chất lãnh đạo, lòng tự tôn và con đường thành công của cung Sư Tử (Leo).'
+  },
+  virgo: {
+    nameVi: 'Xử Nữ',
+    nameEn: 'Virgo',
+    icon: '♍',
+    dateRange: '23/08 – 22/09',
+    element: 'Đất',
+    ruler: 'Sao Thủy',
+    quality: 'Biến đổi',
+    shortDesc: 'Tỉ mỉ, cầu toàn, phân tích logic vượt trội và tinh thần phụng sự, hoàn thiện mọi việc.',
+    aiPrompt: 'Hãy phân tích phong cách làm việc, sự cầu toàn và thế mạnh phân tích của cung Xử Nữ (Virgo).'
+  },
+  libra: {
+    nameVi: 'Thiên Bình',
+    nameEn: 'Libra',
+    icon: '♎',
+    dateRange: '23/09 – 22/10',
+    element: 'Khí',
+    ruler: 'Sao Kim',
+    quality: 'Thống lĩnh',
+    shortDesc: 'Hài hòa, công bằng, gu thẩm mỹ tinh tế và khả năng ngoại giao, kết nối duyên dáng.',
+    aiPrompt: 'Hãy phân tích góc nhìn thẩm mỹ, quan điểm tình yêu và sự cân bằng của cung Thiên Bình (Libra).'
+  },
+  scorpio: {
+    nameVi: 'Bọ Cạp',
+    nameEn: 'Scorpio',
+    icon: '♏',
+    dateRange: '23/10 – 21/11',
+    element: 'Nước',
+    ruler: 'Sao Diêm Vương',
+    quality: 'Kiên định',
+    shortDesc: 'Bí ẩn, mãnh liệt, trực giác phi thường cùng bản lĩnh kiên cường tái sinh qua thử thách.',
+    aiPrompt: 'Hãy phân tích năng lượng nội tâm bí ẩn, trực giác sâu sắc và sự chung thủy của cung Bọ Cạp (Scorpio).'
+  },
+  sagittarius: {
+    nameVi: 'Nhân Mã',
+    nameEn: 'Sagittarius',
+    icon: '♐',
+    dateRange: '22/11 – 21/12',
+    element: 'Lửa',
+    ruler: 'Sao Mộc',
+    quality: 'Biến đổi',
+    shortDesc: 'Yêu tự do, lạc quan, đam mê xê dịch và không ngừng mở rộng chân trời triết lý sống.',
+    aiPrompt: 'Hãy phân tích tinh thần tự do, triết lý sống và vận mệnh may mắn của cung Nhân Mã (Sagittarius).'
+  },
+  capricorn: {
+    nameVi: 'Ma Kết',
+    nameEn: 'Capricorn',
+    icon: '♑',
+    dateRange: '22/12 – 19/01',
+    element: 'Đất',
+    ruler: 'Sao Thổ',
+    quality: 'Thống lĩnh',
+    shortDesc: 'Bền bỉ, kỷ luật thép, tầm nhìn chiến lược dài hạn và ý chí kiên định chinh phục đỉnh cao.',
+    aiPrompt: 'Hãy phân tích bản lĩnh chinh phục đỉnh cao, kỷ luật thép và con đường sự nghiệp của cung Ma Kết (Capricorn).'
+  },
+  aquarius: {
+    nameVi: 'Bảo Bình',
+    nameEn: 'Aquarius',
+    icon: '♒',
+    dateRange: '20/01 – 18/02',
+    element: 'Khí',
+    ruler: 'Sao Thiên Vương',
+    quality: 'Kiên định',
+    shortDesc: 'Độc đáo, nhân văn, tư duy đột phá vượt thời đại và luôn đề cao sự tự do, độc lập.',
+    aiPrompt: 'Hãy phân tích tư duy đột phá, tinh thần nhân văn và cá tính độc bản của cung Bảo Bình (Aquarius).'
+  },
+  pisces: {
+    nameVi: 'Song Ngư',
+    nameEn: 'Pisces',
+    icon: '♓',
+    dateRange: '19/02 – 20/03',
+    element: 'Nước',
+    ruler: 'Sao Hải Vương',
+    quality: 'Biến đổi',
+    shortDesc: 'Thấu cảm diệu kỳ, giàu trí tưởng tượng phong phú, tâm hồn thi vị và gắn kết tâm linh.',
+    aiPrompt: 'Hãy phân tích trực giác tâm linh, tâm hồn nghệ thuật và chiều sâu cảm xúc của cung Song Ngư (Pisces).'
+  }
+};
+
 export default function ReferenceHomeSections() {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const navigate = useNavigate();
@@ -48,6 +193,10 @@ export default function ReferenceHomeSections() {
           link.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
+            window.scrollTo(0, 0);
+            try { window.parent?.scrollTo?.(0, 0); } catch {}
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
             const destination = !uidRef.current ? '/register' : (isAllService ? '/assistant' : (isArticles ? '/glossary' : '/prediction'));
             try {
               navigate(destination);
@@ -75,6 +224,10 @@ export default function ReferenceHomeSections() {
         card.addEventListener('click', (event) => {
           const clickedElement = event.target as Element | null;
           if (clickedElement?.closest('a, button')) return;
+          window.scrollTo(0, 0);
+          try { window.parent?.scrollTo?.(0, 0); } catch {}
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
           const finalRoute = !uidRef.current ? '/register' : '/glossary';
           try {
             navigate(finalRoute);
@@ -170,6 +323,10 @@ export default function ReferenceHomeSections() {
         card.addEventListener('click', (event) => {
           const clickedElement = event.target as Element | null;
           if (clickedElement?.closest('a, button')) return;
+          window.scrollTo(0, 0);
+          try { window.parent?.scrollTo?.(0, 0); } catch {}
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
           const finalRoute = !uidRef.current ? '/register' : destination.route;
           try {
             navigate(finalRoute);
@@ -179,41 +336,188 @@ export default function ReferenceHomeSections() {
         });
       });
 
-      // 2. Cấu hình các liên kết điều hướng Case Studies
+      // 2. Case Studies Section ("Illuminate your way"): Chỉ dùng để trang trí thị giác, không click nhảy trang
       doc.querySelectorAll<HTMLElement>('.case-studies-item-block').forEach((card) => {
-        const titleLink = card.querySelector<HTMLAnchorElement>('.case-studies-item-title');
-        const text = titleLink?.textContent?.trim().toLowerCase() || '';
-        let targetRoute = '/natal';
-        for (const [key, route] of Object.entries(caseTargets)) {
-          if (text.includes(key) || key.includes(text)) {
-            targetRoute = route;
-            break;
-          }
-        }
-
-        const isUnauth = !uidRef.current;
-        const finalRoute = isUnauth ? '/register' : targetRoute;
-
-        card.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((link) => {
-          link.setAttribute('href', finalRoute);
-          link.setAttribute('target', '_top');
+        card.style.cursor = 'default';
+        card.querySelectorAll<HTMLAnchorElement>('a').forEach((link) => {
+          link.removeAttribute('href');
+          link.removeAttribute('target');
+          link.style.cursor = 'default';
+          link.style.pointerEvents = 'none';
         });
 
-        card.style.cursor = 'pointer';
         card.addEventListener('click', (event) => {
-          const clickedElement = event.target as Element | null;
-          if (clickedElement?.closest('a, button')) return;
-          const destination = !uidRef.current ? '/register' : targetRoute;
-          try {
-            navigate(destination);
-          } catch {
-            window.parent.location.assign(destination);
-          }
-        });
+          event.preventDefault();
+          event.stopPropagation();
+        }, true);
       });
 
       // 3. Cấu hình các nút "All service" và "Get more detail"
       applyActionLinks(doc);
+
+      // 3.5. Cửa sổ nổi thông tin chi tiết (Hover Popup) cho Carousel Cung Hoàng Đạo
+      const setupHoroscopePopups = () => {
+        const slider = doc.querySelector<HTMLElement>('.horoscope-slider');
+        if (!slider) return;
+
+        let popup = doc.getElementById('zodiac-cosmic-popover');
+        if (!popup) {
+          popup = doc.createElement('div');
+          popup.id = 'zodiac-cosmic-popover';
+          popup.setAttribute('style', `
+            position: absolute;
+            width: 320px;
+            background: linear-gradient(145deg, rgba(18, 12, 42, 0.97) 0%, rgba(9, 6, 24, 0.98) 100%);
+            border: 1px solid rgba(168, 85, 247, 0.55);
+            border-radius: 18px;
+            padding: 18px 20px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9), 0 0 25px rgba(168, 85, 247, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 999999;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(6px);
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+            pointer-events: auto;
+            color: #ffffff;
+            font-family: inherit;
+          `);
+          doc.body.appendChild(popup);
+        }
+
+        let hideTimer: number | null = null;
+        let activePrompt = '';
+
+        const cancelHide = () => {
+          if (hideTimer) {
+            window.clearTimeout(hideTimer);
+            hideTimer = null;
+          }
+        };
+
+        const scheduleHide = () => {
+          cancelHide();
+          hideTimer = window.setTimeout(() => {
+            if (popup) {
+              popup.style.opacity = '0';
+              popup.style.visibility = 'hidden';
+              popup.style.transform = 'translateY(6px)';
+            }
+          }, 220);
+        };
+
+        popup.addEventListener('mouseenter', cancelHide);
+        popup.addEventListener('mouseleave', scheduleHide);
+
+        const openAI = (promptText: string) => {
+          window.scrollTo(0, 0);
+          try { window.parent?.scrollTo?.(0, 0); } catch {}
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+          const target = `/assistant?prompt=${encodeURIComponent(promptText)}`;
+          try {
+            navigate(target);
+          } catch {
+            window.parent.location.assign(target);
+          }
+        };
+
+        // Gắn sự kiện hover và click cho từng slide cung hoàng đạo
+        doc.querySelectorAll<HTMLAnchorElement>('.horoscope-item-block').forEach((item) => {
+          const href = (item.getAttribute('href') || '').toLowerCase();
+          let signKey = '';
+          for (const key of Object.keys(ZODIAC_CAROUSEL_DATA)) {
+            if (href.includes(key) || item.textContent?.toLowerCase().includes(key)) {
+              signKey = key;
+              break;
+            }
+          }
+          if (!signKey) return;
+
+          const data = ZODIAC_CAROUSEL_DATA[signKey];
+
+          // Cập nhật text ngày tháng chuẩn xác hiển thị trên card (thay thế cho chữ Mar 21 - Apr 19 bị lặp cũ)
+          const dateEl = item.querySelector<HTMLElement>('.horoscope-date-text');
+          if (dateEl) dateEl.textContent = data.dateRange;
+
+          const titleEl = item.querySelector<HTMLElement>('.horoscope-item-title');
+          if (titleEl) titleEl.textContent = `${data.nameVi} (${data.nameEn})`;
+
+          item.style.cursor = 'pointer';
+
+          // Khi click vào slide -> điều hướng sang màn hình AI với prompt của cung đó
+          item.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openAI(data.aiPrompt);
+          });
+
+          // Khi di chuột vào slide -> hiển thị cửa sổ nổi (Popup)
+          item.addEventListener('mouseenter', () => {
+            cancelHide();
+            activePrompt = data.aiPrompt;
+
+            if (popup) {
+              popup.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 26px; line-height: 1; color: #ffd700;">${data.icon}</span>
+                    <div>
+                      <div style="font-size: 17px; font-weight: 700; color: #ffffff; line-height: 1.2;">${data.nameVi}</div>
+                      <div style="font-size: 12px; color: #d8b4fe; font-style: italic;">${data.nameEn}</div>
+                    </div>
+                  </div>
+                  <span style="font-size: 11.5px; font-weight: 600; color: #ffd700; background: rgba(255, 215, 0, 0.12); padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255, 215, 0, 0.35);">${data.dateRange}</span>
+                </div>
+                <div style="display: flex; gap: 5px; font-size: 11px; color: #e9d5ff; margin-bottom: 10px; flex-wrap: wrap;">
+                  <span style="background: rgba(147, 51, 234, 0.25); padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(168, 85, 247, 0.3);">Hệ: ${data.element}</span>
+                  <span style="background: rgba(147, 51, 234, 0.25); padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(168, 85, 247, 0.3);">${data.quality}</span>
+                  <span style="background: rgba(147, 51, 234, 0.25); padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(168, 85, 247, 0.3);">${data.ruler}</span>
+                </div>
+                <p style="font-size: 12px; line-height: 1.5; color: #cbd5e1; margin: 0 0 14px 0;">${data.shortDesc}</p>
+                <button id="zodiac-ask-ai-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 14px; border-radius: 12px; background: linear-gradient(135deg, #ffd700 0%, #ff6eb4 50%, #9d4edd 100%); color: #0f0c23; font-weight: 700; font-size: 13px; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 110, 180, 0.45); transition: transform 0.15s ease;">
+                  <span>✨ Khám phá chi tiết cùng AI</span>
+                </button>
+              `;
+
+              const aiBtn = popup.querySelector<HTMLButtonElement>('#zodiac-ask-ai-btn');
+              if (aiBtn) {
+                aiBtn.onclick = (btnEvt) => {
+                  btnEvt.preventDefault();
+                  btnEvt.stopPropagation();
+                  openAI(activePrompt);
+                };
+              }
+
+              // Tính toán tọa độ popup định vị theo slide đang hover
+              const rect = item.getBoundingClientRect();
+              const popupWidth = 320;
+              const scrollLeft = doc.documentElement.scrollLeft || doc.body.scrollLeft || 0;
+              const scrollTop = doc.documentElement.scrollTop || doc.body.scrollTop || 0;
+
+              let left = rect.left + scrollLeft + (rect.width / 2) - (popupWidth / 2);
+              left = Math.max(12, Math.min(left, doc.documentElement.clientWidth - popupWidth - 12));
+
+              // Nếu phía trên đủ chỗ thì hiển thị phía trên, ngược lại đặt phía dưới
+              let top = rect.top + scrollTop - 185;
+              if (rect.top < 195) {
+                top = rect.bottom + scrollTop + 12;
+              }
+
+              popup.style.left = `${left}px`;
+              popup.style.top = `${top}px`;
+              popup.style.opacity = '1';
+              popup.style.visibility = 'visible';
+              popup.style.transform = 'translateY(0)';
+            }
+          });
+
+          item.addEventListener('mouseleave', scheduleHide);
+        });
+      };
+
+      setupHoroscopePopups();
 
       // 4. Đồng bộ & tinh chỉnh giao diện CTA Section (Secret Universe's)
       const ctaTitle = ctaSection?.querySelector<HTMLElement>('.cta-title');

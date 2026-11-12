@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { apiAstrologyChat } from '../services/api';
@@ -66,7 +66,7 @@ function loadSessions(uid?: string): ChatSession[] {
 function saveSessions(sessions: ChatSession[], uid?: string) {
   try {
     localStorage.setItem(getStorageKey(uid), JSON.stringify(sessions));
-  } catch {}
+  } catch { }
 }
 
 function normalizeText(value: string) {
@@ -89,6 +89,8 @@ export default function AssistantPage() {
   const authUser = useSelector((state: RootState) => state.auth);
   const currentUid = profile.uid || authUser.uid || '';
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
@@ -98,6 +100,18 @@ export default function AssistantPage() {
 
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [prompt, setPrompt] = useState('');
+
+  // Tự động nhận câu hỏi từ các màn hình khác (như danh mục cung hoàng đạo) chuyển sang
+  useEffect(() => {
+    const incomingPrompt = searchParams.get('prompt');
+    if (incomingPrompt && incomingPrompt.trim()) {
+      setPrompt(incomingPrompt.trim());
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 150);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isHandsFree, setIsHandsFree] = useState(false);
@@ -491,8 +505,8 @@ export default function AssistantPage() {
               !isSupported
                 ? 'Bấm để đối thoại trực tiếp bằng giọng nói (khuyên dùng Chrome, Edge, Safari)'
                 : isHandsFree
-                ? 'Tắt đối thoại trực tiếp'
-                : 'Bật đối thoại 2 chiều rảnh tay'
+                  ? 'Tắt đối thoại trực tiếp'
+                  : 'Bật đối thoại 2 chiều rảnh tay'
             }
           >
             {isHandsFree ? (
@@ -674,8 +688,8 @@ export default function AssistantPage() {
                   {isListening
                     ? 'Đang lắng nghe bạn nói... Hãy đặt câu hỏi.'
                     : isSpeaking
-                    ? 'AstroBot đang phát âm thanh câu trả lời...'
-                    : 'Chế độ đối thoại trực tiếp đang bật · Nói để trò chuyện cùng AI'}
+                      ? 'AstroBot đang phát âm thanh câu trả lời...'
+                      : 'Chế độ đối thoại trực tiếp đang bật · Nói để trò chuyện cùng AI'}
                 </span>
               </div>
             )}
