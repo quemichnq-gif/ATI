@@ -1,6 +1,13 @@
 @import url('/astrica/css/astrica-ttm.webflow.shared.bce2edb4e.min.css');
 @import url('/astrica/css/astrica-ttm.webflow.687098000d727d9d41fe5acf-c88343216.min.css');
 
+
+:root {
+  --font-family--body-font: var(--font-sans);
+  --font-family--heading-font-1: var(--font-sans);
+  --font-family--heading-font: var(--font-display);
+}
+
 body {
   background-color: var(--color--body-background-color, #04032a);
   background-image: url('/astrica/images/6870bb19f01c2d68b7b36998_hero-bg-p-1600.png');
@@ -9,7 +16,7 @@ body {
   background-size: cover;
   background-attachment: fixed;
   color: var(--color--body-font-color, #d5d5d5);
-  font-family: var(--font-family--body-font, 'Manrope', sans-serif);
+  font-family: var(--font-family--body-font, var(--font-sans));
 }
 
 body:has(.hero-section) {
@@ -165,7 +172,7 @@ body,
   justify-self: start;
   margin-right: auto;
   color: #fff;
-  font-family: var(--font-family--heading-font-1, 'Manrope', sans-serif);
+  font-family: var(--font-family--heading-font-1, var(--font-sans));
   font-size: 42px;
   font-weight: 700;
   line-height: 1;
@@ -462,7 +469,7 @@ body,
 
 .astrica-menu-header-title {
   display: block;
-  font-family: var(--font-family--heading-font-1, 'Manrope', sans-serif);
+  font-family: var(--font-family--heading-font-1, var(--font-sans));
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -603,7 +610,7 @@ body,
 }
 
 .astrica-menu-card-title {
-  font-family: var(--font-family--body-font, 'Manrope', sans-serif);
+  font-family: var(--font-family--body-font, var(--font-sans));
   font-size: 14px;
   font-weight: 600;
   color: #fff;
@@ -1035,7 +1042,7 @@ body,
 .astrica-assistant-welcome h2 {
   margin: 0;
   color: var(--color--heading-font-color, #fff);
-  font-family: var(--font-family--heading-font, Merriweather, serif);
+  font-family: var(--font-family--heading-font, var(--font-display));
 }
 
 .astrica-assistant-heading h1 {
@@ -1505,7 +1512,7 @@ body,
 
 .astrica-footer .widget-title {
   color: #ffffff !important;
-  font-family: Merriweather, Georgia, serif !important;
+  font-family: var(--font-display) !important;
   font-size: 18px !important;
   line-height: 28px !important;
   font-weight: 700 !important;
@@ -1532,7 +1539,7 @@ body,
 
 .astrica-footer .footer-nav-link {
   color: #ffffff !important;
-  font-family: Manrope, sans-serif !important;
+  font-family: var(--font-sans) !important;
   font-size: 15px !important;
   line-height: 24px !important;
   text-decoration: none !important;
@@ -1654,7 +1661,7 @@ body,
 }
 
 .astrica-footer .bottom-footer-text {
-  font-family: Merriweather, Georgia, serif !important;
+  font-family: var(--font-display) !important;
   color: #ffffff !important;
   text-align: center !important;
   letter-spacing: clamp(6px, 1.2vw, 16px) !important;
@@ -2457,3 +2464,5 @@ a.w-webflow-badge {
 .resonancia-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(140, 120, 255, 0.65);
 }
+
+

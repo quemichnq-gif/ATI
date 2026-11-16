@@ -68,31 +68,31 @@ export default function PersonalNatalSummary({ onOpenChart }: PersonalNatalSumma
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="p-5 rounded-2xl bg-zinc-950/60 border border-purple-700/30 text-center hover:border-purple-500/50 transition-all">
-            <span className="block text-[11px] font-mono text-purple-300/70 uppercase">Mặt Trời (Sun)</span>
+            <span className="block text-xs font-mono text-purple-200/85 font-semibold uppercase tracking-wider">Mặt Trời (Sun)</span>
             <span className="block text-xl sm:text-2xl font-bold text-amber-300 mt-2">
               {profile.sun || 'Chưa thiết lập'}
             </span>
-            <span className="text-[10px] text-purple-400/80 mt-1 block">Bản ngã & Mục đích sống</span>
+            <span className="text-xs text-purple-300/90 mt-1.5 block">Bản ngã & Mục đích sống</span>
           </div>
 
           <div className="p-5 rounded-2xl bg-zinc-950/60 border border-purple-700/30 text-center hover:border-purple-500/50 transition-all">
-            <span className="block text-[11px] font-mono text-purple-300/70 uppercase">Mặt Trăng (Moon)</span>
+            <span className="block text-xs font-mono text-purple-200/85 font-semibold uppercase tracking-wider">Mặt Trăng (Moon)</span>
             <span className="block text-xl sm:text-2xl font-bold text-purple-300 mt-2">
               {profile.moon || 'Chưa thiết lập'}
             </span>
-            <span className="text-[10px] text-purple-400/80 mt-1 block">Cảm xúc & Tiềm thức</span>
+            <span className="text-xs text-purple-300/90 mt-1.5 block">Cảm xúc & Tiềm thức</span>
           </div>
 
           <div className="p-5 rounded-2xl bg-zinc-950/60 border border-purple-700/30 text-center hover:border-purple-500/50 transition-all">
-            <span className="block text-[11px] font-mono text-purple-300/70 uppercase">Cung Mọc (Ascendant)</span>
+            <span className="block text-xs font-mono text-purple-200/85 font-semibold uppercase tracking-wider">Cung Mọc (Ascendant)</span>
             <span className="block text-xl sm:text-2xl font-bold text-pink-300 mt-2">
               {profile.ascendant || 'Chưa thiết lập'}
             </span>
-            <span className="text-[10px] text-purple-400/80 mt-1 block">Diện mạo & Cách nhìn đời</span>
+            <span className="text-xs text-purple-300/90 mt-1.5 block">Diện mạo & Cách nhìn đời</span>
           </div>
 
           <div className="p-5 rounded-2xl bg-zinc-950/60 border border-purple-700/30 text-center hover:border-purple-500/50 transition-all">
-            <span className="block text-[11px] font-mono text-purple-300/70 uppercase">Nguyên Tố Chủ Đạo</span>
+            <span className="block text-xs font-mono text-purple-200/85 font-semibold uppercase tracking-wider">Nguyên Tố Chủ Đạo</span>
             <span className="block text-xl sm:text-2xl font-bold text-emerald-300 mt-2">
               {profile.sun && ['Bạch Dương', 'Sư Tử', 'Nhân Mã'].includes(profile.sun)
                 ? 'Hỏa (Nhiệt Huyết)'
@@ -102,7 +102,7 @@ export default function PersonalNatalSummary({ onOpenChart }: PersonalNatalSumma
                 ? 'Khí (Tự Do)'
                 : 'Thủy (Cảm Xúc)'}
             </span>
-            <span className="text-[10px] text-purple-400/80 mt-1 block">Khí chất tâm hồn</span>
+            <span className="text-xs text-purple-300/90 mt-1.5 block">Khí chất tâm hồn</span>
           </div>
         </div>
 

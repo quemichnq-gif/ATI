@@ -37,8 +37,55 @@ export default function ReferenceHomeSections() {
       const isArticles = text.includes('all articles') || text.includes('bài viết') || text.includes('articles');
 
       if (isAllService || isGetMoreDetail || isArticles) {
+        if (isAllService) {
+          link.setAttribute('href', '#menu');
+          link.setAttribute('target', '_top');
+
+          if (!link.dataset.hasAuthHandler) {
+            link.dataset.hasAuthHandler = 'true';
+            link.style.cursor = 'pointer';
+            link.addEventListener('click', (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              // Cuộn mượt lên đầu trang và kích hoạt mở Menu Resonancia AI trên thanh Navbar
+              window.dispatchEvent(new CustomEvent('open-resonancia-menu'));
+              try {
+                window.parent.dispatchEvent(new CustomEvent('open-resonancia-menu'));
+              } catch {}
+            }, true);
+          }
+          return;
+        }
+
+        if (isGetMoreDetail) {
+          link.setAttribute('href', '#site-footer');
+          link.setAttribute('target', '_top');
+
+          if (!link.dataset.hasAuthHandler) {
+            link.dataset.hasAuthHandler = 'true';
+            link.style.cursor = 'pointer';
+            link.addEventListener('click', (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              // Cuộn mượt tới footer ở cuối màn hình /home
+              try {
+                const targetWindow = window.parent !== window ? window.parent : window;
+                const footerEl = targetWindow.document.getElementById('site-footer') || targetWindow.document.querySelector('footer');
+                if (footerEl) {
+                  footerEl.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  targetWindow.scrollTo({ top: targetWindow.document.body.scrollHeight, behavior: 'smooth' });
+                }
+              } catch {
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+              }
+            }, true);
+          }
+          return;
+        }
+
         const isUnauth = !uidRef.current;
-        const targetRoute = isUnauth ? '/register' : (isAllService ? '/assistant' : (isArticles ? '/glossary' : '/prediction'));
+        const targetRoute = isUnauth ? '/register' : (isArticles ? '/glossary' : '/prediction');
         link.setAttribute('href', targetRoute);
         link.setAttribute('target', '_top');
 
@@ -48,7 +95,7 @@ export default function ReferenceHomeSections() {
           link.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            const destination = !uidRef.current ? '/register' : (isAllService ? '/assistant' : (isArticles ? '/glossary' : '/prediction'));
+            const destination = !uidRef.current ? '/register' : (isArticles ? '/glossary' : '/prediction');
             try {
               navigate(destination);
             } catch {

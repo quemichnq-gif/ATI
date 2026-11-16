@@ -227,7 +227,7 @@ export default function NatalChartPage() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold gradient-text font-display"><UiIcon name="chart" label="Natal Chart" className="mr-2 inline" />Natal Chart Analysis</h1>
-        <p className="text-purple-300 opacity-70 mt-1">Phân tích chiêm tinh sâu từ biểu đồ sinh của bạn</p>
+        <p className="text-purple-200/80 text-sm mt-1.5">Phân tích chiêm tinh sâu từ biểu đồ sinh của bạn</p>
       </motion.div>
 
       <PersonalNatalSummary onOpenChart={() => setPageTab('chart')} />
@@ -275,7 +275,7 @@ export default function NatalChartPage() {
           {/* Legend */}
           <div className="mt-4 flex flex-wrap gap-3 justify-center text-xs">
             {[['#fbbf24','Trùng tụ (0°)'],['#4ade80','Tam hợp (120°)'],['#f87171','Xung đối (180°)'],['#fb923c','Vuông góc (90°)'],['#38bdf8','Lục hợp (60°)']].map(([c,l])=>(
-              <span key={l} className="flex items-center gap-1.5 glass px-2.5 py-1 rounded-full"><span className="w-2.5 h-2.5 inline-block rounded-full shadow-sm" style={{background:c}}/><span className="text-purple-200 text-xs">{l}</span></span>
+              <span key={l} className="flex items-center gap-1.5 glass px-3 py-1 rounded-full"><span className="w-2.5 h-2.5 inline-block rounded-full shadow-sm" style={{background:c}}/><span className="text-purple-200 text-[13px] font-medium">{l}</span></span>
             ))}
           </div>
         </div>
@@ -297,8 +297,8 @@ export default function NatalChartPage() {
               { label: 'Nguyên Tố', icon: 'sparkles', value: element },
             ].map(p => (
               <div key={p.label} className="glass p-3 rounded-xl text-center">
-                <p className="text-purple-300 text-xs mb-1 opacity-70">{'icon' in p && <UiIcon name={p.icon as IconName} label={p.label} className="mr-1 inline" />}{p.label}</p>
-                <p className="text-white text-sm font-semibold">{p.value || '—'}</p>
+                <p className="text-purple-200/85 text-[12.5px] font-medium mb-1">{'icon' in p && <UiIcon name={p.icon as IconName} label={p.label} className="mr-1 inline" />}{p.label}</p>
+                <p className="text-white text-base font-bold">{p.value || '—'}</p>
               </div>
             ))}
           </div>
@@ -307,57 +307,57 @@ export default function NatalChartPage() {
 
       {/* TAB: CAREER CHART */}
       {pageTab === 'career' && (
-        <div className="space-y-4">
-          <div className="glass-card p-6">
-            <h2 className="text-white font-semibold mb-2 flex items-center gap-2">
+        <div className="space-y-6">
+          <div className="glass-card p-6 sm:p-8">
+            <h2 className="text-white font-bold text-2xl sm:text-3xl mb-2 flex items-center gap-3">
               <UiIcon name="briefcase" label="Hướng nghiệp" className="inline text-purple-400" />
               Bản Đồ Hướng Nghiệp Chiêm Tinh
             </h2>
-            <p className="text-purple-300 text-sm opacity-70 mb-4">
+            <p className="text-purple-200/90 text-sm sm:text-base mb-5">
               Phân tích chuyên sâu từ Trung Thiên (Midheaven - MC), Nhà 10 và Sao Thổ của {profile.sun || 'bạn'}
             </p>
 
             {careerLoading ? (
               <div className="glass p-8 rounded-2xl text-center space-y-3" style={{ border: '1px solid rgba(168,85,247,0.3)' }}>
-                <div className="w-9 h-9 mx-auto border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin" />
-                <p className="text-white font-medium text-sm">✦ AI đang giải mã Midheaven ({profile.mc || 'MC'}) & Nhà 10...</p>
-                <p className="text-purple-300 text-xs opacity-70">Tổng hợp năng lực bẩm sinh, phong cách làm việc và lộ trình phát triển sự nghiệp</p>
+                <div className="w-10 h-10 mx-auto border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin" />
+                <p className="text-white font-medium text-base">✦ AI đang giải mã Midheaven ({profile.mc || 'MC'}) & Nhà 10...</p>
+                <p className="text-purple-200/80 text-sm">Tổng hợp năng lực bẩm sinh, phong cách làm việc và lộ trình phát triển sự nghiệp</p>
               </div>
             ) : !careerAnalysis ? (
               <button onClick={handleCareerAnalysis}
-                className="btn-cosmic px-8 py-3 w-full"
+                className="btn-cosmic px-8 py-3.5 w-full text-base font-semibold"
                 style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}>
                 <UiIcon name="sparkles" label="Phân tích hướng nghiệp" className="mr-2 inline" />
                 Khai Mở Bản Đồ Hướng Nghiệp
               </button>
             ) : (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-                <div className="p-5 md:p-6 rounded-2xl glass bg-purple-950/40 border border-purple-500/25">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div className="p-6 md:p-8 rounded-2xl glass bg-purple-950/40 border border-purple-500/25">
                   <FormattedMarkdown content={careerAnalysis} />
                 </div>
                 <div className="flex justify-end">
-                  <button onClick={handleCareerAnalysis} className="text-purple-300 text-xs hover:text-white underline transition-colors">
+                  <button onClick={handleCareerAnalysis} className="text-purple-300 text-sm hover:text-white underline transition-colors">
                     ↻ Phân tích lại hướng nghiệp
                   </button>
                 </div>
               </motion.div>
             )}
           </div>
-          <div className="glass-card p-5">
-            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+          <div className="glass-card p-6">
+            <h3 className="text-white font-bold text-lg sm:text-xl mb-4 flex items-center gap-2">
               <UiIcon name="chart" label="Vị trí liên quan sự nghiệp" className="inline text-purple-400" />
               Vị Trí Trọng Yếu Trong Lá Số Sự Nghiệp
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { l: 'Trung Thiên (MC)', v: profile.mc || 'Ma Kết' },
                 { l: 'Nhà 10 (Sự nghiệp)', v: profile.house10 || profile.mc || 'Ma Kết' },
                 { l: 'Sao Thổ (Kỷ luật)', v: profile.saturn || 'Bọ Cạp' },
                 { l: 'Sao Mộc (Cơ hội)', v: profile.jupiter || 'Xử Nữ' }
               ].map(({ l, v }) => (
-                <div key={l} className="glass p-3 rounded-xl text-center">
-                  <p className="text-purple-400 text-xs mb-1">{l}</p>
-                  <p className="text-white font-semibold text-sm">{v || '—'}</p>
+                <div key={l} className="glass p-4 rounded-xl text-center">
+                  <p className="text-purple-300 text-sm font-medium mb-1.5">{l}</p>
+                  <p className="text-white font-bold text-base sm:text-lg">{v || '—'}</p>
                 </div>
               ))}
             </div>
@@ -407,7 +407,7 @@ export default function NatalChartPage() {
             <div className="glass-card p-8 rounded-2xl max-w-md mx-auto space-y-3" style={{ border: '1px solid rgba(168,85,247,0.3)' }}>
               <div className="w-10 h-10 mx-auto border-2 border-purple-500/30 border-t-purple-400 rounded-full animate-spin" />
               <p className="text-white font-medium text-base">✦ AI đang giải mã toàn diện bản đồ sao của bạn...</p>
-              <p className="text-purple-300 text-xs opacity-75">
+              <p className="text-purple-200/80 text-sm">
                 Đối chiếu 12 Nhà, Big 3 (Mặt Trời {profile.sun || ''}, Mặt Trăng {profile.moon || ''}, Cung Mọc {profile.ascendant || ''}) và phân bổ năng lượng
               </p>
             </div>
@@ -460,13 +460,13 @@ export default function NatalChartPage() {
                         <UiIcon name="sparkles" label="Tổng quan" className="text-yellow-400" />
                         Tổng Quan Vận Mệnh & Năng Lượng Bản Đồ Sao
                       </h3>
-                      <p className="text-purple-300 text-xs mt-1 opacity-80">
+                      <p className="text-purple-200/85 text-sm mt-1">
                         Bức tranh tổng hợp đa chiều về Tính Cách, Cảm Xúc, Sự Nghiệp và Tình Yêu của bạn
                       </p>
                     </div>
 
                     {/* Chế độ xem */}
-                    <div className="flex gap-1.5 p-1 rounded-xl glass bg-purple-950/40 text-xs">
+                    <div className="flex gap-1.5 p-1 rounded-xl glass bg-purple-950/40 text-xs sm:text-sm">
                       <button
                         onClick={() => setOverviewMode('cards')}
                         className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
@@ -489,20 +489,20 @@ export default function NatalChartPage() {
                   {/* Highlights Tam Trụ Hoàng Đạo (Big 3) & Nguyên tố */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-purple-500/20">
                     <div className="glass p-3 rounded-xl text-center">
-                      <span className="text-purple-300 text-[11px] block">Mặt Trời (Bản ngã)</span>
-                      <span className="text-white font-bold text-sm mt-0.5 block">{profile.sun || 'Kim Ngưu'}</span>
+                      <span className="text-purple-200/90 text-xs font-medium block">Mặt Trời (Bản ngã)</span>
+                      <span className="text-white font-bold text-base mt-0.5 block">{profile.sun || 'Kim Ngưu'}</span>
                     </div>
                     <div className="glass p-3 rounded-xl text-center">
-                      <span className="text-purple-300 text-[11px] block">Mặt Trăng (Cảm xúc)</span>
-                      <span className="text-white font-bold text-sm mt-0.5 block">{profile.moon || 'Xử Nữ'}</span>
+                      <span className="text-purple-200/90 text-xs font-medium block">Mặt Trăng (Cảm xúc)</span>
+                      <span className="text-white font-bold text-base mt-0.5 block">{profile.moon || 'Xử Nữ'}</span>
                     </div>
                     <div className="glass p-3 rounded-xl text-center">
-                      <span className="text-purple-300 text-[11px] block">Cung Mọc (Diện mạo)</span>
-                      <span className="text-white font-bold text-sm mt-0.5 block">{profile.ascendant || 'Ma Kết'}</span>
+                      <span className="text-purple-200/90 text-xs font-medium block">Cung Mọc (Diện mạo)</span>
+                      <span className="text-white font-bold text-base mt-0.5 block">{profile.ascendant || 'Ma Kết'}</span>
                     </div>
                     <div className="glass p-3 rounded-xl text-center">
-                      <span className="text-purple-300 text-[11px] block">Nguyên Tố Trội</span>
-                      <span className="text-white font-bold text-sm mt-0.5 block">
+                      <span className="text-purple-200/90 text-xs font-medium block">Nguyên Tố Trội</span>
+                      <span className="text-white font-bold text-base mt-0.5 block">
                         {profile.earthRatio && profile.earthRatio >= 30 ? 'Thổ' : profile.fireRatio && profile.fireRatio >= 30 ? 'Hoả' : profile.waterRatio && profile.waterRatio >= 30 ? 'Thuỷ' : 'Khí'} (Chủ đạo)
                       </span>
                     </div>
@@ -511,7 +511,7 @@ export default function NatalChartPage() {
 
                 {/* Chế độ 1: Dạng Thẻ Lưới Tổng Hợp */}
                 {overviewMode === 'cards' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {DETAIL_SECTIONS.map((s, idx) => {
                       const content = sections[s.key];
                       const cleaned = cleanSectionText(content);
@@ -521,32 +521,32 @@ export default function NatalChartPage() {
                           initial={{ opacity: 0, y: 15 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: idx * 0.04 }}
-                          className="glass-card p-5 flex flex-col justify-between hover:border-purple-400/40 transition-all card-hover"
+                          className="glass-card p-6 flex flex-col justify-between hover:border-purple-400/40 transition-all card-hover"
                           style={{ border: '1px solid rgba(168, 85, 247, 0.2)' }}
                         >
                           <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+                            <div className="flex items-center justify-between mb-2.5">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base"
                                   style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.3), rgba(236,72,153,0.2))' }}>
                                   <UiIcon name={s.icon as any} label={s.label} />
                                 </div>
-                                <h4 className="text-white font-bold text-base">{s.label}</h4>
+                                <h4 className="text-white font-bold text-lg sm:text-xl">{s.label}</h4>
                               </div>
-                              <span className="text-[10px] text-purple-300/60 font-mono">0{idx + 1}</span>
+                              <span className="text-xs text-purple-300/80 font-mono">0{idx + 1}</span>
                             </div>
 
-                            <p className="text-[11px] text-purple-300/70 mb-2 italic">{s.desc}</p>
+                            <p className="text-sm text-purple-200/90 mb-3 italic">{s.desc}</p>
                             
-                            <p className="text-purple-100 text-xs leading-relaxed opacity-90 line-clamp-4">
+                            <p className="text-purple-50/95 text-sm sm:text-[15px] leading-[1.7] opacity-95 line-clamp-4">
                               {cleaned || 'Đang cập nhật phân tích chiêm tinh học...'}
                             </p>
                           </div>
 
-                          <div className="pt-3 mt-3 border-t border-purple-500/15 flex justify-end">
+                          <div className="pt-3.5 mt-3.5 border-t border-purple-500/20 flex justify-end">
                             <button
                               onClick={() => setActiveSection(s.key)}
-                              className="text-xs font-medium text-pink-400 hover:text-pink-300 transition-colors flex items-center gap-1"
+                              className="text-sm font-semibold text-pink-400 hover:text-pink-300 transition-colors flex items-center gap-1.5"
                             >
                               <span>Xem chi tiết {s.label}</span>
                               <span>→</span>
@@ -565,15 +565,15 @@ export default function NatalChartPage() {
                       const content = sections[s.key];
                       const cleaned = cleanSectionText(content);
                       return (
-                        <div key={s.key} className={idx > 0 ? 'pt-6 border-t border-purple-500/20' : ''}>
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-white font-bold text-lg flex items-center gap-2">
+                        <div key={s.key} className={idx > 0 ? 'pt-8 border-t border-purple-500/25' : ''}>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-white font-bold text-xl sm:text-2xl flex items-center gap-2.5">
                               <UiIcon name={s.icon as any} label={s.label} className="text-purple-400" />
                               <span>{idx + 1}. {s.label}</span>
                             </h4>
                             <button
                               onClick={() => setActiveSection(s.key)}
-                              className="text-xs text-purple-400 hover:text-white glass px-2.5 py-1 rounded-lg transition-all"
+                              className="text-xs sm:text-sm font-medium text-purple-300 hover:text-white glass px-3.5 py-1.5 rounded-lg transition-all"
                             >
                               Tab riêng ↗
                             </button>
@@ -593,10 +593,10 @@ export default function NatalChartPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
-                className="glass-card p-6 space-y-4"
+                className="glass-card p-6 md:p-8 space-y-5"
               >
-                <div className="flex items-center justify-between pb-3 border-b border-purple-500/20">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                <div className="flex items-center justify-between pb-4 border-b border-purple-500/25">
+                  <h3 className="text-white font-bold text-xl sm:text-2xl flex items-center gap-2.5">
                     {(() => {
                       const section = SECTIONS.find(s => s.key === activeSection);
                       return section && <><UiIcon name={section.icon as any} label={section.label} className="mr-1 inline text-purple-400" />{section.label}</>;
@@ -604,7 +604,7 @@ export default function NatalChartPage() {
                   </h3>
                   <button
                     onClick={() => setActiveSection('overview')}
-                    className="glass px-3 py-1.5 rounded-xl text-xs text-purple-300 hover:text-white transition-all flex items-center gap-1.5"
+                    className="glass px-4 py-2 rounded-xl text-xs sm:text-sm font-medium text-purple-200 hover:text-white transition-all flex items-center gap-1.5"
                   >
                     <span>← Về Tổng Quan</span>
                   </button>

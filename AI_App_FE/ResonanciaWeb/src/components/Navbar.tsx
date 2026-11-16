@@ -191,6 +191,18 @@ export default function Navbar() {
     return unsub;
   }, []);
 
+  // Lắng nghe sự kiện mở menu từ các component khác (ví dụ: nút Tất cả dịch vụ ở Home)
+  useEffect(() => {
+    const handleOpenMenu = () => {
+      setMenuOpen(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('open-resonancia-menu', handleOpenMenu);
+    return () => {
+      window.removeEventListener('open-resonancia-menu', handleOpenMenu);
+    };
+  }, []);
+
   useEffect(() => {
     if (!currentUid) return;
     const checkUnread = async () => {

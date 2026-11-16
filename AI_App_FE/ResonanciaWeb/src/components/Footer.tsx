@@ -48,7 +48,7 @@ const socialLinks = [
 
 export default function Footer() {
   return (
-    <footer className="astrica-footer relative z-20 w-full overflow-hidden">
+    <footer id="site-footer" className="astrica-footer relative z-20 w-full overflow-hidden">
       <div className="container w-container mx-auto max-w-[1330px] px-4 sm:px-6 lg:px-8">
         {/* Top 3-column Widget Grid */}
         <div className="first-footer">

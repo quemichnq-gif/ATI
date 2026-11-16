@@ -399,10 +399,9 @@ export default function NatalChartSVG({ planets, aspects = {}, size = 420 }: Pro
               y={pos.y + 1}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize={size * 0.023}
-              fill="rgba(216,180,254,0.65)"
-              fontFamily="Georgia, serif"
-              fontWeight="600"
+              fontSize={size * 0.027}
+              fill="rgba(216,180,254,0.75)"
+              className="font-display font-semibold select-none pointer-events-none"
             >
               {num}
             </text>
@@ -532,10 +531,9 @@ export default function NatalChartSVG({ planets, aspects = {}, size = 420 }: Pro
                 y={pos.y + (p.isAngle ? 0.5 : 1)}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fontSize={p.isAngle ? size * 0.021 : size * 0.034}
+                fontSize={p.isAngle ? size * 0.025 : size * 0.036}
                 fill={p.color}
-                fontFamily={p.isAngle ? 'ui-sans-serif, system-ui, sans-serif' : 'serif'}
-                fontWeight={p.isAngle ? '700' : 'bold'}
+                className={p.isAngle ? 'font-sans font-bold select-none pointer-events-none' : 'font-serif font-bold select-none pointer-events-none'}
                 letterSpacing={p.isAngle ? '0.5px' : 'normal'}
               >
                 {p.label}
